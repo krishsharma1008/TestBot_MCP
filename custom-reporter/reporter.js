@@ -373,7 +373,7 @@ function createTestRow(test) {
         </td>
         <td>${TestDataParser.formatDuration(test.duration)}</td>
         <td>
-            <button class="btn-details" onclick="showTestDetails('${test.id}')">
+            <button class="btn-details" data-test-id="${test.id}">
                 <i class="fas fa-info-circle"></i> Details
             </button>
         </td>
@@ -504,6 +504,17 @@ function setupEventListeners() {
             renderTestTable();
         });
     });
+    
+    // Details buttons - using event delegation
+    document.getElementById('resultsTableBody').addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-details');
+        if (btn) {
+            const testId = btn.getAttribute('data-test-id');
+            if (testId) {
+                showTestDetails(testId);
+            }
+        }
+    });
 }
 
 /**
@@ -555,6 +566,7 @@ function showTestDetails(testId) {
                 ` : ''}
             </div>
         ` : ''}
+        ${renderTestArtifacts(test)}
     `;
     
     modal.classList.add('active');
@@ -569,16 +581,28 @@ function closeModal() {
 
 // Close modal when clicking outside
 document.addEventListener('click', (e) => {
-    const modal = document.getElementById('testModal');
-    if (e.target === modal) {
+    const testModal = document.getElementById('testModal');
+    const artifactModal = document.getElementById('artifactModal');
+    
+    if (e.target === testModal) {
         closeModal();
+    }
+    if (e.target === artifactModal) {
+        closeArtifactModal();
     }
 });
 
 // Close modal with Escape key
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        closeModal();
+        const testModal = document.getElementById('testModal');
+        const artifactModal = document.getElementById('artifactModal');
+        
+        if (artifactModal.classList.contains('active')) {
+            closeArtifactModal();
+        } else if (testModal.classList.contains('active')) {
+            closeModal();
+        }
     }
 });
 
@@ -609,4 +633,183 @@ function escapeHtml(text) {
         "'": '&#039;'
     };
     return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+/**
+ * Render test artifacts section
+ */
+function renderTestArtifacts(test) {
+    if (!test.attachments) {
+        return '';
+    }
+
+    const { screenshots, videos, traces, other } = test.attachments;
+    const hasArtifacts = screenshots.length > 0 || videos.length > 0 || traces.length > 0 || other.length > 0;
+
+    if (!hasArtifacts) {
+        return '';
+    }
+
+    let html = '<div class="test-artifacts"><h4><i class="fas fa-paperclip"></i> Test Artifacts</h4>';
+
+    // Screenshots section
+    if (screenshots.length > 0) {
+        html += `
+            <div class="artifact-section">
+                <div class="artifact-section-title">
+                    <i class="fas fa-image"></i> Screenshots
+                    <span class="artifact-badge">${screenshots.length}</span>
+                </div>
+                <div class="artifacts-grid">
+                    ${screenshots.map((screenshot, index) => `
+                        <div class="artifact-item" onclick="viewArtifact('${escapeHtml(screenshot.path)}', 'image', '${escapeHtml(screenshot.name)}')">
+                            <img src="${escapeHtml(screenshot.path)}" alt="${escapeHtml(screenshot.name)}" class="screenshot-preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                            <div class="artifact-item-icon" style="display:none;"><i class="fas fa-image"></i></div>
+                            <div class="artifact-item-name">${escapeHtml(screenshot.name)}</div>
+                            <div class="artifact-item-type">PNG Image</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Videos section
+    if (videos.length > 0) {
+        html += `
+            <div class="artifact-section">
+                <div class="artifact-section-title">
+                    <i class="fas fa-video"></i> Videos
+                    <span class="artifact-badge">${videos.length}</span>
+                </div>
+                <div class="artifacts-grid">
+                    ${videos.map((video, index) => `
+                        <div class="artifact-item" onclick="viewArtifact('${escapeHtml(video.path)}', 'video', '${escapeHtml(video.name)}')">
+                            <div class="artifact-item-icon"><i class="fas fa-video"></i></div>
+                            <div class="artifact-item-name">${escapeHtml(video.name)}</div>
+                            <div class="artifact-item-type">WebM Video</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Traces section
+    if (traces.length > 0) {
+        html += `
+            <div class="artifact-section">
+                <div class="artifact-section-title">
+                    <i class="fas fa-file-archive"></i> Traces
+                    <span class="artifact-badge">${traces.length}</span>
+                </div>
+                <div class="artifacts-grid">
+                    ${traces.map((trace, index) => `
+                        <div class="artifact-item" onclick="window.open('${escapeHtml(trace.path)}', '_blank')">
+                            <div class="artifact-item-icon"><i class="fas fa-file-archive"></i></div>
+                            <div class="artifact-item-name">${escapeHtml(trace.name)}</div>
+                            <div class="artifact-item-type">Trace File</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Other attachments section
+    if (other.length > 0) {
+        html += `
+            <div class="artifact-section">
+                <div class="artifact-section-title">
+                    <i class="fas fa-file"></i> Other Files
+                    <span class="artifact-badge">${other.length}</span>
+                </div>
+                <div class="artifacts-grid">
+                    ${other.map((file, index) => `
+                        <div class="artifact-item" onclick="window.open('${escapeHtml(file.path)}', '_blank')">
+                            <div class="artifact-item-icon"><i class="fas fa-file"></i></div>
+                            <div class="artifact-item-name">${escapeHtml(file.name)}</div>
+                            <div class="artifact-item-type">${escapeHtml(file.contentType)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+/**
+ * View artifact in modal
+ */
+function viewArtifact(path, type, name) {
+    const modal = document.getElementById('artifactModal');
+    const modalTitle = document.getElementById('artifactModalTitle');
+    const modalBody = document.getElementById('artifactModalBody');
+
+    modalTitle.textContent = name;
+
+    let content = '';
+    if (type === 'image') {
+        content = `
+            <div class="artifact-viewer-content">
+                <div class="artifact-viewer-media">
+                    <img src="${escapeHtml(path)}" alt="${escapeHtml(name)}">
+                </div>
+                <div class="artifact-viewer-info">
+                    <div class="artifact-viewer-info-item">
+                        <strong>Name:</strong>
+                        <span>${escapeHtml(name)}</span>
+                    </div>
+                    <div class="artifact-viewer-info-item">
+                        <strong>Type:</strong>
+                        <span>Screenshot</span>
+                    </div>
+                    <div class="artifact-viewer-info-item">
+                        <a href="${escapeHtml(path)}" download class="artifact-download-btn">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (type === 'video') {
+        content = `
+            <div class="artifact-viewer-content">
+                <div class="artifact-viewer-media">
+                    <video controls>
+                        <source src="${escapeHtml(path)}" type="video/webm">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                <div class="artifact-viewer-info">
+                    <div class="artifact-viewer-info-item">
+                        <strong>Name:</strong>
+                        <span>${escapeHtml(name)}</span>
+                    </div>
+                    <div class="artifact-viewer-info-item">
+                        <strong>Type:</strong>
+                        <span>Test Recording</span>
+                    </div>
+                    <div class="artifact-viewer-info-item">
+                        <a href="${escapeHtml(path)}" download class="artifact-download-btn">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    modalBody.innerHTML = content;
+    modal.classList.add('active');
+}
+
+/**
+ * Close artifact modal
+ */
+function closeArtifactModal() {
+    document.getElementById('artifactModal').classList.remove('active');
 }

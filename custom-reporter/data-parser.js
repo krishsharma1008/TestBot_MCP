@@ -120,6 +120,7 @@ class TestDataParser {
             const duration = lastResult.duration || 0;
             const error = lastResult.error;
             const category = this.getCategoryFromTest(test, spec.file);
+            const attachments = this.parseAttachments(lastResult.attachments || []);
 
             // Create test object
             const testObj = {
@@ -135,7 +136,8 @@ class TestDataParser {
                     stack: error.stack || ''
                 } : null,
                 retries: results.length - 1,
-                file: spec.file || ''
+                file: spec.file || '',
+                attachments: attachments
             };
 
             // Update statistics
@@ -196,6 +198,69 @@ class TestDataParser {
             return 'Backend';
         }
         return 'Other';
+    }
+
+    parseAttachments(attachments) {
+        if (!attachments || !Array.isArray(attachments)) {
+            return {
+                screenshots: [],
+                videos: [],
+                traces: [],
+                other: []
+            };
+        }
+
+        const parsed = {
+            screenshots: [],
+            videos: [],
+            traces: [],
+            other: []
+        };
+
+        attachments.forEach(attachment => {
+            const { name, contentType, path } = attachment;
+            
+            if (!path) return;
+
+            // Convert absolute path to relative path for web access
+            const relativePath = this.convertToRelativePath(path);
+            
+            const attachmentObj = {
+                name: name || 'Unnamed',
+                contentType: contentType || 'application/octet-stream',
+                path: relativePath,
+                originalPath: path
+            };
+
+            // Categorize by content type
+            if (contentType && contentType.startsWith('image/')) {
+                parsed.screenshots.push(attachmentObj);
+            } else if (contentType && contentType.startsWith('video/')) {
+                parsed.videos.push(attachmentObj);
+            } else if (name && (name.includes('trace') || contentType === 'application/zip')) {
+                parsed.traces.push(attachmentObj);
+            } else {
+                parsed.other.push(attachmentObj);
+            }
+        });
+
+        return parsed;
+    }
+
+    convertToRelativePath(absolutePath) {
+        if (!absolutePath) return '';
+        
+        // Convert Windows backslashes to forward slashes
+        let normalized = absolutePath.replace(/\\/g, '/');
+        
+        // Try to find test-results directory and make path relative to project root
+        const testResultsIndex = normalized.indexOf('/test-results/');
+        if (testResultsIndex !== -1) {
+            return '..' + normalized.substring(testResultsIndex);
+        }
+        
+        // Fallback: return the path as-is
+        return normalized;
     }
 
     updateCategoryStats(category, status, duration) {
