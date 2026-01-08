@@ -2,7 +2,42 @@
 
 ![img.png](website/public/asset/img.png)
 
-Context of the project
+## 🤖 NEW: Fully Automated AI-Powered Test Fixing
+
+This project includes an **AI Agent** that automatically detects test failures, processes all artifacts (screenshots, videos, traces), analyzes them using AI with full visual context, applies fixes, and creates GitHub Pull Requests - **completely automated, zero manual intervention!**
+
+### Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Set up your AI provider (choose one)
+echo "AI_PROVIDER=openai" > .env
+echo "AI_API_KEY=your-api-key" >> .env
+
+# Run the AI agent
+npm run ai-agent
+```
+
+### Features
+- ✅ **Fully automated** - Zero manual intervention required
+- ✅ **Automatic artifact processing** - Screenshots, videos, traces
+- ✅ **Visual AI analysis** - AI sees screenshots and understands UI state
+- ✅ **Smart error detection** - Extracts all context automatically
+- ✅ **Automatic code fixing** - With backup and rollback
+- ✅ **GitHub PR creation** - With embedded screenshots in reports
+- ✅ **Multiple AI providers** - OpenAI, Anthropic, Windsurf IDE
+
+### Documentation
+- 📚 [Quick Start Guide](./AI_AGENT_QUICKSTART.md)
+- 🤖 [Fully Automated System](./AI_AGENT_AUTOMATED.md) ⭐ **NEW**
+- 📖 [Full Documentation](./AI_AGENT_README.md)
+- 🌊 [Windsurf IDE Integration](./WINDSURF_INTEGRATION.md)
+
+---
+
+## Context of the project
 You are required to build a full stack website for the company ShipCruiseTour which will increase their notoriety in the
 market, for this purpose, you must follow the following instructions.
 
