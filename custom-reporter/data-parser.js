@@ -253,13 +253,21 @@ class TestDataParser {
         // Convert Windows backslashes to forward slashes
         let normalized = absolutePath.replace(/\\/g, '/');
         
-        // Try to find test-results directory and make path relative to project root
+        // Try to find test-results directory and convert to absolute URL via PHP server
         const testResultsIndex = normalized.indexOf('/test-results/');
         if (testResultsIndex !== -1) {
-            return '..' + normalized.substring(testResultsIndex);
+            // Return absolute URL pointing to PHP server on port 8000
+            const relativePath = normalized.substring(testResultsIndex + 1); // Remove leading slash
+            return `http://localhost:8000/${relativePath}`;
         }
         
-        // Fallback: return the path as-is
+        // Fallback: try to extract just the test-results path
+        const testResultsMatch = normalized.match(/test-results\/.+$/);
+        if (testResultsMatch) {
+            return `http://localhost:8000/${testResultsMatch[0]}`;
+        }
+        
+        // Last resort: return the path as-is
         return normalized;
     }
 
