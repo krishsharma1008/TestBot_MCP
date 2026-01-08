@@ -18,9 +18,24 @@ class GitHubPRCreator {
   extractRepoOwner() {
     try {
       const remoteUrl = execSync('git config --get remote.origin.url', { encoding: 'utf-8' }).trim();
+      console.log('DEBUG - Remote URL:', remoteUrl);
+      
+      // Handle SSH format: pers:ShreyesPD/ShipCruiseTour_POC.git
+      if (remoteUrl.includes(':') && !remoteUrl.includes('://')) {
+        const match = remoteUrl.match(/[:/]([^/]+)\/(.+?)(?:\.git)?$/);
+        if (match) {
+          console.log('DEBUG - Extracted owner (SSH):', match[1]);
+          return match[1];
+        }
+      }
+      
+      // Handle HTTPS format
       const match = remoteUrl.match(/github\.com[:/]([^/]+)\//);
-      return match ? match[1] : null;
-    } catch {
+      const owner = match ? match[1] : null;
+      console.log('DEBUG - Extracted owner (HTTPS):', owner);
+      return owner;
+    } catch (error) {
+      console.error('Failed to extract repo owner:', error.message);
       return null;
     }
   }
@@ -28,9 +43,23 @@ class GitHubPRCreator {
   extractRepoName() {
     try {
       const remoteUrl = execSync('git config --get remote.origin.url', { encoding: 'utf-8' }).trim();
+      
+      // Handle SSH format: pers:ShreyesPD/ShipCruiseTour_POC.git
+      if (remoteUrl.includes(':') && !remoteUrl.includes('://')) {
+        const match = remoteUrl.match(/[:/]([^/]+)\/(.+?)(?:\.git)?$/);
+        if (match) {
+          console.log('DEBUG - Extracted repo (SSH):', match[2]);
+          return match[2];
+        }
+      }
+      
+      // Handle HTTPS format
       const match = remoteUrl.match(/github\.com[:/][^/]+\/(.+?)(\.git)?$/);
-      return match ? match[1] : null;
-    } catch {
+      const repo = match ? match[1] : null;
+      console.log('DEBUG - Extracted repo (HTTPS):', repo);
+      return repo;
+    } catch (error) {
+      console.error('Failed to extract repo name:', error.message);
       return null;
     }
   }

@@ -250,36 +250,55 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting, no explanations 
    */
   parseResponse(response) {
     try {
-      // Try to parse as JSON directly
-      let parsed;
-      try {
-        parsed = JSON.parse(response);
-      } catch {
-        // If not valid JSON, try to extract JSON from markdown code blocks
-        const jsonMatch = response.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
-        if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[1]);
-        } else {
-          // Try to find any JSON object in the response
-          const objectMatch = response.match(/{[\s\S]*}/);
-          if (objectMatch) {
-            parsed = JSON.parse(objectMatch[0]);
-          } else {
-            throw new Error('No valid JSON found in response');
-          }
-        }
-      }
+      // Extract JSON from response
+      const content = response.choices[0]?.message?.content || '';
       
-      return {
-        analysis: parsed.analysis || 'No analysis provided',
-        rootCause: parsed.rootCause || 'Unknown',
-        fix: parsed.fix || { description: 'No fix provided', changes: [] },
-        confidence: parsed.confidence || 0.5,
-        affectedFiles: parsed.affectedFiles || [],
-        testingRecommendations: parsed.testingRecommendations || ''
-      };
+      // Try to parse as JSON directly
+      try {
+        return JSON.parse(content);
+      } catch {
+        // Try to extract JSON from markdown code blocks
+        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[1]);
+        }
+        
+        // Try to find JSON object in the text (greedy match for nested objects)
+        const jsonObjectMatch = content.match(/(\{(?:[^{}]|(?:\{[^{}]*\}))*\})/);
+        if (jsonObjectMatch) {
+          // Clean up common issues
+          let jsonStr = jsonObjectMatch[1]
+            .replace(/\n/g, ' ')
+            .replace(/\r/g, '')
+            .replace(/\t/g, ' ')
+            .replace(/\s+/g, ' ');
+          return JSON.parse(jsonStr);
+        }
+        
+        // Last resort: try to find any JSON-like structure
+        const lastResortMatch = content.match(/\{[\s\S]*"analysis"[\s\S]*\}/);
+        if (lastResortMatch) {
+          return JSON.parse(lastResortMatch[0]);
+        }
+        
+        throw new Error('No valid JSON found in response');
+      }
     } catch (error) {
-      throw new Error(`Failed to parse Sarvam AI response: ${error.message}`);
+      console.error('Failed to parse Sarvam AI response:', error.message);
+      console.error('Response content preview:', response.choices[0]?.message?.content?.substring(0, 500));
+      
+      // Return a default low-confidence response so workflow can continue
+      return {
+        analysis: 'Failed to parse AI response',
+        rootCause: 'Unable to determine root cause due to parsing error',
+        fix: {
+          description: 'Manual review required',
+          changes: []
+        },
+        confidence: 0,
+        affectedFiles: [],
+        testingRecommendations: 'Manual investigation needed'
+      };
     }
   }
 }
