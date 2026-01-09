@@ -78,7 +78,9 @@ async function applyFixesWorkflow() {
         
         // Run only the specific test that was fixed
         const testFilePath = path.join(rootDir, 'tests', testFile);
-        await runCommand('npx', ['playwright', 'test', testFilePath, '--grep', testTitle], {
+        // Escape special regex characters in test title
+        const escapedTitle = testTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        await runCommand('npx', ['playwright', 'test', testFilePath, '--grep', `"${escapedTitle}"`], {
             cwd: rootDir
         });
         console.log('✅ Verification tests completed');

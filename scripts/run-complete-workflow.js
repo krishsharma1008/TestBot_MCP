@@ -99,8 +99,23 @@ async function runWorkflow() {
     
     console.log(`✅ Analyzed ${analysisResults.analysisResults?.length || 0} error(s)`);
     
-    // Step 4: Generate dashboard (AFTER AI analysis)
-    console.log('\n📋 Step 4: Generating test dashboard with AI analysis...');
+    // Step 4: Apply fixes automatically
+    console.log('\n📋 Step 4: Applying AI-suggested fixes...');
+    console.log('─'.repeat(80));
+    
+    const fixResults = await applyFixes(analysisResults);
+    steps.applyFixes = true;
+    console.log(`✅ Applied ${fixResults.appliedCount || 0} fix(es)`);
+    
+    // Step 5: Verify fixes
+    console.log('\n📋 Step 5: Verifying fixes...');
+    console.log('─'.repeat(80));
+    
+    const verificationResults = runTests();
+    console.log(`✅ Verification complete: ${verificationResults.failureCount} failure(s) remaining`);
+    
+    // Step 6: Generate dashboard (AFTER fixes applied)
+    console.log('\n📋 Step 6: Generating test dashboard with AI analysis...');
     console.log('─'.repeat(80));
     
     execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
@@ -113,35 +128,38 @@ async function runWorkflow() {
     await openInBrowser('http://localhost:3000');
     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for browser to open
     
-    // Start fix application server
-    console.log('\n📋 Step 5: Starting Fix Application Server...');
+    // Step 7: Create Pull Request
+    console.log('\n📋 Step 7: Creating GitHub Pull Request...');
     console.log('─'.repeat(80));
     
-    const fixServerProcess = startFixApplicationServer();
-    console.log('✅ Fix Application Server started on http://localhost:3001');
-    console.log('   Ready to receive fix requests from dashboard');
+    const prResults = await createPR(analysisResults, fixResults);
+    steps.createPR = true;
     
-    // NOTE: Steps 5-7 are now triggered manually from the dashboard
-    // by clicking "Apply Fix" button on each AI analysis card
+    if (prResults.success) {
+      console.log(`✅ Pull Request created: ${prResults.url}`);
+    } else {
+      console.log('⚠️  PR creation skipped:', prResults.message || prResults.error);
+    }
     
     // Summary
     console.log('\n' + '═'.repeat(80));
-    console.log('✅ Workflow Part 1 Complete - Ready for Manual Fix Application');
+    console.log('✅ Complete Workflow Finished!');
     console.log('═'.repeat(80));
     console.log('\nSummary:');
     console.log(`  Tests Run: ${testResults.totalTests}`);
-    console.log(`  Failures Found: ${testResults.failureCount}`);
-    console.log(`  AI Analyses Generated: ${analysisResults.analysisResults?.length || 0}`);
+    console.log(`  Initial Failures: ${testResults.failureCount}`);
+    console.log(`  Fixes Applied: ${fixResults.appliedCount || 0}`);
+    console.log(`  Final Failures: ${verificationResults.failureCount}`);
+    if (prResults.success) {
+      console.log(`  Pull Request: ${prResults.url}`);
+    }
     console.log('\n📊 Servers Running:');
     console.log('   🌐 Website: http://localhost:8000');
     console.log('   📊 Dashboard: http://localhost:3000');
-    console.log('   🔧 Fix Application Server: http://localhost:3001');
-    console.log('\n💡 Next Steps:');
-    console.log('   1. Review AI analysis on the dashboard');
-    console.log('   2. Click "Apply Fix" button on any test to trigger fix application');
-    console.log('   3. The fix will be applied, verified, and a PR will be created');
+    console.log('\n📊 View dashboard: http://localhost:3000');
+    console.log('📊 View AI report: ai-agent-reports/latest-report.json');
     console.log('\n' + '─'.repeat(80));
-    console.log('⏸️  Servers are running. Press ENTER to stop all servers and exit...');
+    console.log('⏸️  Servers are running. Press ENTER to stop servers and exit...');
     console.log('─'.repeat(80));
     
     await waitForUserInput();
@@ -154,7 +172,7 @@ async function runWorkflow() {
     }
     console.log('✅ Servers stopped');
     
-    return { success: true, results: { testResults, analysisResults, fixResults, prResults } };
+    return { success: true, results: { testResults, analysisResults, fixResults, verificationResults, prResults } };
     
   } catch (error) {
     console.error('\n❌ Workflow failed:', error.message);
@@ -266,24 +284,6 @@ function startProjectServer() {
   
   serverProcess.on('error', (error) => {
     console.error('Failed to start server:', error.message);
-  });
-  
-  return serverProcess;
-}
-
-function startFixApplicationServer() {
-  console.log('Starting Fix Application Server on port 3001...');
-  
-  const serverPath = path.join(__dirname, 'fix-application-server.js');
-  
-  const serverProcess = spawn('node', [serverPath], {
-    detached: false,
-    stdio: 'inherit',
-    cwd: process.cwd()
-  });
-  
-  serverProcess.on('error', (error) => {
-    console.error('Failed to start Fix Application Server:', error.message);
   });
   
   return serverProcess;
