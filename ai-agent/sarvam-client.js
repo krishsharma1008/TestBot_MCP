@@ -293,6 +293,9 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting, no explanations 
         throw new Error('Unexpected response format: ' + JSON.stringify(Object.keys(response)));
       }
       
+      // Trim whitespace from content
+      content = content.trim();
+      
       // Try to parse as JSON directly
       try {
         return JSON.parse(content);
