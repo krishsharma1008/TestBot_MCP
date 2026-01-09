@@ -316,6 +316,10 @@ body {
     border-left-color: var(--color-warning);
 }
 
+.kpi-card.kpi-timedout {
+    border-left-color: #f97316;
+}
+
 .kpi-card.kpi-rate {
     border-left-color: var(--color-info);
 }
@@ -435,6 +439,11 @@ body {
 .kpi-skipped .kpi-icon {
     background: rgba(245, 158, 11, 0.1);
     color: var(--color-warning);
+}
+
+.kpi-timedout .kpi-icon {
+    background: rgba(249, 115, 22, 0.1);
+    color: #f97316;
 }
 
 .kpi-rate .kpi-icon {

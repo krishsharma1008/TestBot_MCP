@@ -68,15 +68,18 @@ function updateKPIs() {
     document.getElementById('passedTests').textContent = stats.passed;
     document.getElementById('failedTests').textContent = stats.failed;
     document.getElementById('skippedTests').textContent = stats.skipped;
+    document.getElementById('timedoutTests').textContent = stats.timedout || 0;
     
     // Calculate and update percentages
     const passedPercentage = stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0;
     const failedPercentage = stats.total > 0 ? Math.round((stats.failed / stats.total) * 100) : 0;
     const skippedPercentage = stats.total > 0 ? Math.round((stats.skipped / stats.total) * 100) : 0;
+    const timedoutPercentage = stats.total > 0 ? Math.round(((stats.timedout || 0) / stats.total) * 100) : 0;
     
     document.getElementById('passedPercentage').textContent = `${passedPercentage}%`;
     document.getElementById('failedPercentage').textContent = `${failedPercentage}%`;
     document.getElementById('skippedPercentage').textContent = `${skippedPercentage}%`;
+    document.getElementById('timedoutPercentage').textContent = `${timedoutPercentage}%`;
     
     // Update pass rate
     document.getElementById('passRate').textContent = `${stats.passRate}%`;

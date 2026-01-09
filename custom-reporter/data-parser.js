@@ -15,6 +15,7 @@ class TestDataParser {
             passed: 0,
             failed: 0,
             skipped: 0,
+            timedout: 0,
             duration: 0,
             startTime: null,
             endTime: null,
@@ -192,6 +193,10 @@ class TestDataParser {
                 case 'pending':
                     this.stats.skipped++;
                     suiteStats.skipped++;
+                    break;
+                case 'timedout':
+                    this.stats.timedout++;
+                    suiteStats.timedout = (suiteStats.timedout || 0) + 1;
                     break;
                 default:
                     break;
