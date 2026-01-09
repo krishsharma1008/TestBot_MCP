@@ -113,60 +113,35 @@ async function runWorkflow() {
     await openInBrowser('http://localhost:3000');
     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for browser to open
     
-    // Step 5: Apply fixes
-    console.log('\n📋 Step 5: Applying AI-suggested fixes...');
+    // Start fix application server
+    console.log('\n📋 Step 5: Starting Fix Application Server...');
     console.log('─'.repeat(80));
     
-    const fixResults = await applyFixes(analysisResults);
-    steps.applyFixes = true;
-    console.log(`✅ Applied ${fixResults.successfulFixes} fix(es)`);
+    const fixServerProcess = startFixApplicationServer();
+    console.log('✅ Fix Application Server started on http://localhost:3001');
+    console.log('   Ready to receive fix requests from dashboard');
     
-    // Step 6: Verify fixes
-    console.log('\n📋 Step 6: Verifying fixes...');
-    console.log('─'.repeat(80));
-    
-    const verifyResults = runTests();
-    
-    if (verifyResults.allPassed) {
-      console.log('✅ All tests now passing!');
-    } else {
-      console.log(`⚠️  ${verifyResults.failureCount} test(s) still failing`);
-    }
-    
-    // Step 7: Create PR
-    console.log('\n📋 Step 7: Creating GitHub Pull Request...');
-    console.log('─'.repeat(80));
-    
-    const prResults = await createPR(analysisResults, fixResults);
-    steps.createPR = true;
-    
-    if (prResults.success) {
-      console.log(`✅ Pull Request created: ${prResults.prUrl}`);
-    }
+    // NOTE: Steps 5-7 are now triggered manually from the dashboard
+    // by clicking "Apply Fix" button on each AI analysis card
     
     // Summary
     console.log('\n' + '═'.repeat(80));
-    console.log('✅ Complete Workflow Finished!');
+    console.log('✅ Workflow Part 1 Complete - Ready for Manual Fix Application');
     console.log('═'.repeat(80));
     console.log('\nSummary:');
     console.log(`  Tests Run: ${testResults.totalTests}`);
-    console.log(`  Initial Failures: ${testResults.failureCount}`);
-    console.log(`  Fixes Applied: ${fixResults.successfulFixes}`);
-    console.log(`  Final Status: ${verifyResults.allPassed ? '✅ All Passing' : `⚠️  ${verifyResults.failureCount} Still Failing`}`);
-    if (prResults.success) {
-      console.log(`  Pull Request: ${prResults.prUrl}`);
-    }
+    console.log(`  Failures Found: ${testResults.failureCount}`);
+    console.log(`  AI Analyses Generated: ${analysisResults.analysisResults?.length || 0}`);
     console.log('\n📊 Servers Running:');
     console.log('   🌐 Website: http://localhost:8000');
     console.log('   📊 Dashboard: http://localhost:3000');
-    console.log('\n📂 Reports:');
-    console.log('   📊 Dashboard: custom-report/index.html');
-    console.log('   📊 AI Analysis: custom-report/ai-analysis.json');
-    console.log('   📊 AI Report: ai-agent-reports/latest-report.json');
-    
-    // Wait for user input before cleanup
+    console.log('   🔧 Fix Application Server: http://localhost:3001');
+    console.log('\n💡 Next Steps:');
+    console.log('   1. Review AI analysis on the dashboard');
+    console.log('   2. Click "Apply Fix" button on any test to trigger fix application');
+    console.log('   3. The fix will be applied, verified, and a PR will be created');
     console.log('\n' + '─'.repeat(80));
-    console.log('⏸️  Servers are running. Press ENTER to stop servers and exit...');
+    console.log('⏸️  Servers are running. Press ENTER to stop all servers and exit...');
     console.log('─'.repeat(80));
     
     await waitForUserInput();
@@ -291,6 +266,24 @@ function startProjectServer() {
   
   serverProcess.on('error', (error) => {
     console.error('Failed to start server:', error.message);
+  });
+  
+  return serverProcess;
+}
+
+function startFixApplicationServer() {
+  console.log('Starting Fix Application Server on port 3001...');
+  
+  const serverPath = path.join(__dirname, 'fix-application-server.js');
+  
+  const serverProcess = spawn('node', [serverPath], {
+    detached: false,
+    stdio: 'inherit',
+    cwd: process.cwd()
+  });
+  
+  serverProcess.on('error', (error) => {
+    console.error('Failed to start Fix Application Server:', error.message);
   });
   
   return serverProcess;

@@ -412,9 +412,100 @@ function createAISummaryCard(test) {
                 </div>
             ` : ''}
         </div>
+        
+        <div class="ai-summary-card-footer">
+            <button class="btn-apply-fix" 
+                    data-test-file="${escapeHtml(test.file)}" 
+                    data-test-title="${escapeHtml(test.title)}"
+                    onclick="applyAIFix('${escapeHtml(test.file)}', '${escapeHtml(test.title)}')">
+                <i class="fas fa-magic"></i> Apply Fix
+            </button>
+        </div>
     `;
     
     return card;
+}
+
+/**
+ * Apply AI-suggested fix for a specific test
+ */
+async function applyAIFix(testFile, testTitle) {
+    const button = event.target.closest('.btn-apply-fix');
+    if (!button) return;
+    
+    // Disable button and show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying Fix...';
+    
+    try {
+        console.log('Applying fix for:', testFile, testTitle);
+        
+        // Call the fix application endpoint
+        const response = await fetch('http://localhost:3001/apply-fix', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                testFile,
+                testTitle
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Fix application failed: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Show success state
+        button.innerHTML = '<i class="fas fa-check"></i> Fix Applied!';
+        button.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+        
+        // Show notification
+        showNotification('Fix applied successfully! Running verification tests...', 'success');
+        
+        console.log('Fix application result:', result);
+        
+    } catch (error) {
+        console.error('Error applying fix:', error);
+        
+        // Show error state
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Fix Failed';
+        button.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+        
+        showNotification(`Failed to apply fix: ${error.message}`, 'error');
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            button.innerHTML = '<i class="fas fa-magic"></i> Apply Fix';
+            button.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        }, 3000);
+    }
+}
+
+/**
+ * Show notification message
+ */
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => notification.classList.add('show'), 10);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
 }
 
 /**

@@ -382,6 +382,7 @@ class TestDataParser {
                 passed: 0,
                 failed: 0,
                 skipped: 0,
+                timedout: 0,
                 duration: 0
             });
         }
@@ -402,6 +403,9 @@ class TestDataParser {
             case 'pending':
                 entry.skipped++;
                 break;
+            case 'timedout':
+                entry.timedout++;
+                break;
             default:
                 break;
         }
@@ -414,6 +418,7 @@ class TestDataParser {
             passed: 0,
             failed: 0,
             skipped: 0,
+            timedout: 0,
             duration: 0
         };
     }
@@ -707,6 +712,8 @@ class TestDataParser {
                 return 'Frontend';
             case 'backend':
                 return 'Backend';
+            case 'smoke':
+                return 'Smoke';
             default:
                 return 'Other';
         }
