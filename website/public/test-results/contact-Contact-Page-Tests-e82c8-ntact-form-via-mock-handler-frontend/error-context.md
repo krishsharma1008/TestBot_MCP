@@ -1,0 +1,155 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner:
+    - navigation [ref=e2]:
+      - generic [ref=e3]:
+        - link "logo" [ref=e4] [cursor=pointer]:
+          - /url: http://localhost:8000/
+          - img "logo" [ref=e5]
+        - text: 
+        - list [ref=e7]:
+          - listitem [ref=e8]:
+            - link "Home" [ref=e9] [cursor=pointer]:
+              - /url: http://localhost:8000/
+          - listitem [ref=e10]:
+            - link "Ship" [ref=e11] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e12]:
+            - link "Cuirses" [ref=e13] [cursor=pointer]:
+              - /url: http://localhost:8000/cuirses
+          - listitem [ref=e14]:
+            - link "About" [ref=e15] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e16]:
+            - link "Contact" [ref=e17] [cursor=pointer]:
+              - /url: http://localhost:8000/contact
+        - list [ref=e19]:
+          - listitem [ref=e20]:
+            - link "Login" [ref=e21] [cursor=pointer]:
+              - /url: http://localhost:8000/Login
+  - generic [ref=e26]:
+    - generic [ref=e28]:
+      - heading "Send us a message" [level=3] [ref=e29]
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]:
+            - generic [ref=e33]: Name *
+            - textbox "Your name" [ref=e34]
+          - generic [ref=e35]:
+            - generic [ref=e36]: Email *
+            - textbox "Your email" [ref=e37]
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - generic [ref=e40]: Phone
+            - 'textbox "Phone #" [ref=e41]'
+          - generic [ref=e42]:
+            - generic [ref=e43]: Company
+            - textbox "Company name" [ref=e44]:
+              - /placeholder: Company  name
+        - generic [ref=e46]:
+          - generic [ref=e47]: Message *
+          - textbox "Message *" [ref=e48]:
+            - /placeholder: Write your message
+        - button "Send Message" [ref=e51] [cursor=pointer]
+    - generic [ref=e53]:
+      - heading "Contact Information" [level=3] [ref=e54]
+      - paragraph [ref=e55]: Lorem ipsum dolor sit amet, consectetur adipisicing elit. Molestias, magnam!
+      - list [ref=e56]:
+        - listitem [ref=e57]:
+          - generic [ref=e58]: 9757 Aspen Lane South Richmond Hill, NY 11419
+        - listitem [ref=e59]:
+          - generic [ref=e60]: +1 (291) 939 9321
+        - listitem [ref=e61]:
+          - generic [ref=e62]: info@mywebsite.com
+  - contentinfo [ref=e63]:
+    - generic [ref=e70]:
+      - generic [ref=e71]:
+        - heading "logo" [level=3] [ref=e72]:
+          - link "logo" [ref=e73] [cursor=pointer]:
+            - /url: http://localhost:8000/
+            - img "logo" [ref=e74]
+        - paragraph [ref=e75]:
+          - text: A108 Adam Street
+          - text: New Safi, NY 535022
+          - text: United States
+          - strong [ref=e76]: "Phone:"
+          - text: +212 631198914
+          - strong [ref=e77]: "Email:"
+          - text: ouharrioutman@gmail.com
+      - generic [ref=e78]:
+        - heading "Useful Links" [level=4] [ref=e79]
+        - list [ref=e80]:
+          - listitem [ref=e81]:
+            - generic [ref=e82]: 
+            - link "Home" [ref=e83] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e84]:
+            - generic [ref=e85]: 
+            - link "Ship" [ref=e86] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e87]:
+            - generic [ref=e88]: 
+            - link "About us" [ref=e89] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e90]:
+            - generic [ref=e91]: 
+            - link "Terms of service" [ref=e92] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e93]:
+            - generic [ref=e94]: 
+            - link "Privacy policy" [ref=e95] [cursor=pointer]:
+              - /url: "#"
+      - generic [ref=e96]:
+        - heading "POPULAR PORTS" [level=4] [ref=e97]
+        - list [ref=e98]:
+          - listitem [ref=e99]:
+            - generic [ref=e100]: 
+            - link "Miami, Florida" [ref=e101] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e102]:
+            - generic [ref=e103]: 
+            - link "Galveston, Texas" [ref=e104] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e105]:
+            - generic [ref=e106]: 
+            - link "Baltimore, Maryland" [ref=e107] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e108]:
+            - generic [ref=e109]: 
+            - link "Fort Lauderdale, Florida" [ref=e110] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=e111]:
+            - generic [ref=e112]: 
+            - link "Los Angeles, California" [ref=e113] [cursor=pointer]:
+              - /url: "#"
+      - generic [ref=e114]:
+        - heading "Our Social Networks" [level=4] [ref=e115]
+        - paragraph [ref=e116]: Cras fermentum odio eu feugiat lide par naso tierra videa magna derita valies
+        - generic [ref=e117]:
+          - link "" [ref=e118] [cursor=pointer]:
+            - /url: "#"
+            - generic [ref=e119]: 
+          - link "" [ref=e120] [cursor=pointer]:
+            - /url: "#"
+            - generic [ref=e121]: 
+          - link "" [ref=e122] [cursor=pointer]:
+            - /url: "#"
+            - generic [ref=e123]: 
+          - link "" [ref=e124] [cursor=pointer]:
+            - /url: "#"
+            - generic [ref=e125]: 
+          - link "" [ref=e126] [cursor=pointer]:
+            - /url: "#"
+            - generic [ref=e127]: 
+    - generic [ref=e128]:
+      - generic [ref=e129]:
+        - text: © 2026 Copyright
+        - strong [ref=e130]: ShipCruiseTour
+        - text: . All Rights Reserved
+      - generic [ref=e131]:
+        - text: Designed by
+        - link "ouharri" [ref=e132] [cursor=pointer]:
+          - /url: https://github.com/OUHARRI
+```
