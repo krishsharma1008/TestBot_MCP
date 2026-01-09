@@ -12,7 +12,8 @@
             <div class="col-md-8">
                 <div class="form h-100">
                     <h3>Send us a message</h3>
-                    <form class="mb-5" method="post" id="contactForm" name="contactForm">
+                    <form class="mb-5" method="post" id="contactForm" name="contactForm"
+                          data-endpoint="<?= url('php/send-email.php') ?>">
                         <div class="row">
                             <div class="col-md-6 form-group mb-5">
                                 <label for="" class="col-form-label">Name *</label>
@@ -53,8 +54,8 @@
                         </div>
                     </form>
 
-                    <div id="form-message-warning mt-4"></div>
-                    <div id="form-message-success">
+                    <div id="form-message-warning" class="mt-4" style="display: none;"></div>
+                    <div id="form-message-success" style="display: none;">
                         Your message was sent, thank you!
                     </div>
 

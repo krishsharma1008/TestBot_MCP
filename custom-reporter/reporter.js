@@ -1,5 +1,6 @@
 // Main Reporter Script for Dashboard
 let parser;
+let currentScope = 'all';
 let currentFilter = 'all';
 let currentSort = { column: null, direction: 'asc' };
 let statusChart, suiteChart;
@@ -15,17 +16,47 @@ document.addEventListener('DOMContentLoaded', async () => {
  * Initialize the dashboard with all components
  */
 function initializeDashboard() {
+    refreshDashboard();
+    setupEventListeners();
+}
+
+function refreshDashboard() {
+    setActiveScopeTab(currentScope);
+    updateScopeCounts();
     updateKPIs();
+    renderCategoryCards();
     renderCharts();
     renderTestTable();
-    setupEventListeners();
+}
+
+function setActiveScopeTab(scope = 'all') {
+    document.querySelectorAll('.scope-tab').forEach(tab => {
+        const isActive = tab.dataset.scope === scope;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+}
+
+function updateScopeCounts() {
+    if (!parser) return;
+    const allStats = parser.getScopeStats('all');
+    const frontendStats = parser.getScopeStats('frontend');
+    const backendStats = parser.getScopeStats('backend');
+
+    const allNode = document.getElementById('scopeAllCount');
+    const feNode = document.getElementById('scopeFrontendCount');
+    const beNode = document.getElementById('scopeBackendCount');
+
+    if (allNode) allNode.textContent = allStats.total ?? 0;
+    if (feNode) feNode.textContent = frontendStats.total ?? 0;
+    if (beNode) beNode.textContent = backendStats.total ?? 0;
 }
 
 /**
  * Update KPI cards with test statistics
  */
 function updateKPIs() {
-    const stats = parser.getStats();
+    const stats = parser.getScopeStats(currentScope);
     
     // Update test date
     document.getElementById('testDate').textContent = 
@@ -61,14 +92,112 @@ function updateKPIs() {
     document.getElementById('filterPassedCount').textContent = stats.passed;
     document.getElementById('filterFailedCount').textContent = stats.failed;
     document.getElementById('filterSkippedCount').textContent = stats.skipped;
+
+    updateCategoryKpis();
+}
+
+function updateCategoryKpis() {
+    const frontendStats = parser.getCategoryStat('Frontend');
+    const backendStats = parser.getCategoryStat('Backend');
+
+    updateCategoryKpiCard({
+        totalEl: 'frontendTotal',
+        passedEl: 'frontendPassed',
+        failedEl: 'frontendFailed',
+        passRateEl: 'frontendPassRate',
+        barEl: 'frontendPassRateBar',
+        stats: frontendStats
+    });
+
+    updateCategoryKpiCard({
+        totalEl: 'backendTotal',
+        passedEl: 'backendPassed',
+        failedEl: 'backendFailed',
+        passRateEl: 'backendPassRate',
+        barEl: 'backendPassRateBar',
+        stats: backendStats
+    });
+}
+
+function updateCategoryKpiCard({ totalEl, passedEl, failedEl, passRateEl, barEl, stats }) {
+    const total = stats.total || 0;
+    const passed = stats.passed || 0;
+    const failed = stats.failed || 0;
+    const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+    const totalNode = document.getElementById(totalEl);
+    const passedNode = document.getElementById(passedEl);
+    const failedNode = document.getElementById(failedEl);
+    const passRateNode = document.getElementById(passRateEl);
+    const barNode = document.getElementById(barEl);
+
+    if (!totalNode || !passedNode || !failedNode || !passRateNode || !barNode) {
+        return;
+    }
+
+    totalNode.textContent = total;
+    passedNode.textContent = passed;
+    failedNode.textContent = failed;
+    passRateNode.textContent = `Pass Rate: ${passRate}%`;
+    barNode.style.width = `${passRate}%`;
+}
+
+function renderCategoryCards() {
+    const categories = parser.getCategoryStats().filter(cat => {
+        if (currentScope === 'all') return true;
+        return cat.name.toLowerCase() === currentScope;
+    });
+    const container = document.getElementById('categoryCards');
+    if (!container) return;
+    container.innerHTML = '';
+
+    categories.forEach(cat => {
+        const card = document.createElement('div');
+        card.className = 'category-card';
+        const passRate = cat.total ? Math.round((cat.passed / cat.total) * 100) : 0;
+        card.innerHTML = `
+            <div class="category-card__header">
+                <h3>${escapeHtml(cat.name)}</h3>
+                <span class="badge">${cat.total} tests</span>
+            </div>
+            <div class="category-card__metrics">
+                <div>
+                    <span class="label">Passed</span>
+                    <strong>${cat.passed}</strong>
+                </div>
+                <div>
+                    <span class="label">Failed</span>
+                    <strong>${cat.failed}</strong>
+                </div>
+                <div>
+                    <span class="label">Skipped</span>
+                    <strong>${cat.skipped}</strong>
+                </div>
+            </div>
+            <div class="category-card__progress">
+                <span>Pass Rate</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width:${passRate}%;"></div>
+                </div>
+                <span class="pass-rate">${passRate}%</span>
+            </div>
+        `;
+        container.appendChild(card);
+    });
 }
 
 /**
  * Render charts using Chart.js
  */
 function renderCharts() {
-    const stats = parser.getStats();
-    const suiteStats = parser.getSuiteStats();
+    const stats = parser.getScopeStats(currentScope);
+    const suiteStats = parser.getSuiteStatsByScope(currentScope);
+    
+    if (statusChart) {
+        statusChart.destroy();
+    }
+    if (suiteChart) {
+        suiteChart.destroy();
+    }
     
     // Status Distribution Pie Chart
     const statusCtx = document.getElementById('statusChart').getContext('2d');
@@ -244,7 +373,7 @@ function createTestRow(test) {
         </td>
         <td>${TestDataParser.formatDuration(test.duration)}</td>
         <td>
-            <button class="btn-details" onclick="showTestDetails('${test.id}')">
+            <button class="btn-details" data-test-id="${test.id}">
                 <i class="fas fa-info-circle"></i> Details
             </button>
         </td>
@@ -257,12 +386,16 @@ function createTestRow(test) {
  * Get filtered and sorted tests
  */
 function getFilteredAndSortedTests() {
-    let tests = parser.getTests();
+    let tests = parser.getTestsByScope(currentScope);
     
     // Apply search filter
     const searchQuery = document.getElementById('searchInput').value;
     if (searchQuery) {
-        tests = parser.searchTests(searchQuery);
+        const lowerQuery = searchQuery.toLowerCase();
+        tests = tests.filter(test =>
+            test.title.toLowerCase().includes(lowerQuery) ||
+            test.suite.toLowerCase().includes(lowerQuery)
+        );
     }
     
     // Apply status filter
@@ -322,6 +455,16 @@ function sortTests(tests, column, direction) {
  * Setup event listeners
  */
 function setupEventListeners() {
+    // Scope tabs
+    document.querySelectorAll('.scope-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const selectedScope = tab.dataset.scope || 'all';
+            if (selectedScope === currentScope) return;
+            currentScope = selectedScope;
+            refreshDashboard();
+        });
+    });
+
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -360,6 +503,17 @@ function setupEventListeners() {
             
             renderTestTable();
         });
+    });
+    
+    // Details buttons - using event delegation
+    document.getElementById('resultsTableBody').addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-details');
+        if (btn) {
+            const testId = btn.getAttribute('data-test-id');
+            if (testId) {
+                showTestDetails(testId);
+            }
+        }
     });
 }
 
@@ -412,6 +566,7 @@ function showTestDetails(testId) {
                 ` : ''}
             </div>
         ` : ''}
+        ${renderTestArtifacts(test)}
     `;
     
     modal.classList.add('active');
@@ -426,16 +581,28 @@ function closeModal() {
 
 // Close modal when clicking outside
 document.addEventListener('click', (e) => {
-    const modal = document.getElementById('testModal');
-    if (e.target === modal) {
+    const testModal = document.getElementById('testModal');
+    const artifactModal = document.getElementById('artifactModal');
+    
+    if (e.target === testModal) {
         closeModal();
+    }
+    if (e.target === artifactModal) {
+        closeArtifactModal();
     }
 });
 
 // Close modal with Escape key
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        closeModal();
+        const testModal = document.getElementById('testModal');
+        const artifactModal = document.getElementById('artifactModal');
+        
+        if (artifactModal.classList.contains('active')) {
+            closeArtifactModal();
+        } else if (testModal.classList.contains('active')) {
+            closeModal();
+        }
     }
 });
 
@@ -466,4 +633,183 @@ function escapeHtml(text) {
         "'": '&#039;'
     };
     return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+/**
+ * Render test artifacts section
+ */
+function renderTestArtifacts(test) {
+    if (!test.attachments) {
+        return '';
+    }
+
+    const { screenshots, videos, traces, other } = test.attachments;
+    const hasArtifacts = screenshots.length > 0 || videos.length > 0 || traces.length > 0 || other.length > 0;
+
+    if (!hasArtifacts) {
+        return '';
+    }
+
+    let html = '<div class="test-artifacts"><h4><i class="fas fa-paperclip"></i> Test Artifacts</h4>';
+
+    // Screenshots section
+    if (screenshots.length > 0) {
+        html += `
+            <div class="artifact-section">
+                <div class="artifact-section-title">
+                    <i class="fas fa-image"></i> Screenshots
+                    <span class="artifact-badge">${screenshots.length}</span>
+                </div>
+                <div class="artifacts-grid">
+                    ${screenshots.map((screenshot, index) => `
+                        <div class="artifact-item" onclick="viewArtifact('${escapeHtml(screenshot.path)}', 'image', '${escapeHtml(screenshot.name)}')">
+                            <img src="${escapeHtml(screenshot.path)}" alt="${escapeHtml(screenshot.name)}" class="screenshot-preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                            <div class="artifact-item-icon" style="display:none;"><i class="fas fa-image"></i></div>
+                            <div class="artifact-item-name">${escapeHtml(screenshot.name)}</div>
+                            <div class="artifact-item-type">PNG Image</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Videos section
+    if (videos.length > 0) {
+        html += `
+            <div class="artifact-section">
+                <div class="artifact-section-title">
+                    <i class="fas fa-video"></i> Videos
+                    <span class="artifact-badge">${videos.length}</span>
+                </div>
+                <div class="artifacts-grid">
+                    ${videos.map((video, index) => `
+                        <div class="artifact-item" onclick="viewArtifact('${escapeHtml(video.path)}', 'video', '${escapeHtml(video.name)}')">
+                            <div class="artifact-item-icon"><i class="fas fa-video"></i></div>
+                            <div class="artifact-item-name">${escapeHtml(video.name)}</div>
+                            <div class="artifact-item-type">WebM Video</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Traces section
+    if (traces.length > 0) {
+        html += `
+            <div class="artifact-section">
+                <div class="artifact-section-title">
+                    <i class="fas fa-file-archive"></i> Traces
+                    <span class="artifact-badge">${traces.length}</span>
+                </div>
+                <div class="artifacts-grid">
+                    ${traces.map((trace, index) => `
+                        <div class="artifact-item" onclick="window.open('${escapeHtml(trace.path)}', '_blank')">
+                            <div class="artifact-item-icon"><i class="fas fa-file-archive"></i></div>
+                            <div class="artifact-item-name">${escapeHtml(trace.name)}</div>
+                            <div class="artifact-item-type">Trace File</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Other attachments section
+    if (other.length > 0) {
+        html += `
+            <div class="artifact-section">
+                <div class="artifact-section-title">
+                    <i class="fas fa-file"></i> Other Files
+                    <span class="artifact-badge">${other.length}</span>
+                </div>
+                <div class="artifacts-grid">
+                    ${other.map((file, index) => `
+                        <div class="artifact-item" onclick="window.open('${escapeHtml(file.path)}', '_blank')">
+                            <div class="artifact-item-icon"><i class="fas fa-file"></i></div>
+                            <div class="artifact-item-name">${escapeHtml(file.name)}</div>
+                            <div class="artifact-item-type">${escapeHtml(file.contentType)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+/**
+ * View artifact in modal
+ */
+function viewArtifact(path, type, name) {
+    const modal = document.getElementById('artifactModal');
+    const modalTitle = document.getElementById('artifactModalTitle');
+    const modalBody = document.getElementById('artifactModalBody');
+
+    modalTitle.textContent = name;
+
+    let content = '';
+    if (type === 'image') {
+        content = `
+            <div class="artifact-viewer-content">
+                <div class="artifact-viewer-media">
+                    <img src="${escapeHtml(path)}" alt="${escapeHtml(name)}">
+                </div>
+                <div class="artifact-viewer-info">
+                    <div class="artifact-viewer-info-item">
+                        <strong>Name:</strong>
+                        <span>${escapeHtml(name)}</span>
+                    </div>
+                    <div class="artifact-viewer-info-item">
+                        <strong>Type:</strong>
+                        <span>Screenshot</span>
+                    </div>
+                    <div class="artifact-viewer-info-item">
+                        <a href="${escapeHtml(path)}" download class="artifact-download-btn">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (type === 'video') {
+        content = `
+            <div class="artifact-viewer-content">
+                <div class="artifact-viewer-media">
+                    <video controls>
+                        <source src="${escapeHtml(path)}" type="video/webm">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                <div class="artifact-viewer-info">
+                    <div class="artifact-viewer-info-item">
+                        <strong>Name:</strong>
+                        <span>${escapeHtml(name)}</span>
+                    </div>
+                    <div class="artifact-viewer-info-item">
+                        <strong>Type:</strong>
+                        <span>Test Recording</span>
+                    </div>
+                    <div class="artifact-viewer-info-item">
+                        <a href="${escapeHtml(path)}" download class="artifact-download-btn">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    modalBody.innerHTML = content;
+    modal.classList.add('active');
+}
+
+/**
+ * Close artifact modal
+ */
+function closeArtifactModal() {
+    document.getElementById('artifactModal').classList.remove('active');
 }

@@ -15,7 +15,7 @@ if (!defined('BURL')) {
 
 const HOST = "localhost";
 const USER = "root";
-const PASS = "";
+const PASS = "Spd7890&*()";
 const DBNAME = "shipcruisetour";
 
 
