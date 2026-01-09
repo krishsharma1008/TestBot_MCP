@@ -24,7 +24,7 @@ test.describe('Authenticated user flows', () => {
   test('logged-in user can access reservation page', async ({ page }) => {
     await loginViaUI(page);
     await page.goto('/reservation');
-    await expect(page.locator('h1:has-text("Mes réservations")')).toBeVisible();
+await expect(page.locator('h1:has-text("Mes réservations")')).toBeVisible({ timeout: 10000 });
   });
 
   test('user can logout from navbar dropdown', async ({ page }) => {

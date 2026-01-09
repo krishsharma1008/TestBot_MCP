@@ -11,7 +11,8 @@ async function fetchCruises(request) {
     form: { action: 'searchByPort', value: 'ALL' },
   });
   expect(response.ok()).toBeTruthy();
-  const cruises = await response.json();
+const responseData = await response.text();
+const cruises = JSON.parse(responseData);
   expect(Array.isArray(cruises)).toBeTruthy();
   expect(cruises.length).toBeGreaterThan(0);
   return cruises;
