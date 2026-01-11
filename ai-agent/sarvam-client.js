@@ -230,11 +230,31 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting, no explanations 
       
       const data = await response.json();
       
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        throw new Error('Invalid response format from Sarvam API');
-      }
+      // Log response structure for debugging
+      console.log('   📋 Sarvam API response keys:', Object.keys(data));
       
-      return data.choices[0].message.content;
+      // Handle different response formats
+      if (data.choices && data.choices[0]?.message?.content) {
+        // OpenAI-compatible format
+        return data.choices[0].message.content;
+      } else if (data.message?.content) {
+        // Direct message format
+        return data.message.content;
+      } else if (data.content) {
+        // Direct content format
+        return data.content;
+      } else if (data.text) {
+        // Text field format
+        return data.text;
+      } else if (typeof data === 'string') {
+        // Direct string response
+        return data;
+      } else {
+        // Log full response for debugging
+        console.error('   ⚠️  Unexpected Sarvam API response format');
+        console.error('   Response structure:', JSON.stringify(data, null, 2).substring(0, 1000));
+        throw new Error('Invalid response format from Sarvam API. Response keys: ' + Object.keys(data).join(', '));
+      }
       
     } catch (error) {
       clearTimeout(timeout);
@@ -250,8 +270,31 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting, no explanations 
    */
   parseResponse(response) {
     try {
-      // Extract JSON from response
-      const content = response.choices[0]?.message?.content || '';
+      // Handle different response formats
+      let content = '';
+      
+      // Check if response is already a string (direct API response)
+      if (typeof response === 'string') {
+        content = response;
+      }
+      // Check for standard OpenAI-style format
+      else if (response.choices && response.choices[0]?.message?.content) {
+        content = response.choices[0].message.content;
+      }
+      // Check for direct message content
+      else if (response.message?.content) {
+        content = response.message.content;
+      }
+      // Check if response itself is the content
+      else if (response.content) {
+        content = response.content;
+      }
+      else {
+        throw new Error('Unexpected response format: ' + JSON.stringify(Object.keys(response)));
+      }
+      
+      // Trim whitespace from content
+      content = content.trim();
       
       // Try to parse as JSON directly
       try {
@@ -285,7 +328,11 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting, no explanations 
       }
     } catch (error) {
       console.error('Failed to parse Sarvam AI response:', error.message);
-      console.error('Response content preview:', response.choices[0]?.message?.content?.substring(0, 500));
+      console.error('Response type:', typeof response);
+      console.error('Response keys:', response ? Object.keys(response) : 'null');
+      if (typeof response === 'object') {
+        console.error('Response preview:', JSON.stringify(response).substring(0, 500));
+      }
       
       // Return a default low-confidence response so workflow can continue
       return {

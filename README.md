@@ -2,11 +2,51 @@
 
 ![img.png](website/public/asset/img.png)
 
-## 🤖 NEW: Fully Automated AI-Powered Test Fixing
+## 🎯 NEW: Jira-Based Automated Regression Testing
+
+This project now includes **Jira Integration** that automatically detects changes in your Jira board, generates Playwright tests from user stories and acceptance criteria, and triggers the complete regression cycle - **fully automated!**
+
+### Quick Start - Jira Integration
+
+```bash
+# Set up Jira credentials
+cp .env.example .env
+# Edit .env with your Jira credentials
+
+# Initialize and test connection
+npm run jira:init
+
+# Generate tests for all stories
+npm run jira:sync
+
+# Detect changes and run regression
+npm run jira:detect
+
+# Or use watch mode (continuous monitoring)
+npm run jira:watch
+```
+
+### Jira Integration Features
+- 🎯 **Auto-generate tests** from Jira user stories
+- 🔍 **Change detection** - monitors Jira board for updates
+- 📝 **Gherkin support** - parses Given-When-Then acceptance criteria
+- 🔄 **Smart updates** - only regenerates when criteria changes
+- 🤖 **AI integration** - works with existing AI agent workflow
+- ⏰ **Watch mode** - continuous monitoring and auto-regression
+- 📊 **Full workflow** - test generation → execution → AI fixes → dashboard
+
+### Jira Documentation
+- ⚡ [Quick Start Guide](./JIRA_INTEGRATION_QUICKSTART.md) ⭐ **START HERE**
+- 📖 [Full Documentation](./JIRA_INTEGRATION_README.md)
+- 🏗️ [Architecture Overview](./JIRA_INTEGRATION_ARCHITECTURE.md)
+
+---
+
+## 🤖 Fully Automated AI-Powered Test Fixing
 
 This project includes an **AI Agent** that automatically detects test failures, processes all artifacts (screenshots, videos, traces), analyzes them using AI with full visual context, applies fixes, and creates GitHub Pull Requests - **completely automated, zero manual intervention!**
 
-### Quick Start
+### Quick Start - AI Agent
 
 ```bash
 # Install dependencies
@@ -20,7 +60,7 @@ echo "AI_API_KEY=your-api-key" >> .env
 npm run ai-agent
 ```
 
-### Features
+### AI Agent Features
 - ✅ **Fully automated** - Zero manual intervention required
 - ✅ **Automatic artifact processing** - Screenshots, videos, traces
 - ✅ **Visual AI analysis** - AI sees screenshots and understands UI state
@@ -29,9 +69,9 @@ npm run ai-agent
 - ✅ **GitHub PR creation** - With embedded screenshots in reports
 - ✅ **Multiple AI providers** - OpenAI, Anthropic, Windsurf IDE
 
-### Documentation
+### AI Agent Documentation
 - 📚 [Quick Start Guide](./AI_AGENT_QUICKSTART.md)
-- 🤖 [Fully Automated System](./AI_AGENT_AUTOMATED.md) ⭐ **NEW**
+- 🤖 [Fully Automated System](./AI_AGENT_AUTOMATED.md)
 - 📖 [Full Documentation](./AI_AGENT_README.md)
 - 🌊 [Windsurf IDE Integration](./WINDSURF_INTEGRATION.md)
 

@@ -1,0 +1,84 @@
+{
+  "todo": [],
+  "inProgress": [
+    {
+      "key": "MSCSHIP-14",
+      "summary": "Regression Test: Contact Page - Loads successfully",
+      "status": "In Progress",
+      "priority": "Medium",
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-14",
+      "testsPassed": 4,
+      "testsFailed": 1,
+      "testsTotal": 5,
+      "passRate": 80,
+      "needsUpdate": false,
+      "recommendedStatus": "In Progress"
+    },
+    {
+      "key": "MSCSHIP-15",
+      "summary": "Regression Test: Contact Form - Displays all form elements",
+      "status": "In Progress",
+      "priority": "Medium",
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-15",
+      "testsPassed": 6,
+      "testsFailed": 1,
+      "testsTotal": 7,
+      "passRate": 86,
+      "needsUpdate": false,
+      "recommendedStatus": "In Progress"
+    },
+    {
+      "key": "MSCSHIP-16",
+      "summary": "Regression Test: Contact Form - Validates required fields",
+      "status": "In Progress",
+      "priority": "Medium",
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-16",
+      "testsPassed": 4,
+      "testsFailed": 1,
+      "testsTotal": 5,
+      "passRate": 80,
+      "needsUpdate": false,
+      "recommendedStatus": "In Progress"
+    },
+    {
+      "key": "MSCSHIP-19",
+      "summary": "Regression Test: Cruises Page - Loads successfully",
+      "status": "In Progress",
+      "priority": "Medium",
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-19",
+      "testsPassed": 4,
+      "testsFailed": 1,
+      "testsTotal": 5,
+      "passRate": 80,
+      "needsUpdate": false,
+      "recommendedStatus": "In Progress"
+    },
+    {
+      "key": "MSCSHIP-20",
+      "summary": "Regression Test: Cruises Page - Displays cruise listings",
+      "status": "In Progress",
+      "priority": "Medium",
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-20",
+      "testsPassed": 4,
+      "testsFailed": 1,
+      "testsTotal": 5,
+      "passRate": 80,
+      "needsUpdate": false,
+      "recommendedStatus": "In Progress"
+    },
+    {
+      "key": "MSCSHIP-22",
+      "summary": "Regression Test: Cruises Page - Displays cruise cards with details",
+      "status": "In Progress",
+      "priority": "Medium",
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-22",
+      "testsPassed": 6,
+      "testsFailed": 1,
+      "testsTotal": 7,
+      "passRate": 86,
+      "needsUpdate": false,
+      "recommendedStatus": "In Progress"
+    }
+  ],
+  "done": []
+}

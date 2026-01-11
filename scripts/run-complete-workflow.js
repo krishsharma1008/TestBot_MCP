@@ -21,8 +21,18 @@ const steps = {
 
 async function runWorkflow() {
   try {
-    // Step 1: Start the project
-    console.log('\n📋 Step 1: Starting the project...');
+    // Enable Jira-only test mode
+    process.env.JIRA_ONLY_TESTS = 'true';
+    
+    // Step 1: Scan Jira and Generate Tests
+    console.log('\n📋 Step 1: Scanning Jira stories and generating tests...');
+    console.log('─'.repeat(80));
+    
+    await scanJiraAndGenerateTests();
+    console.log('✅ Jira stories scanned and tests generated');
+    
+    // Step 2: Start the project
+    console.log('\n📋 Step 2: Starting the project...');
     console.log('─'.repeat(80));
     
     const serverProcess = startProjectServer();
@@ -38,8 +48,8 @@ async function runWorkflow() {
     await openInBrowser('http://localhost:8000');
     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for browser to open
     
-    // Step 2: Run tests
-    console.log('\n📋 Step 2: Running tests...');
+    // Step 3: Run tests (existing + generated)
+    console.log('\n📋 Step 3: Running all tests (existing + Jira-generated)...');
     console.log('─'.repeat(80));
     
     const testResults = runTests();
@@ -47,27 +57,71 @@ async function runWorkflow() {
     
     if (testResults.allPassed) {
       console.log('✅ All tests passed! No fixes needed.');
+      
+      // Generate dashboard anyway
+      console.log('\n📋 Step 4: Generating test dashboard...');
+      console.log('─'.repeat(80));
+      execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
+      console.log('✅ Dashboard generated');
+      
+      // Enrich with Jira data
+      console.log('\n📋 Step 4.5: Enriching dashboard with Jira data...');
+      console.log('─'.repeat(80));
+      
+      try {
+        execSync('node scripts/enrich-dashboard-with-jira.js', { stdio: 'inherit' });
+        console.log('✅ Dashboard enriched with Jira board integration');
+        
+        // Rebuild dashboard with Jira data
+        execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
+        console.log('✅ Dashboard rebuilt with Jira integration');
+      } catch (error) {
+        console.log('⚠️  Jira enrichment skipped (not configured or failed)');
+      }
+      
+      // Update Jira board status based on test results
+      console.log('\n📋 Step 4.6: Updating Jira board status...');
+      console.log('─'.repeat(80));
+      
+      try {
+        execSync('node scripts/update-jira-board-status.js', { stdio: 'inherit' });
+        console.log('✅ Jira board status updated');
+      } catch (error) {
+        console.log('⚠️  Jira board update skipped (not configured or failed)');
+      }
+      
+      // Start dashboard server
+      dashboardServer = await startDashboardServer();
+      const dashboardPort = dashboardServer.port || 3000;
+      console.log('📊 Opening test dashboard in browser...');
+      await openInBrowser(`http://localhost:${dashboardPort}`);
+      
+      // Summary
+      console.log('\n' + '═'.repeat(80));
+      console.log('✅ All Tests Passed!');
+      console.log('═'.repeat(80));
+      console.log('\n📊 Servers Running:');
+      console.log('   🌐 Website: http://localhost:8000');
+      console.log(`   📊 Dashboard: http://localhost:${dashboardPort}`);
+      console.log('\n' + '─'.repeat(80));
+      console.log('⏸️  Servers are running. Press ENTER to stop servers and exit...');
+      console.log('─'.repeat(80));
+      
+      await waitForUserInput();
+      
+      console.log('\n📋 Cleaning up...');
       serverProcess.kill();
+      if (dashboardServer) {
+        dashboardServer.kill();
+      }
+      console.log('✅ Servers stopped');
+      
       return { success: true, message: 'All tests passed' };
     }
     
     console.log(`⚠️  Found ${testResults.failureCount} test failure(s)`);
     
-    // Step 3: Generate dashboard
-    console.log('\n📋 Step 3: Generating test dashboard...');
-    console.log('─'.repeat(80));
-    
-    execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
-    steps.generateDashboard = true;
-    console.log('✅ Dashboard generated');
-    
-    // Start live server for dashboard
-    dashboardServer = await startDashboardServer();
-    console.log('📊 Opening test dashboard in browser...');
-    await openInBrowser('http://localhost:3000');
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for browser to open
-    
-    // Step 4: Analyze errors with AI
+    // Step 4: Analyze errors with AI (BEFORE dashboard generation)
     console.log('\n📋 Step 4: Analyzing errors with AI...');
     console.log('─'.repeat(80));
     
@@ -82,36 +136,97 @@ async function runWorkflow() {
     
     console.log(`✅ Analyzed ${analysisResults.analysisResults?.length || 0} error(s)`);
     
-    // Step 5: Apply fixes
+    // Step 5: Apply fixes automatically
     console.log('\n📋 Step 5: Applying AI-suggested fixes...');
     console.log('─'.repeat(80));
     
     const fixResults = await applyFixes(analysisResults);
     steps.applyFixes = true;
-    console.log(`✅ Applied ${fixResults.successfulFixes} fix(es)`);
+    console.log(`✅ Applied ${fixResults.appliedCount || 0} fix(es)`);
     
     // Step 6: Verify fixes
     console.log('\n📋 Step 6: Verifying fixes...');
     console.log('─'.repeat(80));
     
-    const verifyResults = runTests();
+    const verificationResults = runTests();
+    console.log(`✅ Verification complete: ${verificationResults.failureCount} failure(s) remaining`);
     
-    if (verifyResults.allPassed) {
-      console.log('✅ All tests now passing!');
-    } else {
-      console.log(`⚠️  ${verifyResults.failureCount} test(s) still failing`);
+    // Step 7: Generate dashboard (AFTER fixes applied)
+    console.log('\n📋 Step 7: Generating test dashboard with AI analysis...');
+    console.log('─'.repeat(80));
+    
+    execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
+    steps.generateDashboard = true;
+    console.log('✅ Dashboard generated with AI insights');
+    
+    // Step 7.5: Enrich dashboard with Jira data
+    console.log('\n📋 Step 7.5: Enriching dashboard with Jira data...');
+    console.log('─'.repeat(80));
+    
+    try {
+      execSync('node scripts/enrich-dashboard-with-jira.js', { stdio: 'inherit' });
+      console.log('✅ Dashboard enriched with Jira board integration');
+      
+      // Rebuild dashboard with Jira data
+      execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
+      console.log('✅ Dashboard rebuilt with Jira integration');
+    } catch (error) {
+      console.log('⚠️  Jira enrichment skipped (not configured or failed)');
     }
     
-    // Step 7: Create PR
-    console.log('\n📋 Step 7: Creating GitHub Pull Request...');
+    // Update Jira board status based on test results
+    console.log('\n📋 Step 7.6: Updating Jira board status...');
+    console.log('─'.repeat(80));
+    
+    try {
+      execSync('node scripts/update-jira-board-status.js', { stdio: 'inherit' });
+      console.log('✅ Jira board status updated');
+    } catch (error) {
+      console.log('⚠️  Jira board update skipped (not configured or failed)');
+    }
+    
+    // Start live server for dashboard
+    dashboardServer = await startDashboardServer();
+    const dashboardPort = dashboardServer.port || 3000;
+    console.log('📊 Opening test dashboard in browser...');
+    await openInBrowser(`http://localhost:${dashboardPort}`);
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for browser to open
+    
+    // Step 8: Create Pull Request
+    console.log('\n📋 Step 8: Creating GitHub Pull Request...');
     console.log('─'.repeat(80));
     
     const prResults = await createPR(analysisResults, fixResults);
     steps.createPR = true;
     
     if (prResults.success) {
-      console.log(`✅ Pull Request created: ${prResults.prUrl}`);
+      console.log(`✅ Pull Request created: ${prResults.url}`);
+    } else {
+      console.log('⚠️  PR creation skipped:', prResults.message || prResults.error);
     }
+    
+    // Summary
+    console.log('\n' + '═'.repeat(80));
+    console.log('✅ Complete Workflow Finished!');
+    console.log('═'.repeat(80));
+    console.log('\nSummary:');
+    console.log(`  Tests Run: ${testResults.totalTests}`);
+    console.log(`  Initial Failures: ${testResults.failureCount}`);
+    console.log(`  Fixes Applied: ${fixResults.appliedCount || 0}`);
+    console.log(`  Final Failures: ${verificationResults.failureCount}`);
+    if (prResults.success) {
+      console.log(`  Pull Request: ${prResults.url}`);
+    }
+    console.log('\n📊 Servers Running:');
+    console.log('   🌐 Website: http://localhost:8000');
+    console.log(`   📊 Dashboard: http://localhost:${dashboardPort}`);
+    console.log(`\n📊 View dashboard: http://localhost:${dashboardPort}`);
+    console.log('📊 View AI report: ai-agent-reports/latest-report.json');
+    console.log('\n' + '─'.repeat(80));
+    console.log('⏸️  Servers are running. Press ENTER to stop servers and exit...');
+    console.log('─'.repeat(80));
+    
+    await waitForUserInput();
     
     // Cleanup
     console.log('\n📋 Cleaning up...');
@@ -121,28 +236,28 @@ async function runWorkflow() {
     }
     console.log('✅ Servers stopped');
     
-    // Summary
-    console.log('\n' + '═'.repeat(80));
-    console.log('✅ Complete Workflow Finished!');
-    console.log('═'.repeat(80));
-    console.log('\nSummary:');
-    console.log(`  Tests Run: ${testResults.totalTests}`);
-    console.log(`  Initial Failures: ${testResults.failureCount}`);
-    console.log(`  Fixes Applied: ${fixResults.successfulFixes}`);
-    console.log(`  Final Status: ${verifyResults.allPassed ? '✅ All Passing' : `⚠️  ${verifyResults.failureCount} Still Failing`}`);
-    if (prResults.success) {
-      console.log(`  Pull Request: ${prResults.prUrl}`);
-    }
-    console.log('\n📊 View dashboard: custom-report/index.html');
-    console.log('📊 View AI report: ai-agent-reports/latest-report.json');
-    
-    return { success: true, results: { testResults, analysisResults, fixResults, prResults } };
+    return { success: true, results: { testResults, analysisResults, fixResults, verificationResults, prResults } };
     
   } catch (error) {
     console.error('\n❌ Workflow failed:', error.message);
     console.error(error.stack);
     return { success: false, error: error.message };
   }
+}
+
+function waitForUserInput() {
+  return new Promise((resolve) => {
+    const readline = require('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    
+    rl.on('line', () => {
+      rl.close();
+      resolve();
+    });
+  });
 }
 
 async function openInBrowser(url) {
@@ -157,8 +272,8 @@ async function openInBrowser(url) {
   });
 }
 
-async function startDashboardServer() {
-  console.log('Starting dashboard server on port 3000...');
+async function startDashboardServer(port = 3000) {
+  console.log(`Starting dashboard server on port ${port}...`);
   
   const http = require('http');
   const dashboardDir = path.join(process.cwd(), 'custom-report');
@@ -208,15 +323,33 @@ async function startDashboardServer() {
     });
   });
   
-  server.listen(3000);
-  
-  // Return a mock process object with kill method
-  return {
-    kill: () => {
-      server.close();
-      console.log('✅ Dashboard server stopped');
-    }
-  };
+  return new Promise((resolve, reject) => {
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.log(`⚠️  Port ${port} is in use, trying port ${port + 1}...`);
+        server.close();
+        // Try next port
+        if (port < 3010) {
+          resolve(startDashboardServer(port + 1));
+        } else {
+          reject(new Error('Could not find available port for dashboard server'));
+        }
+      } else {
+        reject(error);
+      }
+    });
+    
+    server.listen(port, () => {
+      console.log(`✅ Dashboard server started on port ${port}`);
+      resolve({
+        port,
+        kill: () => {
+          server.close();
+          console.log('✅ Dashboard server stopped');
+        }
+      });
+    });
+  });
 }
 
 function startProjectServer() {
@@ -258,10 +391,20 @@ async function waitForServer(url, timeout = 30000) {
 }
 
 function runTests() {
-  console.log('Running Playwright tests...');
+  const jiraOnlyTests = process.env.JIRA_ONLY_TESTS === 'true';
+  
+  if (jiraOnlyTests) {
+    console.log('Running Jira-generated tests only...');
+  } else {
+    console.log('Running Playwright tests...');
+  }
   
   try {
-    execSync('npx playwright test', {
+    const testCommand = jiraOnlyTests 
+      ? 'npx playwright test --config=playwright.jira.config.js'
+      : 'npx playwright test';
+    
+    execSync(testCommand, {
       stdio: 'inherit',
       cwd: process.cwd()
     });
@@ -387,6 +530,11 @@ async function analyzeWithAI() {
   
   const analysisResults = await orchestrator.errorAnalyzer.analyzeTestFailures(testResults);
   
+  // Save analysis for dashboard consumption
+  if (analysisResults && analysisResults.hasErrors) {
+    orchestrator.errorAnalyzer.saveAnalysisForDashboard(analysisResults);
+  }
+  
   return analysisResults;
 }
 
@@ -426,6 +574,30 @@ async function createPR(analysisResults, fixResults) {
   } catch (error) {
     console.error('Failed to create PR:', error.message);
     return { success: false, error: error.message };
+  }
+}
+
+async function scanJiraAndGenerateTests() {
+  console.log('🔍 Scanning Jira board for stories...');
+  
+  try {
+    // Check if Jira is configured
+    if (!process.env.JIRA_BASE_URL || !process.env.JIRA_API_TOKEN) {
+      console.log('⚠️  Jira not configured, skipping story scanning');
+      console.log('   Using existing tests only');
+      return;
+    }
+    
+    // Run Jira sync to generate tests from stories
+    execSync('node jira-integration/index.js --sync', {
+      stdio: 'inherit',
+      cwd: process.cwd()
+    });
+    
+    console.log('✅ Tests generated from Jira stories');
+  } catch (error) {
+    console.warn('⚠️  Jira story scanning failed:', error.message);
+    console.log('   Continuing with existing tests only');
   }
 }
 

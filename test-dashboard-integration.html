@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Dashboard AI Integration</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard AI Integration Test</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testIntegration() {
+            const results = document.getElementById('results');
+            
+            // Test 1: Load test results
+            results.innerHTML += '<h2>Test 1: Loading test-results.json</h2>';
+            try {
+                const testResponse = await fetch('custom-report/test-results.json');
+                const testData = await testResponse.json();
+                results.innerHTML += `<p class="success">✓ Loaded test results: ${testData.suites?.length || 0} suites</p>`;
+                
+                // Count tests
+                let testCount = 0;
+                let failedTests = [];
+                for (const suite of testData.suites || []) {
+                    for (const spec of suite.specs || []) {
+                        for (const test of spec.tests || []) {
+                            testCount++;
+                            const lastResult = test.results?.[test.results.length - 1];
+                            if (lastResult?.status === 'failed') {
+                                failedTests.push({
+                                    file: spec.file,
+                                    title: test.title || spec.title,
+                                    fullPath: spec.file
+                                });
+                            }
+                        }
+                    }
+                }
+                results.innerHTML += `<p class="info">Total tests: ${testCount}</p>`;
+                results.innerHTML += `<p class="info">Failed tests: ${failedTests.length}</p>`;
+                
+                // Test 2: Load AI analysis
+                results.innerHTML += '<h2>Test 2: Loading ai-analysis.json</h2>';
+                const aiResponse = await fetch('custom-report/ai-analysis.json');
+                const aiData = await aiResponse.json();
+                results.innerHTML += `<p class="success">✓ Loaded AI analysis: ${Object.keys(aiData.analyses || {}).length} analyses</p>`;
+                results.innerHTML += `<p class="info">AI Provider: ${aiData.aiProvider}</p>`;
+                results.innerHTML += `<p class="info">Model: ${aiData.model}</p>`;
+                
+                // Test 3: Match tests with AI analysis
+                results.innerHTML += '<h2>Test 3: Matching Tests with AI Analysis</h2>';
+                let matchCount = 0;
+                
+                for (const failedTest of failedTests) {
+                    let matched = false;
+                    
+                    // Try to find matching analysis
+                    for (const [key, analysis] of Object.entries(aiData.analyses)) {
+                        const normalizedTestFile = failedTest.fullPath.replace(/\\/g, '/').toLowerCase();
+                        const normalizedAnalysisFile = analysis.file.replace(/\\/g, '/').toLowerCase();
+                        const normalizedTestTitle = failedTest.title.toLowerCase().trim();
+                        const normalizedAnalysisTitle = analysis.testName.toLowerCase().trim();
+                        
+                        if ((normalizedTestFile.endsWith(normalizedAnalysisFile) || 
+                             normalizedAnalysisFile.endsWith(normalizedTestFile)) &&
+                            normalizedTestTitle === normalizedAnalysisTitle) {
+                            matched = true;
+                            matchCount++;
+                            results.innerHTML += `<p class="success">✓ Match: ${failedTest.title}</p>`;
+                            results.innerHTML += `<pre>  Test file: ${normalizedTestFile}\n  AI file: ${normalizedAnalysisFile}\n  Confidence: ${analysis.aiAnalysis.confidence}</pre>`;
+                            break;
+                        }
+                    }
+                    
+                    if (!matched) {
+                        results.innerHTML += `<p class="error">✗ No match: ${failedTest.title}</p>`;
+                        results.innerHTML += `<pre>  File: ${failedTest.fullPath}</pre>`;
+                    }
+                }
+                
+                results.innerHTML += `<h3>Summary: ${matchCount}/${failedTests.length} tests matched with AI analysis</h3>`;
+                
+                if (matchCount === failedTests.length && failedTests.length > 0) {
+                    results.innerHTML += '<p class="success" style="font-size: 1.2em; font-weight: bold;">✓ ALL TESTS MATCHED! Dashboard should display AI analysis correctly.</p>';
+                } else if (matchCount > 0) {
+                    results.innerHTML += '<p class="info" style="font-size: 1.2em; font-weight: bold;">⚠ PARTIAL MATCH: Some tests have AI analysis.</p>';
+                } else {
+                    results.innerHTML += '<p class="error" style="font-size: 1.2em; font-weight: bold;">✗ NO MATCHES: Dashboard will not display AI analysis.</p>';
+                }
+                
+            } catch (error) {
+                results.innerHTML += `<p class="error">✗ Error: ${error.message}</p>`;
+                console.error(error);
+            }
+        }
+        
+        testIntegration();
+    </script>
+</body>
+</html>

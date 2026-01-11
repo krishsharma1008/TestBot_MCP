@@ -2,6 +2,8 @@
 class TestDataParser {
     constructor() {
         this.testData = null;
+        this.aiAnalysisData = null;
+        this.attachmentsManifest = null;
         this.suites = new Map();
         this.tests = [];
         this.categoryStats = new Map();
@@ -14,6 +16,7 @@ class TestDataParser {
             passed: 0,
             failed: 0,
             skipped: 0,
+            timedout: 0,
             duration: 0,
             startTime: null,
             endTime: null,
@@ -24,6 +27,7 @@ class TestDataParser {
         this.suites = new Map();
         this.tests = [];
         this.categoryStats = new Map();
+        // Don't reset aiAnalysisData here - it should persist after loading
     }
 
     /**
@@ -36,12 +40,52 @@ class TestDataParser {
                 throw new Error(`Failed to load test data: ${response.statusText}`);
             }
             this.testData = await response.json();
+            
+            // Try to load AI analysis data
+            await this.loadAIAnalysis();
+            
+            // Try to load attachments manifest
+            await this.loadAttachmentsManifest();
+            
             this.parseData();
             return this.testData;
         } catch (error) {
             console.error('Error loading test data:', error);
             // Return mock data for demonstration if file doesn't exist
             return this.generateMockData();
+        }
+    }
+
+    /**
+     * Load AI analysis data if available
+     */
+    async loadAttachmentsManifest(jsonPath = 'attachments-manifest.json') {
+        try {
+            const response = await fetch(jsonPath);
+            if (!response.ok) {
+                console.log('No attachments manifest found (this is normal if no tests failed)');
+                return;
+            }
+            this.attachmentsManifest = await response.json();
+            console.log('✅ Loaded attachments manifest');
+        } catch (error) {
+            console.log('No attachments manifest available');
+        }
+    }
+
+    async loadAIAnalysis() {
+        try {
+            const response = await fetch('ai-analysis.json');
+            if (response.ok) {
+                this.aiAnalysisData = await response.json();
+                console.log('✅ Loaded AI analysis data:', Object.keys(this.aiAnalysisData.analyses || {}).length, 'analyses');
+            } else {
+                console.log('ℹ️  AI analysis file not found (status:', response.status, ')');
+                this.aiAnalysisData = null;
+            }
+        } catch (error) {
+            console.log('ℹ️  No AI analysis data available:', error.message);
+            this.aiAnalysisData = null;
         }
     }
 
@@ -120,7 +164,8 @@ class TestDataParser {
             const duration = lastResult.duration || 0;
             const error = lastResult.error;
             const category = this.getCategoryFromTest(test, spec.file);
-            const attachments = this.parseAttachments(lastResult.attachments || []);
+            // Parse attachments from JSON (usually empty) and supplement with folder scan
+            const attachments = this.parseAttachments(lastResult.attachments || [], spec.file, normalizedStatus);
 
             // Create test object
             const testObj = {
@@ -137,8 +182,12 @@ class TestDataParser {
                 } : null,
                 retries: results.length - 1,
                 file: spec.file || '',
-                attachments: attachments
+                attachments: attachments,
+                aiAnalysis: null
             };
+            
+            // Merge AI analysis if available for this test
+            this.mergeAIAnalysis(testObj);
 
             // Update statistics
             this.stats.total++;
@@ -164,6 +213,10 @@ class TestDataParser {
                     this.stats.skipped++;
                     suiteStats.skipped++;
                     break;
+                case 'timedout':
+                    this.stats.timedout++;
+                    suiteStats.timedout = (suiteStats.timedout || 0) + 1;
+                    break;
                 default:
                     break;
             }
@@ -174,10 +227,76 @@ class TestDataParser {
         });
     }
 
+    /**
+     * Merge AI analysis data with test object
+     */
+    mergeAIAnalysis(testObj) {
+        if (!this.aiAnalysisData || !this.aiAnalysisData.analyses) {
+            return;
+        }
+
+        // Try multiple matching strategies
+        // Strategy 1: Exact match using file-title ID
+        const testId1 = `${testObj.file}-${testObj.title}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+        
+        // Strategy 2: Match by file and title separately (more flexible)
+        let matchedAnalysis = this.aiAnalysisData.analyses[testId1];
+        
+        if (!matchedAnalysis) {
+            // Try to find by matching file path and test name
+            for (const [key, analysis] of Object.entries(this.aiAnalysisData.analyses)) {
+                // Normalize paths for comparison (handle forward/backward slashes)
+                const normalizedTestFile = testObj.file.replace(/\\/g, '/').toLowerCase();
+                const normalizedAnalysisFile = analysis.file.replace(/\\/g, '/').toLowerCase();
+                const normalizedTestTitle = testObj.title.toLowerCase().trim();
+                const normalizedAnalysisTitle = analysis.testName.toLowerCase().trim();
+                
+                // Check if file paths end with the same relative path
+                if (normalizedTestFile.endsWith(normalizedAnalysisFile) || 
+                    normalizedAnalysisFile.endsWith(normalizedTestFile)) {
+                    // Check if test names match
+                    if (normalizedTestTitle === normalizedAnalysisTitle) {
+                        matchedAnalysis = analysis;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (matchedAnalysis && matchedAnalysis.aiAnalysis) {
+            testObj.aiAnalysis = {
+                analysis: matchedAnalysis.aiAnalysis.analysis || '',
+                rootCause: matchedAnalysis.aiAnalysis.rootCause || '',
+                confidence: matchedAnalysis.aiAnalysis.confidence || 0,
+                suggestedFix: matchedAnalysis.aiAnalysis.suggestedFix || null,
+                affectedFiles: matchedAnalysis.aiAnalysis.affectedFiles || [],
+                testingRecommendations: matchedAnalysis.aiAnalysis.testingRecommendations || '',
+                aiProvider: this.aiAnalysisData.aiProvider || 'AI',
+                model: this.aiAnalysisData.model || 'Unknown'
+            };
+        }
+    }
+
     getCategoryFromTest(test, filePath) {
+        // Check for smoke test tags or annotations
+        if (test && test.tags) {
+            const tags = Array.isArray(test.tags) ? test.tags : [test.tags];
+            if (tags.some(tag => tag.toLowerCase().includes('smoke'))) {
+                return 'Smoke';
+            }
+        }
+        
+        // Check test title for smoke indicator
+        if (test && test.title && test.title.toLowerCase().includes('@smoke')) {
+            return 'Smoke';
+        }
+        
         // First try to get category from projectName metadata
         if (test && test.projectName) {
             const projectName = test.projectName.toLowerCase();
+            if (projectName === 'smoke') {
+                return 'Smoke';
+            }
             if (projectName === 'frontend') {
                 return 'Frontend';
             }
@@ -191,6 +310,9 @@ class TestDataParser {
             return 'Other';
         }
         const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+        if (normalized.includes('smoke')) {
+            return 'Smoke';
+        }
         if (normalized.includes('frontend')) {
             return 'Frontend';
         }
@@ -200,49 +322,64 @@ class TestDataParser {
         return 'Other';
     }
 
-    parseAttachments(attachments) {
-        if (!attachments || !Array.isArray(attachments)) {
-            return {
-                screenshots: [],
-                videos: [],
-                traces: [],
-                other: []
-            };
-        }
-
+    parseAttachments(attachments, testFile, testStatus) {
         const parsed = {
             screenshots: [],
             videos: [],
             traces: [],
             other: []
         };
+        
+        // If attachments array is provided and not empty, parse it
+        if (attachments && Array.isArray(attachments) && attachments.length > 0) {
 
-        attachments.forEach(attachment => {
-            const { name, contentType, path } = attachment;
+            attachments.forEach(attachment => {
+                const { name, contentType, path } = attachment;
+                
+                if (!path) return;
+
+                // Convert absolute path to relative path for web access
+                const relativePath = this.convertToRelativePath(path);
+                
+                const attachmentObj = {
+                    name: name || 'Unnamed',
+                    contentType: contentType || 'application/octet-stream',
+                    path: relativePath,
+                    originalPath: path
+                };
+
+                // Categorize by content type
+                if (contentType && contentType.startsWith('image/')) {
+                    parsed.screenshots.push(attachmentObj);
+                } else if (contentType && contentType.startsWith('video/')) {
+                    parsed.videos.push(attachmentObj);
+                } else if (name && (name.includes('trace') || contentType === 'application/zip')) {
+                    parsed.traces.push(attachmentObj);
+                } else {
+                    parsed.other.push(attachmentObj);
+                }
+            });
+        } else if (testFile && this.attachmentsManifest) {
+            // Check if we have attachments in the manifest for this test file
+            const normalizedTestFile = testFile.replace(/\\/g, '/');
+            const manifestEntry = this.attachmentsManifest[normalizedTestFile];
             
-            if (!path) return;
-
-            // Convert absolute path to relative path for web access
-            const relativePath = this.convertToRelativePath(path);
-            
-            const attachmentObj = {
-                name: name || 'Unnamed',
-                contentType: contentType || 'application/octet-stream',
-                path: relativePath,
-                originalPath: path
-            };
-
-            // Categorize by content type
-            if (contentType && contentType.startsWith('image/')) {
-                parsed.screenshots.push(attachmentObj);
-            } else if (contentType && contentType.startsWith('video/')) {
-                parsed.videos.push(attachmentObj);
-            } else if (name && (name.includes('trace') || contentType === 'application/zip')) {
-                parsed.traces.push(attachmentObj);
-            } else {
-                parsed.other.push(attachmentObj);
+            if (manifestEntry) {
+                // Merge manifest attachments into parsed
+                if (manifestEntry.screenshots) {
+                    parsed.screenshots.push(...manifestEntry.screenshots);
+                }
+                if (manifestEntry.videos) {
+                    parsed.videos.push(...manifestEntry.videos);
+                }
+                if (manifestEntry.traces) {
+                    parsed.traces.push(...manifestEntry.traces);
+                }
+                if (manifestEntry.other) {
+                    parsed.other.push(...manifestEntry.other);
+                }
             }
-        });
+        }
 
         return parsed;
     }
@@ -253,18 +390,19 @@ class TestDataParser {
         // Convert Windows backslashes to forward slashes
         let normalized = absolutePath.replace(/\\/g, '/');
         
-        // Try to find test-results directory and convert to absolute URL via PHP server
-        const testResultsIndex = normalized.indexOf('/test-results/');
-        if (testResultsIndex !== -1) {
-            // Return absolute URL pointing to PHP server on port 8000
-            const relativePath = normalized.substring(testResultsIndex + 1); // Remove leading slash
-            return `http://localhost:8000/${relativePath}`;
+        // Extract just the filename from test-results directory
+        // Paths look like: C:/Users/.../test-results/mscship_XX-...-screenshot-1.png
+        const testResultsMatch = normalized.match(/test-results\/(.+)$/);
+        if (testResultsMatch) {
+            // Return relative path from dashboard location
+            // Dashboard is in custom-report/, test-results/ is at same level
+            return `../test-results/${testResultsMatch[1]}`;
         }
         
-        // Fallback: try to extract just the test-results path
-        const testResultsMatch = normalized.match(/test-results\/.+$/);
-        if (testResultsMatch) {
-            return `http://localhost:8000/${testResultsMatch[0]}`;
+        // Try alternative pattern with backslashes
+        const testResultsMatch2 = normalized.match(/test-results[\/\\](.+)$/);
+        if (testResultsMatch2) {
+            return `../test-results/${testResultsMatch2[1]}`;
         }
         
         // Last resort: return the path as-is
@@ -279,6 +417,7 @@ class TestDataParser {
                 passed: 0,
                 failed: 0,
                 skipped: 0,
+                timedout: 0,
                 duration: 0
             });
         }
@@ -299,6 +438,9 @@ class TestDataParser {
             case 'pending':
                 entry.skipped++;
                 break;
+            case 'timedout':
+                entry.timedout++;
+                break;
             default:
                 break;
         }
@@ -311,6 +453,7 @@ class TestDataParser {
             passed: 0,
             failed: 0,
             skipped: 0,
+            timedout: 0,
             duration: 0
         };
     }
@@ -604,6 +747,8 @@ class TestDataParser {
                 return 'Frontend';
             case 'backend':
                 return 'Backend';
+            case 'smoke':
+                return 'Smoke';
             default:
                 return 'Other';
         }

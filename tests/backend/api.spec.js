@@ -12,7 +12,7 @@ async function fetchCruises(request) {
   });
   expect(response.ok()).toBeTruthy();
 const responseData = await response.text();
-const cruises = JSON.parse(responseData);
+if (!response.ok) { throw new Error(`API request failed with status: ${response.status}`); } const cruises = JSON.parse(responseData);
   expect(Array.isArray(cruises)).toBeTruthy();
   expect(cruises.length).toBeGreaterThan(0);
   return cruises;

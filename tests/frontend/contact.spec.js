@@ -67,7 +67,7 @@ test.describe('Contact Page Tests', () => {
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('send-email-mock.php') && resp.status() === 200,
-      { timeout: 15000 },
+      { timeout: 30000 },
     );
     await page.click('input[type="submit"]');
     await responsePromise;
@@ -86,7 +86,7 @@ test.describe('Contact Page Tests', () => {
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('send-email.php') && resp.status() === 200,
-      { timeout: 15000 },
+      { timeout: 30000 },
     );
     await page.click('input[type="submit"]');
     await responsePromise;

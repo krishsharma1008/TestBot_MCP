@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test AI Dashboard Integration</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #3b82f6; }
+        .warning { color: #f59e0b; }
+        pre { background: #2d2d2d; padding: 15px; overflow-x: auto; border-radius: 8px; }
+        h2 { border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        .test-card { background: #2d2d2d; padding: 15px; margin: 10px 0; border-left: 4px solid #667eea; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 AI Dashboard Integration Test</h1>
+    <div id="results"></div>
+
+    <script src="custom-report/data-parser.js"></script>
+    <script>
+        async function testIntegration() {
+            const results = document.getElementById('results');
+            
+            try {
+                results.innerHTML += '<h2>Step 1: Initialize Parser</h2>';
+                const parser = new TestDataParser();
+                results.innerHTML += '<p class="success">✓ TestDataParser initialized</p>';
+                
+                results.innerHTML += '<h2>Step 2: Load Data</h2>';
+                await parser.loadData('custom-report/test-results.json');
+                results.innerHTML += '<p class="success">✓ Test data loaded</p>';
+                
+                const allTests = parser.getTests();
+                results.innerHTML += `<p class="info">Total tests: ${allTests.length}</p>`;
+                
+                results.innerHTML += '<h2>Step 3: Check AI Analysis Data</h2>';
+                if (parser.aiAnalysisData) {
+                    results.innerHTML += '<p class="success">✓ AI analysis data loaded</p>';
+                    results.innerHTML += `<p class="info">AI Provider: ${parser.aiAnalysisData.aiProvider}</p>`;
+                    results.innerHTML += `<p class="info">Model: ${parser.aiAnalysisData.model}</p>`;
+                    results.innerHTML += `<p class="info">Total analyses: ${Object.keys(parser.aiAnalysisData.analyses).length}</p>`;
+                    
+                    results.innerHTML += '<h3>Sample AI Analysis Keys:</h3>';
+                    results.innerHTML += '<pre>' + Object.keys(parser.aiAnalysisData.analyses).slice(0, 3).join('\n') + '</pre>';
+                } else {
+                    results.innerHTML += '<p class="error">✗ No AI analysis data loaded</p>';
+                }
+                
+                results.innerHTML += '<h2>Step 4: Check Tests with AI Analysis</h2>';
+                const testsWithAI = allTests.filter(test => test.aiAnalysis);
+                results.innerHTML += `<p class="${testsWithAI.length > 0 ? 'success' : 'error'}">Tests with AI analysis: ${testsWithAI.length}</p>`;
+                
+                if (testsWithAI.length > 0) {
+                    results.innerHTML += '<h3>Tests with AI Analysis:</h3>';
+                    testsWithAI.forEach(test => {
+                        results.innerHTML += `
+                            <div class="test-card">
+                                <strong>${test.title}</strong><br>
+                                <small>File: ${test.file}</small><br>
+                                <small>Confidence: ${Math.round(test.aiAnalysis.confidence * 100)}%</small><br>
+                                <small>Analysis: ${test.aiAnalysis.analysis.substring(0, 100)}...</small>
+                            </div>
+                        `;
+                    });
+                } else {
+                    results.innerHTML += '<h3>Debug: Checking Matching Logic</h3>';
+                    
+                    // Get failed tests
+                    const failedTests = allTests.filter(t => t.status === 'failed' || t.status === 'unexpected');
+                    results.innerHTML += `<p class="info">Failed tests: ${failedTests.length}</p>`;
+                    
+                    if (failedTests.length > 0 && parser.aiAnalysisData) {
+                        results.innerHTML += '<h4>Matching Attempts:</h4>';
+                        
+                        const sampleTest = failedTests[0];
+                        results.innerHTML += `<div class="test-card">
+                            <strong>Sample Test:</strong><br>
+                            Title: ${sampleTest.title}<br>
+                            File: ${sampleTest.file}<br>
+                            Normalized file: ${sampleTest.file.replace(/\\/g, '/').toLowerCase()}
+                        </div>`;
+                        
+                        results.innerHTML += '<h4>Sample AI Analysis:</h4>';
+                        const firstAnalysisKey = Object.keys(parser.aiAnalysisData.analyses)[0];
+                        const firstAnalysis = parser.aiAnalysisData.analyses[firstAnalysisKey];
+                        results.innerHTML += `<div class="test-card">
+                            <strong>Key:</strong> ${firstAnalysisKey}<br>
+                            <strong>Test Name:</strong> ${firstAnalysis.testName}<br>
+                            <strong>File:</strong> ${firstAnalysis.file}<br>
+                            <strong>Normalized file:</strong> ${firstAnalysis.file.replace(/\\/g, '/').toLowerCase()}
+                        </div>`;
+                        
+                        // Try matching
+                        const normalizedTestFile = sampleTest.file.replace(/\\/g, '/').toLowerCase();
+                        const normalizedAnalysisFile = firstAnalysis.file.replace(/\\/g, '/').toLowerCase();
+                        const normalizedTestTitle = sampleTest.title.toLowerCase().trim();
+                        const normalizedAnalysisTitle = firstAnalysis.testName.toLowerCase().trim();
+                        
+                        results.innerHTML += '<h4>Matching Check:</h4>';
+                        results.innerHTML += `<p class="${normalizedTestFile.endsWith(normalizedAnalysisFile) ? 'success' : 'error'}">
+                            File path ends match: ${normalizedTestFile.endsWith(normalizedAnalysisFile)}
+                        </p>`;
+                        results.innerHTML += `<p class="${normalizedAnalysisFile.endsWith(normalizedTestFile) ? 'success' : 'error'}">
+                            Analysis file ends match: ${normalizedAnalysisFile.endsWith(normalizedTestFile)}
+                        </p>`;
+                        results.innerHTML += `<p class="${normalizedTestTitle === normalizedAnalysisTitle ? 'success' : 'error'}">
+                            Title match: ${normalizedTestTitle === normalizedAnalysisTitle}
+                        </p>`;
+                    }
+                }
+                
+                results.innerHTML += '<h2>Step 5: Test renderAISummary Function</h2>';
+                if (typeof renderAISummary === 'function') {
+                    results.innerHTML += '<p class="success">✓ renderAISummary function exists</p>';
+                } else {
+                    results.innerHTML += '<p class="error">✗ renderAISummary function not found</p>';
+                }
+                
+            } catch (error) {
+                results.innerHTML += `<p class="error">✗ Error: ${error.message}</p>`;
+                results.innerHTML += `<pre>${error.stack}</pre>`;
+                console.error(error);
+            }
+        }
+        
+        testIntegration();
+    </script>
+</body>
+</html>

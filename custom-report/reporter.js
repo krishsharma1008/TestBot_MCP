@@ -24,6 +24,7 @@ function refreshDashboard() {
     setActiveScopeTab(currentScope);
     updateScopeCounts();
     updateKPIs();
+    renderAISummary();
     renderCategoryCards();
     renderCharts();
     renderTestTable();
@@ -42,14 +43,17 @@ function updateScopeCounts() {
     const allStats = parser.getScopeStats('all');
     const frontendStats = parser.getScopeStats('frontend');
     const backendStats = parser.getScopeStats('backend');
+    const smokeStats = parser.getScopeStats('smoke');
 
     const allNode = document.getElementById('scopeAllCount');
     const feNode = document.getElementById('scopeFrontendCount');
     const beNode = document.getElementById('scopeBackendCount');
+    const smokeNode = document.getElementById('scopeSmokeCount');
 
     if (allNode) allNode.textContent = allStats.total ?? 0;
     if (feNode) feNode.textContent = frontendStats.total ?? 0;
     if (beNode) beNode.textContent = backendStats.total ?? 0;
+    if (smokeNode) smokeNode.textContent = smokeStats.total ?? 0;
 }
 
 /**
@@ -67,15 +71,18 @@ function updateKPIs() {
     document.getElementById('passedTests').textContent = stats.passed;
     document.getElementById('failedTests').textContent = stats.failed;
     document.getElementById('skippedTests').textContent = stats.skipped;
+    document.getElementById('timedoutTests').textContent = stats.timedout || 0;
     
     // Calculate and update percentages
     const passedPercentage = stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0;
     const failedPercentage = stats.total > 0 ? Math.round((stats.failed / stats.total) * 100) : 0;
     const skippedPercentage = stats.total > 0 ? Math.round((stats.skipped / stats.total) * 100) : 0;
+    const timedoutPercentage = stats.total > 0 ? Math.round(((stats.timedout || 0) / stats.total) * 100) : 0;
     
     document.getElementById('passedPercentage').textContent = `${passedPercentage}%`;
     document.getElementById('failedPercentage').textContent = `${failedPercentage}%`;
     document.getElementById('skippedPercentage').textContent = `${skippedPercentage}%`;
+    document.getElementById('timedoutPercentage').textContent = `${timedoutPercentage}%`;
     
     // Update pass rate
     document.getElementById('passRate').textContent = `${stats.passRate}%`;
@@ -183,6 +190,322 @@ function renderCategoryCards() {
         `;
         container.appendChild(card);
     });
+}
+
+/**
+ * Render AI Analysis Summary section
+ */
+let currentAICardIndex = 0;
+let aiAnalysisCards = [];
+
+function renderAISummary() {
+    console.log('🤖 renderAISummary called');
+    
+    const aiSummarySection = document.getElementById('aiSummarySection');
+    const aiSummaryCarousel = document.getElementById('aiSummaryCarousel');
+    const aiSummaryBadge = document.getElementById('aiSummaryBadge');
+    const aiSummaryCounter = document.getElementById('aiSummaryCounter');
+    
+    console.log('  - aiSummarySection:', aiSummarySection ? 'found' : 'NOT FOUND');
+    console.log('  - aiSummaryCarousel:', aiSummaryCarousel ? 'found' : 'NOT FOUND');
+    console.log('  - parser:', parser ? 'exists' : 'NOT EXISTS');
+    
+    if (!parser || !aiSummarySection || !aiSummaryCarousel) {
+        console.log('  ❌ Early return: missing required elements');
+        return;
+    }
+    
+    // Get all tests with AI analysis
+    let testsWithAI = parser.getTests().filter(test => test.aiAnalysis);
+    console.log('  - Tests with AI analysis:', testsWithAI.length);
+    console.log('  - parser.aiAnalysisData:', parser.aiAnalysisData ? 'exists' : 'NOT EXISTS');
+    
+    if (parser.aiAnalysisData) {
+        console.log('  - AI analyses count:', Object.keys(parser.aiAnalysisData.analyses || {}).length);
+    }
+    
+    // If no tests have AI analysis but AI data exists, create pseudo-tests from AI data
+    if (testsWithAI.length === 0 && parser.aiAnalysisData && parser.aiAnalysisData.analyses) {
+        console.log('  ✓ Creating pseudo-tests from AI analysis data');
+        testsWithAI = Object.values(parser.aiAnalysisData.analyses).map(analysis => ({
+            id: analysis.testName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, ''),
+            title: analysis.testName,
+            fullTitle: analysis.testName,
+            suite: 'Unknown Suite',
+            category: analysis.file.includes('frontend') ? 'Frontend' : analysis.file.includes('backend') ? 'Backend' : 'Other',
+            status: 'failed',
+            duration: 0,
+            error: analysis.error,
+            retries: 0,
+            file: analysis.file,
+            attachments: [],
+            aiAnalysis: analysis.aiAnalysis
+        }));
+    }
+    
+    console.log('  - Final testsWithAI count:', testsWithAI.length);
+    
+    if (testsWithAI.length === 0) {
+        console.log('  ❌ No tests with AI analysis - hiding section');
+        aiSummarySection.style.display = 'none';
+        return;
+    }
+    
+    // Show section and update badge
+    console.log('  ✓ Showing AI Summary section with', testsWithAI.length, 'analyses');
+    aiSummarySection.style.display = 'block';
+    aiSummaryBadge.textContent = `${testsWithAI.length} ${testsWithAI.length === 1 ? 'analysis' : 'analyses'}`;
+    
+    // Clear existing content
+    aiSummaryCarousel.innerHTML = '';
+    aiAnalysisCards = testsWithAI;
+    currentAICardIndex = 0;
+    
+    // Create cards for each test with AI analysis
+    testsWithAI.forEach((test, index) => {
+        console.log(`  - Creating card ${index + 1}:`, test.title);
+        const card = createAISummaryCard(test);
+        if (index === 0) {
+            card.classList.add('active');
+        }
+        aiSummaryCarousel.appendChild(card);
+    });
+    
+    // Update counter
+    updateAICarouselCounter();
+    
+    // Setup navigation
+    setupAICarouselNavigation();
+    
+    console.log('  ✅ AI Summary section rendered successfully');
+}
+
+function updateAICarouselCounter() {
+    const counter = document.getElementById('aiSummaryCounter');
+    if (counter && aiAnalysisCards.length > 0) {
+        counter.textContent = `${currentAICardIndex + 1} / ${aiAnalysisCards.length}`;
+    }
+}
+
+function setupAICarouselNavigation() {
+    const prevBtn = document.getElementById('aiCarouselPrev');
+    const nextBtn = document.getElementById('aiCarouselNext');
+    
+    if (!prevBtn || !nextBtn) return;
+    
+    // Remove old listeners
+    prevBtn.replaceWith(prevBtn.cloneNode(true));
+    nextBtn.replaceWith(nextBtn.cloneNode(true));
+    
+    const newPrevBtn = document.getElementById('aiCarouselPrev');
+    const newNextBtn = document.getElementById('aiCarouselNext');
+    
+    newPrevBtn.addEventListener('click', () => navigateAICarousel(-1));
+    newNextBtn.addEventListener('click', () => navigateAICarousel(1));
+    
+    updateNavigationButtons();
+}
+
+function navigateAICarousel(direction) {
+    const carousel = document.getElementById('aiSummaryCarousel');
+    if (!carousel) return;
+    
+    const cards = carousel.querySelectorAll('.ai-summary-card');
+    if (cards.length === 0) return;
+    
+    // Remove active class from current card
+    cards[currentAICardIndex].classList.remove('active');
+    if (direction < 0) {
+        cards[currentAICardIndex].classList.add('prev');
+    }
+    
+    // Update index
+    currentAICardIndex += direction;
+    currentAICardIndex = Math.max(0, Math.min(currentAICardIndex, cards.length - 1));
+    
+    // Add active class to new card
+    cards[currentAICardIndex].classList.add('active');
+    cards[currentAICardIndex].classList.remove('prev');
+    
+    // Update counter and buttons
+    updateAICarouselCounter();
+    updateNavigationButtons();
+}
+
+function updateNavigationButtons() {
+    const prevBtn = document.getElementById('aiCarouselPrev');
+    const nextBtn = document.getElementById('aiCarouselNext');
+    
+    if (!prevBtn || !nextBtn) return;
+    
+    prevBtn.disabled = currentAICardIndex === 0;
+    nextBtn.disabled = currentAICardIndex === aiAnalysisCards.length - 1;
+}
+
+/**
+ * Create AI summary card for a test
+ */
+function createAISummaryCard(test) {
+    const card = document.createElement('div');
+    card.className = 'ai-summary-card';
+    
+    const analysis = test.aiAnalysis;
+    const confidencePercent = Math.round(analysis.confidence * 100);
+    const confidenceClass = confidencePercent >= 80 ? 'high' : confidencePercent >= 50 ? 'medium' : 'low';
+    
+    card.innerHTML = `
+        <div class="ai-summary-card-header">
+            <div class="ai-summary-card-title">
+                <i class="fas fa-vial"></i>
+                <span>${escapeHtml(test.title)}</span>
+            </div>
+            <span class="confidence-badge confidence-${confidenceClass}">${confidencePercent}% confidence</span>
+        </div>
+        
+        <div class="ai-summary-card-meta">
+            <span class="ai-summary-suite"><i class="fas fa-folder"></i> ${escapeHtml(test.suite.split(' › ').pop())}</span>
+            <span class="ai-summary-provider"><i class="fas fa-robot"></i> ${escapeHtml(analysis.aiProvider)} ${escapeHtml(analysis.model)}</span>
+        </div>
+        
+        <div class="ai-summary-card-content">
+            <div class="ai-summary-item">
+                <div class="ai-summary-item-label">
+                    <i class="fas fa-info-circle"></i> What & Why
+                </div>
+                <div class="ai-summary-item-text">
+                    ${analysis.analysis ? escapeHtml(analysis.analysis) : 'No analysis available'}
+                </div>
+            </div>
+            
+            ${analysis.rootCause ? `
+                <div class="ai-summary-item">
+                    <div class="ai-summary-item-label">
+                        <i class="fas fa-bug"></i> Root Cause
+                    </div>
+                    <div class="ai-summary-item-text">
+                        ${escapeHtml(analysis.rootCause)}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${analysis.suggestedFix?.description ? `
+                <div class="ai-summary-item">
+                    <div class="ai-summary-item-label">
+                        <i class="fas fa-wrench"></i> Suggested Fix
+                    </div>
+                    <div class="ai-summary-item-text">
+                        ${escapeHtml(analysis.suggestedFix.description)}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${analysis.affectedFiles && analysis.affectedFiles.length > 0 ? `
+                <div class="ai-summary-item">
+                    <div class="ai-summary-item-label">
+                        <i class="fas fa-file-code"></i> Affected Files
+                    </div>
+                    <div class="ai-summary-files">
+                        ${analysis.affectedFiles.map(file => 
+                            `<code>${escapeHtml(file)}</code>`
+                        ).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+        
+        <div class="ai-summary-card-footer">
+            <button class="btn-apply-fix" 
+                    data-test-file="${escapeHtml(test.file)}" 
+                    data-test-title="${escapeHtml(test.title)}"
+                    onclick="applyAIFix('${escapeHtml(test.file)}', '${escapeHtml(test.title)}')">
+                <i class="fas fa-magic"></i> Apply Fix
+            </button>
+        </div>
+    `;
+    
+    return card;
+}
+
+/**
+ * Apply AI-suggested fix for a specific test
+ */
+async function applyAIFix(testFile, testTitle) {
+    const button = event.target.closest('.btn-apply-fix');
+    if (!button) return;
+    
+    // Disable button and show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying Fix...';
+    
+    try {
+        console.log('Applying fix for:', testFile, testTitle);
+        
+        // Call the fix application endpoint
+        const response = await fetch('http://localhost:3001/apply-fix', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                testFile,
+                testTitle
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Fix application failed: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Show success state
+        button.innerHTML = '<i class="fas fa-check"></i> Fix Applied!';
+        button.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+        
+        // Show notification
+        showNotification('Fix applied successfully! Running verification tests...', 'success');
+        
+        console.log('Fix application result:', result);
+        
+    } catch (error) {
+        console.error('Error applying fix:', error);
+        
+        // Show error state
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Fix Failed';
+        button.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+        
+        showNotification(`Failed to apply fix: ${error.message}`, 'error');
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            button.innerHTML = '<i class="fas fa-magic"></i> Apply Fix';
+            button.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        }, 3000);
+    }
+}
+
+/**
+ * Show notification message
+ */
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => notification.classList.add('show'), 10);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
 }
 
 /**
@@ -359,12 +682,31 @@ function createTestRow(test) {
     if (test.status === 'unexpected') normalizedStatus = 'failed';
     if (test.status === 'pending') normalizedStatus = 'skipped';
     
+    // Extract Jira story key from file name (e.g., mscship_1.spec.js -> MSCSHIP-1)
+    let jiraStoryKey = '';
+    let jiraLink = '';
+    if (test.file) {
+        const match = test.file.match(/mscship[_-]?(\d+)/i);
+        if (match) {
+            jiraStoryKey = `MSCSHIP-${match[1]}`;
+            jiraLink = `https://shreyespd12.atlassian.net/browse/${jiraStoryKey}`;
+        }
+    }
+    
     tr.innerHTML = `
         <td>
-            <div class="test-name">${escapeHtml(test.title)}</div>
+            <div class="test-name">
+                ${escapeHtml(test.title)}
+                ${test.aiAnalysis ? '<span class="ai-indicator" title="AI Analysis Available"><i class="fas fa-robot"></i></span>' : ''}
+            </div>
             ${test.retries > 0 ? `<small style="color: var(--color-warning)">Retried ${test.retries} time(s)</small>` : ''}
         </td>
         <td>${escapeHtml(test.suite.split(' › ').pop())}</td>
+        <td>
+            ${jiraStoryKey ? `<a href="${jiraLink}" target="_blank" class="jira-link" title="View in Jira">
+                <i class="fab fa-jira"></i> ${jiraStoryKey}
+            </a>` : '<span style="color: #999;">N/A</span>'}
+        </td>
         <td>
             <span class="status-badge status-${normalizedStatus}">
                 ${TestDataParser.getStatusIcon(normalizedStatus)}
@@ -566,10 +908,100 @@ function showTestDetails(testId) {
                 ` : ''}
             </div>
         ` : ''}
+        ${renderAIAnalysis(test)}
         ${renderTestArtifacts(test)}
     `;
     
     modal.classList.add('active');
+}
+
+/**
+ * Render AI analysis section
+ */
+function renderAIAnalysis(test) {
+    if (!test.aiAnalysis) {
+        return '';
+    }
+
+    const analysis = test.aiAnalysis;
+    const confidencePercent = Math.round(analysis.confidence * 100);
+    const confidenceClass = confidencePercent >= 80 ? 'high' : confidencePercent >= 50 ? 'medium' : 'low';
+
+    let html = `
+        <div class="ai-analysis-section">
+            <h4>
+                <i class="fas fa-robot"></i> AI Analysis 
+                <span class="ai-badge">${escapeHtml(analysis.aiProvider)} ${escapeHtml(analysis.model)}</span>
+                <span class="confidence-badge confidence-${confidenceClass}">${confidencePercent}% confidence</span>
+            </h4>
+    `;
+
+    if (analysis.analysis) {
+        html += `
+            <div class="ai-analysis-item">
+                <strong><i class="fas fa-info-circle"></i> What is this test about?</strong>
+                <p>${escapeHtml(analysis.analysis)}</p>
+            </div>
+        `;
+    }
+
+    if (analysis.rootCause) {
+        html += `
+            <div class="ai-analysis-item">
+                <strong><i class="fas fa-bug"></i> Why is it failing?</strong>
+                <p>${escapeHtml(analysis.rootCause)}</p>
+            </div>
+        `;
+    }
+
+    if (analysis.suggestedFix && analysis.suggestedFix.description) {
+        html += `
+            <div class="ai-analysis-item">
+                <strong><i class="fas fa-wrench"></i> How to fix it?</strong>
+                <p>${escapeHtml(analysis.suggestedFix.description)}</p>
+        `;
+
+        if (analysis.suggestedFix.changes && analysis.suggestedFix.changes.length > 0) {
+            html += `<div class="fix-changes">`;
+            analysis.suggestedFix.changes.forEach((change, idx) => {
+                html += `
+                    <div class="fix-change-item">
+                        <div class="fix-change-header">
+                            <strong>Change ${idx + 1}:</strong> ${escapeHtml(change.file)}
+                            <span class="fix-action-badge">${escapeHtml(change.action)}</span>
+                        </div>
+                        ${change.lineStart ? `<div class="fix-lines">Lines ${change.lineStart}${change.lineEnd ? '-' + change.lineEnd : ''}</div>` : ''}
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+
+        html += `</div>`;
+    }
+
+    if (analysis.affectedFiles && analysis.affectedFiles.length > 0) {
+        html += `
+            <div class="ai-analysis-item">
+                <strong><i class="fas fa-file-code"></i> Affected Files:</strong>
+                <ul class="affected-files-list">
+                    ${analysis.affectedFiles.map(file => `<li><code>${escapeHtml(file)}</code></li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    if (analysis.testingRecommendations) {
+        html += `
+            <div class="ai-analysis-item">
+                <strong><i class="fas fa-clipboard-check"></i> Testing Recommendations:</strong>
+                <p>${escapeHtml(analysis.testingRecommendations)}</p>
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+    return html;
 }
 
 /**

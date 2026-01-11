@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Summary Test</title>
+    <link rel="stylesheet" href="custom-report/dashboard-styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { padding: 20px; }
+        .test-status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            font-weight: bold;
+        }
+        .test-status.success { background: #d1fae5; color: #065f46; }
+        .test-status.error { background: #fee2e2; color: #991b1b; }
+        .test-status.info { background: #dbeafe; color: #1e40af; }
+    </style>
+</head>
+<body>
+    <h1>🧪 AI Summary Section Test</h1>
+    <div id="testResults"></div>
+    
+    <hr style="margin: 30px 0;">
+    
+    <div class="container">
+        <!-- AI Analysis Summary Section -->
+        <section class="ai-summary-section" id="aiSummarySection" style="display: none;">
+            <h2 class="section-title">
+                <i class="fas fa-robot"></i> AI Analysis Summary
+                <span class="ai-summary-badge" id="aiSummaryBadge">0 analyses</span>
+            </h2>
+            <div class="ai-summary-grid" id="aiSummaryGrid">
+                <!-- AI analysis cards will be injected here -->
+            </div>
+        </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="custom-report/data-parser.js"></script>
+    <script src="custom-report/reporter.js"></script>
+    
+    <script>
+        let testResults = document.getElementById('testResults');
+        let testsPassed = 0;
+        let testsFailed = 0;
+        
+        function logTest(name, passed, message) {
+            const div = document.createElement('div');
+            div.className = `test-status ${passed ? 'success' : 'error'}`;
+            div.innerHTML = `${passed ? '✓' : '✗'} ${name}: ${message}`;
+            testResults.appendChild(div);
+            if (passed) testsPassed++; else testsFailed++;
+        }
+        
+        function logInfo(message) {
+            const div = document.createElement('div');
+            div.className = 'test-status info';
+            div.innerHTML = `ℹ️ ${message}`;
+            testResults.appendChild(div);
+        }
+        
+        async function runTests() {
+            try {
+                logInfo('Starting AI Summary Section Tests...');
+                
+                // Test 1: Initialize parser
+                logInfo('Test 1: Initializing TestDataParser...');
+                parser = new TestDataParser();
+                logTest('Parser Initialization', true, 'TestDataParser created successfully');
+                
+                // Test 2: Load data
+                logInfo('Test 2: Loading test data...');
+                await parser.loadData('custom-report/test-results.json');
+                logTest('Data Loading', true, 'Test data loaded successfully');
+                
+                // Test 3: Check AI analysis data
+                logInfo('Test 3: Checking AI analysis data...');
+                if (parser.aiAnalysisData) {
+                    const analysisCount = Object.keys(parser.aiAnalysisData.analyses).length;
+                    logTest('AI Analysis Data', true, `Found ${analysisCount} AI analyses`);
+                    logInfo(`AI Provider: ${parser.aiAnalysisData.aiProvider}`);
+                    logInfo(`Model: ${parser.aiAnalysisData.model}`);
+                } else {
+                    logTest('AI Analysis Data', false, 'No AI analysis data found');
+                }
+                
+                // Test 4: Check tests with AI analysis
+                logInfo('Test 4: Checking tests with AI analysis...');
+                const allTests = parser.getTests();
+                const testsWithAI = allTests.filter(test => test.aiAnalysis);
+                logInfo(`Total tests: ${allTests.length}`);
+                logInfo(`Tests with AI analysis: ${testsWithAI.length}`);
+                
+                // Test 5: Render AI Summary
+                logInfo('Test 5: Rendering AI Summary section...');
+                if (typeof renderAISummary === 'function') {
+                    renderAISummary();
+                    
+                    const aiSection = document.getElementById('aiSummarySection');
+                    const aiGrid = document.getElementById('aiSummaryGrid');
+                    
+                    if (aiSection.style.display !== 'none') {
+                        const cardCount = aiGrid.children.length;
+                        logTest('AI Summary Rendering', true, `Section visible with ${cardCount} cards`);
+                        
+                        if (cardCount > 0) {
+                            logInfo('Sample card content:');
+                            const firstCard = aiGrid.children[0];
+                            const title = firstCard.querySelector('.ai-summary-card-title span')?.textContent || 'N/A';
+                            const confidence = firstCard.querySelector('.confidence-badge')?.textContent || 'N/A';
+                            logInfo(`  Title: ${title}`);
+                            logInfo(`  Confidence: ${confidence}`);
+                        }
+                    } else {
+                        logTest('AI Summary Rendering', false, 'Section is hidden');
+                    }
+                } else {
+                    logTest('AI Summary Function', false, 'renderAISummary function not found');
+                }
+                
+                // Summary
+                logInfo('─'.repeat(50));
+                logInfo(`Tests Passed: ${testsPassed}`);
+                logInfo(`Tests Failed: ${testsFailed}`);
+                
+                if (testsFailed === 0) {
+                    const successDiv = document.createElement('div');
+                    successDiv.className = 'test-status success';
+                    successDiv.style.fontSize = '1.2em';
+                    successDiv.style.marginTop = '20px';
+                    successDiv.innerHTML = '🎉 ALL TESTS PASSED! AI Summary section is working correctly.';
+                    testResults.appendChild(successDiv);
+                }
+                
+            } catch (error) {
+                logTest('Test Execution', false, error.message);
+                console.error('Test error:', error);
+            }
+        }
+        
+        // Run tests when page loads
+        window.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html>

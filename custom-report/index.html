@@ -28,18 +28,8 @@
             <div class="scope-tabs" role="tablist">
                 <button class="scope-tab active" data-scope="all" role="tab" aria-selected="true">
                     <i class="fas fa-layer-group"></i>
-                    All
+                    All Jira Tests
                     <span class="scope-count" id="scopeAllCount">0</span>
-                </button>
-                <button class="scope-tab" data-scope="frontend" role="tab" aria-selected="false">
-                    <i class="fas fa-desktop"></i>
-                    Frontend
-                    <span class="scope-count" id="scopeFrontendCount">0</span>
-                </button>
-                <button class="scope-tab" data-scope="backend" role="tab" aria-selected="false">
-                    <i class="fas fa-database"></i>
-                    Backend
-                    <span class="scope-count" id="scopeBackendCount">0</span>
                 </button>
             </div>
         </div>
@@ -88,6 +78,16 @@
                             <div class="kpi-value" id="skippedTests">0</div>
                             <div class="kpi-label">Skipped</div>
                             <div class="kpi-percentage" id="skippedPercentage">0%</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card kpi-timedout">
+                        <div class="kpi-icon">
+                            <i class="fas fa-hourglass-end"></i>
+                        </div>
+                        <div class="kpi-content">
+                            <div class="kpi-value" id="timedoutTests">0</div>
+                            <div class="kpi-label">Timed Out</div>
+                            <div class="kpi-percentage" id="timedoutPercentage">0%</div>
                         </div>
                     </div>
                     <div class="kpi-card kpi-rate">
@@ -167,6 +167,28 @@
                 </div>
             </section>
 
+            <!-- AI Analysis Summary Section -->
+            <section class="ai-summary-section" id="aiSummarySection" style="display: none;">
+                <div class="ai-summary-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-robot"></i> AI Analysis Summary
+                        <span class="ai-summary-badge" id="aiSummaryBadge">0 analyses</span>
+                    </h2>
+                    <div class="ai-summary-counter" id="aiSummaryCounter">1 / 10</div>
+                </div>
+                <div class="ai-summary-carousel">
+                    <button class="carousel-nav carousel-nav-prev" id="aiCarouselPrev" aria-label="Previous analysis">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <div class="ai-summary-carousel-container" id="aiSummaryCarousel">
+                        <!-- AI analysis cards will be injected here -->
+                    </div>
+                    <button class="carousel-nav carousel-nav-next" id="aiCarouselNext" aria-label="Next analysis">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </section>
+
             <!-- Category Breakdown -->
             <section class="category-section">
                 <h2 class="section-title">Suite Breakdown</h2>
@@ -233,6 +255,9 @@
                                 <th class="sortable" data-sort="suite">
                                     Suite <i class="fas fa-sort"></i>
                                 </th>
+                                <th class="sortable" data-sort="jira">
+                                    Jira Story <i class="fas fa-sort"></i>
+                                </th>
                                 <th class="sortable" data-sort="status">
                                     Status <i class="fas fa-sort"></i>
                                 </th>
@@ -257,7 +282,7 @@
             <!-- Footer -->
             <footer class="dashboard-footer">
                 <div class="footer-links">
-                    <a href="http://localhost:8000/playwright-report/index.html" class="footer-link" target="_blank">
+                    <a href="../playwright-report/index.html" class="footer-link" target="_blank">
                         <i class="fas fa-file-alt"></i> View Full Playwright Report
                     </a>
                     <a href="#" class="footer-link" onclick="window.print(); return false;">

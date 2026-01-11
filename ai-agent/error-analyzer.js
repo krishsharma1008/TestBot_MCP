@@ -453,6 +453,61 @@ Please provide your response in the following JSON format:
 
     return report;
   }
+
+  saveAnalysisForDashboard(analysisResults) {
+    const dashboardAnalysisPath = path.join(process.cwd(), 'custom-report', 'ai-analysis.json');
+    
+    const dashboardData = {
+      timestamp: analysisResults.timestamp || new Date().toISOString(),
+      aiProvider: this.config.aiProvider,
+      model: this.config.model,
+      totalFailures: analysisResults.failures?.length || 0,
+      analyzedFailures: analysisResults.analysisResults?.length || 0,
+      analyses: {}
+    };
+
+    if (analysisResults.analysisResults) {
+      for (const result of analysisResults.analysisResults) {
+        const testId = `${result.failure.file}-${result.failure.testName}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+        
+        dashboardData.analyses[testId] = {
+          testName: result.failure.testName,
+          file: result.failure.file,
+          status: result.failure.status,
+          error: {
+            message: result.failure.error?.message || '',
+            stack: result.failure.error?.stack || ''
+          },
+          aiAnalysis: {
+            analysis: result.analysis || '',
+            rootCause: result.suggestedFix?.rootCause || '',
+            confidence: result.confidence || 0,
+            suggestedFix: {
+              description: result.suggestedFix?.description || '',
+              changes: result.suggestedFix?.changes || []
+            },
+            affectedFiles: result.affectedFiles || [],
+            testingRecommendations: result.suggestedFix?.testingRecommendations || ''
+          },
+          artifacts: result.failure.artifacts || {
+            screenshots: [],
+            videos: [],
+            traces: []
+          }
+        };
+      }
+    }
+
+    const dir = path.dirname(dashboardAnalysisPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    fs.writeFileSync(dashboardAnalysisPath, JSON.stringify(dashboardData, null, 2), 'utf-8');
+    console.log(`✅ Saved AI analysis for dashboard: ${dashboardAnalysisPath}`);
+    
+    return dashboardAnalysisPath;
+  }
 }
 
 module.exports = ErrorAnalyzer;

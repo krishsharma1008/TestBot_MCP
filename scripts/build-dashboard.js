@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { generateAttachmentsManifest } = require('./generate-attachments-manifest');
 
 const SOURCE_DIR = path.join(__dirname, '..', 'custom-reporter');
 const TARGET_DIR = path.join(__dirname, '..', 'custom-report');
@@ -14,6 +15,13 @@ const TEST_RESULTS_FILE = path.join(__dirname, '..', 'test-results.json');
 
 function buildDashboard() {
     console.log('\n📊 Building Custom Test Dashboard...\n');
+    
+    // Generate attachments manifest first
+    try {
+        generateAttachmentsManifest();
+    } catch (error) {
+        console.warn('⚠️  Could not generate attachments manifest:', error.message);
+    }
 
     // Create target directory if it doesn't exist
     if (!fs.existsSync(TARGET_DIR)) {
@@ -61,7 +69,7 @@ function buildDashboard() {
 
     // Copy JavaScript files
     try {
-        const jsFiles = ['data-parser.js', 'reporter.js'];
+        const jsFiles = ['data-parser.js', 'jira-dashboard.js', 'reporter.js'];
         jsFiles.forEach(file => {
             const sourcePath = path.join(SOURCE_DIR, file);
             const targetPath = path.join(TARGET_DIR, file);
@@ -76,15 +84,38 @@ function buildDashboard() {
         process.exit(1);
     }
 
+    // Copy Jira dashboard styles
+    try {
+        const jiraStylesPath = path.join(SOURCE_DIR, 'jira-dashboard-styles.css');
+        const targetJiraStylesPath = path.join(TARGET_DIR, 'jira-dashboard-styles.css');
+        
+        if (fs.existsSync(jiraStylesPath)) {
+            fs.copyFileSync(jiraStylesPath, targetJiraStylesPath);
+            console.log('✓ Copied Jira dashboard styles');
+        }
+    } catch (error) {
+        console.warn('⚠️  Warning: Could not copy Jira dashboard styles:', error.message);
+    }
+
     // Copy test results if they exist
     if (fs.existsSync(TEST_RESULTS_FILE)) {
         try {
             const targetResultsPath = path.join(TARGET_DIR, 'test-results.json');
-            fs.copyFileSync(TEST_RESULTS_FILE, targetResultsPath);
+            // Use read/write instead of copyFileSync to avoid permission issues
+            const testData = fs.readFileSync(TEST_RESULTS_FILE, 'utf8');
+            fs.writeFileSync(targetResultsPath, testData, 'utf8');
             console.log('✓ Copied test results');
         } catch (error) {
             console.warn('⚠️  Warning: Could not copy test results:', error.message);
         }
+    }
+
+    // Copy AI analysis if it exists
+    const AI_ANALYSIS_FILE = path.join(TARGET_DIR, 'ai-analysis.json');
+    if (fs.existsSync(AI_ANALYSIS_FILE)) {
+        console.log('✓ AI analysis already in target directory');
+    } else {
+        console.log('ℹ️  No AI analysis available yet (run tests with AI analysis to generate)');
     }
 
     console.log('\n✨ Dashboard built successfully!');
