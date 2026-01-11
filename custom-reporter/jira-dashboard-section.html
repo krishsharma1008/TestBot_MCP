@@ -1,0 +1,97 @@
+<!-- Jira Board Integration Section -->
+<section class="jira-board-section" id="jiraBoardSection" style="display: none;">
+    <div class="jira-board-header">
+        <h2 class="section-title">
+            <i class="fas fa-tasks"></i> Jira Board Status
+            <span class="jira-project-badge" id="jiraProjectBadge">MSCSHIP</span>
+        </h2>
+        <div class="jira-board-actions">
+            <button class="btn-refresh" id="refreshJiraBtn" title="Refresh Jira data">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+            <a href="#" id="jiraBoardLink" class="btn-link" target="_blank">
+                <i class="fas fa-external-link-alt"></i> Open in Jira
+            </a>
+        </div>
+    </div>
+
+    <div class="jira-board-stats">
+        <div class="jira-stat-card">
+            <div class="jira-stat-icon todo">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <div class="jira-stat-content">
+                <div class="jira-stat-value" id="jiraTodoCount">0</div>
+                <div class="jira-stat-label">To Do</div>
+            </div>
+        </div>
+        <div class="jira-stat-card">
+            <div class="jira-stat-icon in-progress">
+                <i class="fas fa-spinner"></i>
+            </div>
+            <div class="jira-stat-content">
+                <div class="jira-stat-value" id="jiraInProgressCount">0</div>
+                <div class="jira-stat-label">In Progress</div>
+            </div>
+        </div>
+        <div class="jira-stat-card">
+            <div class="jira-stat-icon done">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="jira-stat-content">
+                <div class="jira-stat-value" id="jiraDoneCount">0</div>
+                <div class="jira-stat-label">Done</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="jira-board-container">
+        <div class="jira-board-column">
+            <div class="jira-column-header todo">
+                <i class="fas fa-clipboard-list"></i>
+                <span>To Do</span>
+                <span class="jira-column-count" id="jiraTodoColumnCount">0</span>
+            </div>
+            <div class="jira-column-content" id="jiraTodoColumn">
+                <!-- Story cards will be injected here -->
+            </div>
+        </div>
+
+        <div class="jira-board-column">
+            <div class="jira-column-header in-progress">
+                <i class="fas fa-spinner"></i>
+                <span>In Progress</span>
+                <span class="jira-column-count" id="jiraInProgressColumnCount">0</span>
+            </div>
+            <div class="jira-column-content" id="jiraInProgressColumn">
+                <!-- Story cards will be injected here -->
+            </div>
+        </div>
+
+        <div class="jira-board-column">
+            <div class="jira-column-header done">
+                <i class="fas fa-check-circle"></i>
+                <span>Done</span>
+                <span class="jira-column-count" id="jiraDoneColumnCount">0</span>
+            </div>
+            <div class="jira-column-content" id="jiraDoneColumn">
+                <!-- Story cards will be injected here -->
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Jira Story Detail Modal -->
+<div class="modal" id="jiraStoryModal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3 id="jiraStoryModalTitle">Story Details</h3>
+            <button class="modal-close" onclick="closeJiraStoryModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" id="jiraStoryModalBody">
+            <!-- Story details will be populated here -->
+        </div>
+    </div>
+</div>

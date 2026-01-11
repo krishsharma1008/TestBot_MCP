@@ -61,7 +61,7 @@ function buildDashboard() {
 
     // Copy JavaScript files
     try {
-        const jsFiles = ['data-parser.js', 'reporter.js'];
+        const jsFiles = ['data-parser.js', 'jira-dashboard.js', 'reporter.js'];
         jsFiles.forEach(file => {
             const sourcePath = path.join(SOURCE_DIR, file);
             const targetPath = path.join(TARGET_DIR, file);
@@ -74,6 +74,19 @@ function buildDashboard() {
     } catch (error) {
         console.error('❌ Error copying JavaScript files:', error.message);
         process.exit(1);
+    }
+
+    // Copy Jira dashboard styles
+    try {
+        const jiraStylesPath = path.join(SOURCE_DIR, 'jira-dashboard-styles.css');
+        const targetJiraStylesPath = path.join(TARGET_DIR, 'jira-dashboard-styles.css');
+        
+        if (fs.existsSync(jiraStylesPath)) {
+            fs.copyFileSync(jiraStylesPath, targetJiraStylesPath);
+            console.log('✓ Copied Jira dashboard styles');
+        }
+    } catch (error) {
+        console.warn('⚠️  Warning: Could not copy Jira dashboard styles:', error.message);
     }
 
     // Copy test results if they exist

@@ -1,0 +1,401 @@
+{
+  "timestamp": "2026-01-11T16:37:04.019Z",
+  "jiraProject": "MSCSHIP",
+  "jiraBaseUrl": "https://shreyespd12.atlassian.net",
+  "mapping": {
+    "totalTests": 0,
+    "totalStories": 0,
+    "testToStory": {},
+    "storyToTests": {}
+  },
+  "stories": [],
+  "testResults": [
+    {
+      "id": "frontend\\authenticated.spec.js-›-authenticated-user-flows-user-can-login-and-see-dropdown-with-name",
+      "title": "user can login and see dropdown with name",
+      "suite": "frontend\\authenticated.spec.js › Authenticated user flows",
+      "file": "frontend/authenticated.spec.js",
+      "status": "failed",
+      "duration": 24286,
+      "error": {
+        "message": "ReferenceError: toHaveText is not defined",
+        "stack": "ReferenceError: toHaveText is not defined\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\frontend\\authenticated.spec.js:16:1"
+      },
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\authenticated.spec.js-›-authenticated-user-flows-reservation-page-requires-authentication",
+      "title": "reservation page requires authentication",
+      "suite": "frontend\\authenticated.spec.js › Authenticated user flows",
+      "file": "frontend/authenticated.spec.js",
+      "status": "passed",
+      "duration": 17888,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\authenticated.spec.js-›-authenticated-user-flows-logged-in-user-can-access-reservation-page",
+      "title": "logged-in user can access reservation page",
+      "suite": "frontend\\authenticated.spec.js › Authenticated user flows",
+      "file": "frontend/authenticated.spec.js",
+      "status": "passed",
+      "duration": 23915,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\authenticated.spec.js-›-authenticated-user-flows-user-can-logout-from-navbar-dropdown",
+      "title": "user can logout from navbar dropdown",
+      "suite": "frontend\\authenticated.spec.js › Authenticated user flows",
+      "file": "frontend/authenticated.spec.js",
+      "status": "timedout",
+      "duration": 31981,
+      "error": {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+      },
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\authenticated.spec.js-›-cruises-interactions-opening-cruise-detail-renders-modal-with-reservation-form",
+      "title": "opening cruise detail renders modal with reservation form",
+      "suite": "frontend\\authenticated.spec.js › Cruises interactions",
+      "file": "frontend/authenticated.spec.js",
+      "status": "timedout",
+      "duration": 57959,
+      "error": {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+      },
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\authenticated.spec.js-›-cruises-interactions-searching-cruises-by-navire-triggers-results-update",
+      "title": "searching cruises by navire triggers results update",
+      "suite": "frontend\\authenticated.spec.js › Cruises interactions",
+      "file": "frontend/authenticated.spec.js",
+      "status": "timedout",
+      "duration": 58542,
+      "error": {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+      },
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-load-contact-page-successfully",
+      "title": "should load contact page successfully",
+      "suite": "frontend\\contact.spec.js › Contact Page Tests",
+      "file": "frontend/contact.spec.js",
+      "status": "passed",
+      "duration": 5138,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-display-contact-form-elements",
+      "title": "should display contact form elements",
+      "suite": "frontend\\contact.spec.js › Contact Page Tests",
+      "file": "frontend/contact.spec.js",
+      "status": "passed",
+      "duration": 7165,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-validate-contact-form-fields",
+      "title": "should validate contact form fields",
+      "suite": "frontend\\contact.spec.js › Contact Page Tests",
+      "file": "frontend/contact.spec.js",
+      "status": "passed",
+      "duration": 6312,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-submit-contact-form-via-mock-handler",
+      "title": "should submit contact form via mock handler",
+      "suite": "frontend\\contact.spec.js › Contact Page Tests",
+      "file": "frontend/contact.spec.js",
+      "status": "timedout",
+      "duration": 38489,
+      "error": {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+      },
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-submit-contact-form-via-real-handler-and-log-entry",
+      "title": "should submit contact form via real handler and log entry",
+      "suite": "frontend\\contact.spec.js › Contact Page Tests",
+      "file": "frontend/contact.spec.js",
+      "status": "timedout",
+      "duration": 33984,
+      "error": {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+      },
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-load-cruises-page-successfully",
+      "title": "should load cruises page successfully",
+      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
+      "file": "frontend/cruises.spec.js",
+      "status": "passed",
+      "duration": 1152,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-display-cruise-listings",
+      "title": "should display cruise listings",
+      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
+      "file": "frontend/cruises.spec.js",
+      "status": "passed",
+      "duration": 2053,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-have-search/filter-functionality",
+      "title": "should have search/filter functionality",
+      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
+      "file": "frontend/cruises.spec.js",
+      "status": "passed",
+      "duration": 2137,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-display-cruise-cards-with-details",
+      "title": "should display cruise cards with details",
+      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
+      "file": "frontend/cruises.spec.js",
+      "status": "passed",
+      "duration": 1448,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-allow-viewing-cruise-details",
+      "title": "should allow viewing cruise details",
+      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
+      "file": "frontend/cruises.spec.js",
+      "status": "passed",
+      "duration": 1945,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\home.spec.js-›-home-page-tests-should-load-home-page-successfully",
+      "title": "should load home page successfully",
+      "suite": "frontend\\home.spec.js › Home Page Tests",
+      "file": "frontend/home.spec.js",
+      "status": "passed",
+      "duration": 5190,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\home.spec.js-›-home-page-tests-should-display-navigation-elements",
+      "title": "should display navigation elements",
+      "suite": "frontend\\home.spec.js › Home Page Tests",
+      "file": "frontend/home.spec.js",
+      "status": "passed",
+      "duration": 4584,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\home.spec.js-›-home-page-tests-should-display-cruise-listings",
+      "title": "should display cruise listings",
+      "suite": "frontend\\home.spec.js › Home Page Tests",
+      "file": "frontend/home.spec.js",
+      "status": "passed",
+      "duration": 4920,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\home.spec.js-›-home-page-tests-should-have-login-link",
+      "title": "should have login link",
+      "suite": "frontend\\home.spec.js › Home Page Tests",
+      "file": "frontend/home.spec.js",
+      "status": "passed",
+      "duration": 4827,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\home.spec.js-›-home-page-tests-should-have-register-link",
+      "title": "should have register link",
+      "suite": "frontend\\home.spec.js › Home Page Tests",
+      "file": "frontend/home.spec.js",
+      "status": "passed",
+      "duration": 10910,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\login.spec.js-›-login-page-tests-should-load-login-page-successfully",
+      "title": "should load login page successfully",
+      "suite": "frontend\\login.spec.js › Login Page Tests",
+      "file": "frontend/login.spec.js",
+      "status": "passed",
+      "duration": 3618,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\login.spec.js-›-login-page-tests-should-display-login-form-elements",
+      "title": "should display login form elements",
+      "suite": "frontend\\login.spec.js › Login Page Tests",
+      "file": "frontend/login.spec.js",
+      "status": "passed",
+      "duration": 3835,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\login.spec.js-›-login-page-tests-should-show-error-message-for-invalid-credentials",
+      "title": "should show error message for invalid credentials",
+      "suite": "frontend\\login.spec.js › Login Page Tests",
+      "file": "frontend/login.spec.js",
+      "status": "passed",
+      "duration": 4647,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\login.spec.js-›-login-page-tests-should-navigate-to-register-page",
+      "title": "should navigate to register page",
+      "suite": "frontend\\login.spec.js › Login Page Tests",
+      "file": "frontend/login.spec.js",
+      "status": "passed",
+      "duration": 9830,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\register.spec.js-›-register-page-tests-should-load-register-page-successfully",
+      "title": "should load register page successfully",
+      "suite": "frontend\\register.spec.js › Register Page Tests",
+      "file": "frontend/register.spec.js",
+      "status": "passed",
+      "duration": 7593,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\register.spec.js-›-register-page-tests-should-display-registration-form-elements",
+      "title": "should display registration form elements",
+      "suite": "frontend\\register.spec.js › Register Page Tests",
+      "file": "frontend/register.spec.js",
+      "status": "passed",
+      "duration": 6783,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\register.spec.js-›-register-page-tests-should-validate-required-fields",
+      "title": "should validate required fields",
+      "suite": "frontend\\register.spec.js › Register Page Tests",
+      "file": "frontend/register.spec.js",
+      "status": "passed",
+      "duration": 12871,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "frontend\\register.spec.js-›-register-page-tests-should-navigate-to-login-page",
+      "title": "should navigate to login page",
+      "suite": "frontend\\register.spec.js › Register Page Tests",
+      "file": "frontend/register.spec.js",
+      "status": "passed",
+      "duration": 3510,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "backend\\api.spec.js-›-cruise-catalog-apis-search-endpoint-returns-cruises-for-all-ports",
+      "title": "search endpoint returns cruises for ALL ports",
+      "suite": "backend\\api.spec.js › Cruise Catalog APIs",
+      "file": "backend/api.spec.js",
+      "status": "failed",
+      "duration": 464,
+      "error": {
+        "message": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON",
+        "stack": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON\n    at fetchCruises (C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:15:115)\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:31:21"
+      },
+      "jiraStory": null
+    },
+    {
+      "id": "backend\\api.spec.js-›-cruise-catalog-apis-cruise-detail-returns-itinerary-and-rom-data",
+      "title": "cruise detail returns itinerary and rom data",
+      "suite": "backend\\api.spec.js › Cruise Catalog APIs",
+      "file": "backend/api.spec.js",
+      "status": "failed",
+      "duration": 348,
+      "error": {
+        "message": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON",
+        "stack": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON\n    at fetchCruises (C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:15:115)\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:36:21"
+      },
+      "jiraStory": null
+    },
+    {
+      "id": "backend\\api.spec.js-›-cruise-catalog-apis-checksession-reports-false-when-not-authenticated",
+      "title": "checkSession reports false when not authenticated",
+      "suite": "backend\\api.spec.js › Cruise Catalog APIs",
+      "file": "backend/api.spec.js",
+      "status": "passed",
+      "duration": 423,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "backend\\api.spec.js-›-cruise-catalog-apis-cruise-detail-handles-burst-traffic",
+      "title": "cruise detail handles burst traffic",
+      "suite": "backend\\api.spec.js › Cruise Catalog APIs",
+      "file": "backend/api.spec.js",
+      "status": "failed",
+      "duration": 359,
+      "error": {
+        "message": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON",
+        "stack": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON\n    at fetchCruises (C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:15:115)\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:57:21"
+      },
+      "jiraStory": null
+    },
+    {
+      "id": "backend\\api.spec.js-›-contact-handlers-real-handler-rejects-incomplete-payload",
+      "title": "real handler rejects incomplete payload",
+      "suite": "backend\\api.spec.js › Contact handlers",
+      "file": "backend/api.spec.js",
+      "status": "passed",
+      "duration": 261,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "backend\\api.spec.js-›-contact-handlers-real-handler-accepts-valid-payload-and-logs-entry",
+      "title": "real handler accepts valid payload and logs entry",
+      "suite": "backend\\api.spec.js › Contact handlers",
+      "file": "backend/api.spec.js",
+      "status": "passed",
+      "duration": 327,
+      "error": null,
+      "jiraStory": null
+    },
+    {
+      "id": "backend\\api.spec.js-›-contact-handlers-mock-handler-echoes-payload-for-fast-verification",
+      "title": "mock handler echoes payload for fast verification",
+      "suite": "backend\\api.spec.js › Contact handlers",
+      "file": "backend/api.spec.js",
+      "status": "passed",
+      "duration": 457,
+      "error": null,
+      "jiraStory": null
+    }
+  ]
+}

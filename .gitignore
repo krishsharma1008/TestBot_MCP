@@ -38,3 +38,10 @@ yarn-error.log*
 # ai-agent-reports/
 *.backup.*
 >>>>>>> Stashed changes
+
+# Jira Integration
+.jira-cache/
+tests/jira-generated/
+jira-integration/regression-results/
+jira-integration/workflow-reports/
+jira-integration.config.js

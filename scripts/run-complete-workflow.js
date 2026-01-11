@@ -21,8 +21,15 @@ const steps = {
 
 async function runWorkflow() {
   try {
-    // Step 1: Start the project
-    console.log('\n📋 Step 1: Starting the project...');
+    // Step 1: Scan Jira and Generate Tests
+    console.log('\n📋 Step 1: Scanning Jira stories and generating tests...');
+    console.log('─'.repeat(80));
+    
+    await scanJiraAndGenerateTests();
+    console.log('✅ Jira stories scanned and tests generated');
+    
+    // Step 2: Start the project
+    console.log('\n📋 Step 2: Starting the project...');
     console.log('─'.repeat(80));
     
     const serverProcess = startProjectServer();
@@ -38,8 +45,8 @@ async function runWorkflow() {
     await openInBrowser('http://localhost:8000');
     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for browser to open
     
-    // Step 2: Run tests
-    console.log('\n📋 Step 2: Running tests...');
+    // Step 3: Run tests (existing + generated)
+    console.log('\n📋 Step 3: Running all tests (existing + Jira-generated)...');
     console.log('─'.repeat(80));
     
     const testResults = runTests();
@@ -49,10 +56,25 @@ async function runWorkflow() {
       console.log('✅ All tests passed! No fixes needed.');
       
       // Generate dashboard anyway
-      console.log('\n📋 Step 3: Generating test dashboard...');
+      console.log('\n📋 Step 4: Generating test dashboard...');
       console.log('─'.repeat(80));
       execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
       console.log('✅ Dashboard generated');
+      
+      // Enrich with Jira data
+      console.log('\n📋 Step 4.5: Enriching dashboard with Jira data...');
+      console.log('─'.repeat(80));
+      
+      try {
+        execSync('node scripts/enrich-dashboard-with-jira.js', { stdio: 'inherit' });
+        console.log('✅ Dashboard enriched with Jira board integration');
+        
+        // Rebuild dashboard with Jira data
+        execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
+        console.log('✅ Dashboard rebuilt with Jira integration');
+      } catch (error) {
+        console.log('⚠️  Jira enrichment skipped (not configured or failed)');
+      }
       
       // Start dashboard server
       dashboardServer = await startDashboardServer();
@@ -84,8 +106,8 @@ async function runWorkflow() {
     
     console.log(`⚠️  Found ${testResults.failureCount} test failure(s)`);
     
-    // Step 3: Analyze errors with AI (BEFORE dashboard generation)
-    console.log('\n📋 Step 3: Analyzing errors with AI...');
+    // Step 4: Analyze errors with AI (BEFORE dashboard generation)
+    console.log('\n📋 Step 4: Analyzing errors with AI...');
     console.log('─'.repeat(80));
     
     const analysisResults = await analyzeWithAI();
@@ -99,28 +121,43 @@ async function runWorkflow() {
     
     console.log(`✅ Analyzed ${analysisResults.analysisResults?.length || 0} error(s)`);
     
-    // Step 4: Apply fixes automatically
-    console.log('\n📋 Step 4: Applying AI-suggested fixes...');
+    // Step 5: Apply fixes automatically
+    console.log('\n📋 Step 5: Applying AI-suggested fixes...');
     console.log('─'.repeat(80));
     
     const fixResults = await applyFixes(analysisResults);
     steps.applyFixes = true;
     console.log(`✅ Applied ${fixResults.appliedCount || 0} fix(es)`);
     
-    // Step 5: Verify fixes
-    console.log('\n📋 Step 5: Verifying fixes...');
+    // Step 6: Verify fixes
+    console.log('\n📋 Step 6: Verifying fixes...');
     console.log('─'.repeat(80));
     
     const verificationResults = runTests();
     console.log(`✅ Verification complete: ${verificationResults.failureCount} failure(s) remaining`);
     
-    // Step 6: Generate dashboard (AFTER fixes applied)
-    console.log('\n📋 Step 6: Generating test dashboard with AI analysis...');
+    // Step 7: Generate dashboard (AFTER fixes applied)
+    console.log('\n📋 Step 7: Generating test dashboard with AI analysis...');
     console.log('─'.repeat(80));
     
     execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
     steps.generateDashboard = true;
     console.log('✅ Dashboard generated with AI insights');
+    
+    // Step 7.5: Enrich dashboard with Jira data
+    console.log('\n📋 Step 7.5: Enriching dashboard with Jira data...');
+    console.log('─'.repeat(80));
+    
+    try {
+      execSync('node scripts/enrich-dashboard-with-jira.js', { stdio: 'inherit' });
+      console.log('✅ Dashboard enriched with Jira board integration');
+      
+      // Rebuild dashboard with Jira data
+      execSync('node scripts/build-dashboard.js', { stdio: 'inherit' });
+      console.log('✅ Dashboard rebuilt with Jira integration');
+    } catch (error) {
+      console.log('⚠️  Jira enrichment skipped (not configured or failed)');
+    }
     
     // Start live server for dashboard
     dashboardServer = await startDashboardServer();
@@ -128,8 +165,8 @@ async function runWorkflow() {
     await openInBrowser('http://localhost:3000');
     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for browser to open
     
-    // Step 7: Create Pull Request
-    console.log('\n📋 Step 7: Creating GitHub Pull Request...');
+    // Step 8: Create Pull Request
+    console.log('\n📋 Step 8: Creating GitHub Pull Request...');
     console.log('─'.repeat(80));
     
     const prResults = await createPR(analysisResults, fixResults);
@@ -482,6 +519,30 @@ async function createPR(analysisResults, fixResults) {
   } catch (error) {
     console.error('Failed to create PR:', error.message);
     return { success: false, error: error.message };
+  }
+}
+
+async function scanJiraAndGenerateTests() {
+  console.log('🔍 Scanning Jira board for stories...');
+  
+  try {
+    // Check if Jira is configured
+    if (!process.env.JIRA_BASE_URL || !process.env.JIRA_API_TOKEN) {
+      console.log('⚠️  Jira not configured, skipping story scanning');
+      console.log('   Using existing tests only');
+      return;
+    }
+    
+    // Run Jira sync to generate tests from stories
+    execSync('node jira-integration/index.js --sync', {
+      stdio: 'inherit',
+      cwd: process.cwd()
+    });
+    
+    console.log('✅ Tests generated from Jira stories');
+  } catch (error) {
+    console.warn('⚠️  Jira story scanning failed:', error.message);
+    console.log('   Continuing with existing tests only');
   }
 }
 

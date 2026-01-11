@@ -20,7 +20,19 @@
     "ai-agent:no-pr": "node ai-agent/index.js --no-pr",
     "ai-agent:windsurf": "node ai-agent/index.js --provider windsurf",
     "workflow": "node scripts/run-complete-workflow.js",
-    "workflow:no-pr": "node scripts/run-complete-workflow.js --no-pr"
+    "workflow:no-pr": "node scripts/run-complete-workflow.js --no-pr",
+    "jira:init": "node jira-integration/index.js --init",
+    "jira:sync": "node jira-integration/index.js --sync",
+    "jira:detect": "node jira-integration/index.js",
+    "jira:watch": "node jira-integration/index.js --watch",
+    "jira:story": "node jira-integration/index.js --story",
+    "jira:workflow": "node scripts/jira-regression-workflow.js",
+    "jira:workflow:no-pr": "node scripts/jira-regression-workflow.js --no-pr",
+    "jira:enrich": "node scripts/enrich-dashboard-with-jira.js",
+    "jira:enrich:no-update": "node scripts/enrich-dashboard-with-jira.js --no-update",
+    "jira:update-board": "node scripts/enrich-dashboard-with-jira.js",
+    "test:jira": "node scripts/complete-jira-workflow.js",
+    "test:jira:no-update": "node scripts/complete-jira-workflow.js --no-jira-update"
   },
   "repository": {
     "type": "git",
