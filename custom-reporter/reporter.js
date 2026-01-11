@@ -149,35 +149,33 @@ function updateCategoryKpiCard({ totalEl, passedEl, failedEl, passRateEl, barEl,
 }
 
 function renderCategoryCards() {
-    const categories = parser.getCategoryStats().filter(cat => {
-        if (currentScope === 'all') return true;
-        return cat.name.toLowerCase() === currentScope;
-    });
+    // Use suite stats instead of category stats to show MSCSHIP story keys
+    const suites = parser.getSuiteStats();
     const container = document.getElementById('categoryCards');
     if (!container) return;
     container.innerHTML = '';
 
-    categories.forEach(cat => {
+    suites.forEach(suite => {
         const card = document.createElement('div');
         card.className = 'category-card';
-        const passRate = cat.total ? Math.round((cat.passed / cat.total) * 100) : 0;
+        const passRate = suite.total ? Math.round((suite.passed / suite.total) * 100) : 0;
         card.innerHTML = `
             <div class="category-card__header">
-                <h3>${escapeHtml(cat.name)}</h3>
-                <span class="badge">${cat.total} tests</span>
+                <h3>${escapeHtml(suite.name)}</h3>
+                <span class="badge">${suite.total} tests</span>
             </div>
             <div class="category-card__metrics">
                 <div>
                     <span class="label">Passed</span>
-                    <strong>${cat.passed}</strong>
+                    <strong>${suite.passed}</strong>
                 </div>
                 <div>
                     <span class="label">Failed</span>
-                    <strong>${cat.failed}</strong>
+                    <strong>${suite.failed}</strong>
                 </div>
                 <div>
                     <span class="label">Skipped</span>
-                    <strong>${cat.skipped}</strong>
+                    <strong>${suite.skipped}</strong>
                 </div>
             </div>
             <div class="category-card__progress">
