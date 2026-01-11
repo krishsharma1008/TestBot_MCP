@@ -75,8 +75,13 @@ class JiraClient {
   async getUserStories(filters = {}) {
     let jql = `project = ${this.projectKey}`;
     
+    // By default, only fetch stories that are NOT in "Done" status
+    // This optimizes workflow to only generate/run tests for active stories
     if (filters.status) {
       jql += ` AND status = "${filters.status}"`;
+    } else if (filters.includeAll !== true) {
+      // Exclude "Done" stories by default
+      jql += ` AND status != "Done"`;
     }
     
     if (filters.sprint) {

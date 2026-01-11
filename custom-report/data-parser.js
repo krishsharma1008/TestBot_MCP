@@ -3,6 +3,7 @@ class TestDataParser {
     constructor() {
         this.testData = null;
         this.aiAnalysisData = null;
+        this.attachmentsManifest = null;
         this.suites = new Map();
         this.tests = [];
         this.categoryStats = new Map();
@@ -42,6 +43,9 @@ class TestDataParser {
             
             // Try to load AI analysis data
             await this.loadAIAnalysis();
+            
+            // Try to load attachments manifest
+            await this.loadAttachmentsManifest();
             
             this.parseData();
             return this.testData;
@@ -146,7 +150,8 @@ class TestDataParser {
             const duration = lastResult.duration || 0;
             const error = lastResult.error;
             const category = this.getCategoryFromTest(test, spec.file);
-            const attachments = this.parseAttachments(lastResult.attachments || []);
+            // Parse attachments from JSON (usually empty) and supplement with folder scan
+            const attachments = this.parseAttachments(lastResult.attachments || [], spec.file, normalizedStatus);
 
             // Create test object
             const testObj = {
@@ -303,49 +308,64 @@ class TestDataParser {
         return 'Other';
     }
 
-    parseAttachments(attachments) {
-        if (!attachments || !Array.isArray(attachments)) {
-            return {
-                screenshots: [],
-                videos: [],
-                traces: [],
-                other: []
-            };
-        }
-
+    parseAttachments(attachments, testFile, testStatus) {
         const parsed = {
             screenshots: [],
             videos: [],
             traces: [],
             other: []
         };
+        
+        // If attachments array is provided and not empty, parse it
+        if (attachments && Array.isArray(attachments) && attachments.length > 0) {
 
-        attachments.forEach(attachment => {
-            const { name, contentType, path } = attachment;
+            attachments.forEach(attachment => {
+                const { name, contentType, path } = attachment;
+                
+                if (!path) return;
+
+                // Convert absolute path to relative path for web access
+                const relativePath = this.convertToRelativePath(path);
+                
+                const attachmentObj = {
+                    name: name || 'Unnamed',
+                    contentType: contentType || 'application/octet-stream',
+                    path: relativePath,
+                    originalPath: path
+                };
+
+                // Categorize by content type
+                if (contentType && contentType.startsWith('image/')) {
+                    parsed.screenshots.push(attachmentObj);
+                } else if (contentType && contentType.startsWith('video/')) {
+                    parsed.videos.push(attachmentObj);
+                } else if (name && (name.includes('trace') || contentType === 'application/zip')) {
+                    parsed.traces.push(attachmentObj);
+                } else {
+                    parsed.other.push(attachmentObj);
+                }
+            });
+        } else if (testFile && this.attachmentsManifest) {
+            // Check if we have attachments in the manifest for this test file
+            const normalizedTestFile = testFile.replace(/\\/g, '/');
+            const manifestEntry = this.attachmentsManifest[normalizedTestFile];
             
-            if (!path) return;
-
-            // Convert absolute path to relative path for web access
-            const relativePath = this.convertToRelativePath(path);
-            
-            const attachmentObj = {
-                name: name || 'Unnamed',
-                contentType: contentType || 'application/octet-stream',
-                path: relativePath,
-                originalPath: path
-            };
-
-            // Categorize by content type
-            if (contentType && contentType.startsWith('image/')) {
-                parsed.screenshots.push(attachmentObj);
-            } else if (contentType && contentType.startsWith('video/')) {
-                parsed.videos.push(attachmentObj);
-            } else if (name && (name.includes('trace') || contentType === 'application/zip')) {
-                parsed.traces.push(attachmentObj);
-            } else {
-                parsed.other.push(attachmentObj);
+            if (manifestEntry) {
+                // Merge manifest attachments into parsed
+                if (manifestEntry.screenshots) {
+                    parsed.screenshots.push(...manifestEntry.screenshots);
+                }
+                if (manifestEntry.videos) {
+                    parsed.videos.push(...manifestEntry.videos);
+                }
+                if (manifestEntry.traces) {
+                    parsed.traces.push(...manifestEntry.traces);
+                }
+                if (manifestEntry.other) {
+                    parsed.other.push(...manifestEntry.other);
+                }
             }
-        });
+        }
 
         return parsed;
     }

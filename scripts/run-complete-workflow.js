@@ -79,6 +79,17 @@ async function runWorkflow() {
         console.log('⚠️  Jira enrichment skipped (not configured or failed)');
       }
       
+      // Update Jira board status based on test results
+      console.log('\n📋 Step 4.6: Updating Jira board status...');
+      console.log('─'.repeat(80));
+      
+      try {
+        execSync('node scripts/update-jira-board-status.js', { stdio: 'inherit' });
+        console.log('✅ Jira board status updated');
+      } catch (error) {
+        console.log('⚠️  Jira board update skipped (not configured or failed)');
+      }
+      
       // Start dashboard server
       dashboardServer = await startDashboardServer();
       const dashboardPort = dashboardServer.port || 3000;
@@ -161,6 +172,17 @@ async function runWorkflow() {
       console.log('✅ Dashboard rebuilt with Jira integration');
     } catch (error) {
       console.log('⚠️  Jira enrichment skipped (not configured or failed)');
+    }
+    
+    // Update Jira board status based on test results
+    console.log('\n📋 Step 7.6: Updating Jira board status...');
+    console.log('─'.repeat(80));
+    
+    try {
+      execSync('node scripts/update-jira-board-status.js', { stdio: 'inherit' });
+      console.log('✅ Jira board status updated');
+    } catch (error) {
+      console.log('⚠️  Jira board update skipped (not configured or failed)');
     }
     
     // Start live server for dashboard

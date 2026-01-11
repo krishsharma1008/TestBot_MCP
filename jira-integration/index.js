@@ -151,6 +151,15 @@ class JiraIntegration {
     console.log(`  ✅ Generated: ${generated}`);
     console.log(`  ⚠️  Skipped: ${skipped}`);
     console.log(`  ❌ Errors: ${errors}`);
+    
+    // Cleanup test files for Done stories
+    console.log('\n🧹 Cleaning up test files for Done stories...');
+    try {
+      const { cleanupDoneTests } = require('../scripts/cleanup-done-tests');
+      await cleanupDoneTests();
+    } catch (error) {
+      console.log('  ⚠️  Cleanup skipped:', error.message);
+    }
 
     return { success: true, generated, skipped, errors };
   }

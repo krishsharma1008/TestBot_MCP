@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { generateAttachmentsManifest } = require('./generate-attachments-manifest');
 
 const SOURCE_DIR = path.join(__dirname, '..', 'custom-reporter');
 const TARGET_DIR = path.join(__dirname, '..', 'custom-report');
@@ -14,6 +15,13 @@ const TEST_RESULTS_FILE = path.join(__dirname, '..', 'test-results.json');
 
 function buildDashboard() {
     console.log('\n📊 Building Custom Test Dashboard...\n');
+    
+    // Generate attachments manifest first
+    try {
+        generateAttachmentsManifest();
+    } catch (error) {
+        console.warn('⚠️  Could not generate attachments manifest:', error.message);
+    }
 
     // Create target directory if it doesn't exist
     if (!fs.existsSync(TARGET_DIR)) {
