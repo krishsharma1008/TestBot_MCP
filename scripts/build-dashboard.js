@@ -101,7 +101,9 @@ function buildDashboard() {
     if (fs.existsSync(TEST_RESULTS_FILE)) {
         try {
             const targetResultsPath = path.join(TARGET_DIR, 'test-results.json');
-            fs.copyFileSync(TEST_RESULTS_FILE, targetResultsPath);
+            // Use read/write instead of copyFileSync to avoid permission issues
+            const testData = fs.readFileSync(TEST_RESULTS_FILE, 'utf8');
+            fs.writeFileSync(targetResultsPath, testData, 'utf8');
             console.log('✓ Copied test results');
         } catch (error) {
             console.warn('⚠️  Warning: Could not copy test results:', error.message);
