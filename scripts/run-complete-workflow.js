@@ -277,12 +277,24 @@ async function startDashboardServer(port = 3000) {
   
   const http = require('http');
   const dashboardDir = path.join(process.cwd(), 'custom-report');
+  const playwrightReportDir = path.join(process.cwd(), 'playwright-report');
   
   const server = http.createServer((req, res) => {
-    let filePath = path.join(dashboardDir, req.url === '/' ? 'index.html' : req.url);
+    // Route to playwright-report if URL starts with /playwright-report
+    let filePath;
+    let baseDir;
+    
+    if (req.url.startsWith('/playwright-report')) {
+      const relativePath = req.url.replace('/playwright-report', '');
+      filePath = path.join(playwrightReportDir, relativePath === '' || relativePath === '/' ? 'index.html' : relativePath);
+      baseDir = playwrightReportDir;
+    } else {
+      filePath = path.join(dashboardDir, req.url === '/' ? 'index.html' : req.url);
+      baseDir = dashboardDir;
+    }
     
     // Security: prevent directory traversal
-    if (!filePath.startsWith(dashboardDir)) {
+    if (!filePath.startsWith(baseDir)) {
       res.writeHead(403);
       res.end('Forbidden');
       return;
