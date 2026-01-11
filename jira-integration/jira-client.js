@@ -52,11 +52,11 @@ class JiraClient {
   }
 
   async getIssues(jql = null) {
-    const defaultJql = `project = ${this.projectKey} AND type = Story ORDER BY updated DESC`;
+    const defaultJql = `project = ${this.projectKey} ORDER BY created DESC`;
     const query = jql || defaultJql;
     
     const response = await this.makeRequest(
-      `search/jql?jql=${encodeURIComponent(query)}&maxResults=100&fields=summary,description,status,acceptanceCriteria,customfield_*,updated,created,priority,assignee,labels`
+      `search/jql?jql=${encodeURIComponent(query)}&maxResults=100&fields=summary,description,status,issuetype,acceptanceCriteria,customfield_*,updated,created,priority,assignee,labels`
     );
     
     return response.issues || [];
@@ -73,7 +73,7 @@ class JiraClient {
   }
 
   async getUserStories(filters = {}) {
-    let jql = `project = ${this.projectKey} AND type = Story`;
+    let jql = `project = ${this.projectKey}`;
     
     if (filters.status) {
       jql += ` AND status = "${filters.status}"`;
@@ -87,7 +87,7 @@ class JiraClient {
       jql += ` AND updated >= "${filters.updatedAfter}"`;
     }
     
-    jql += ' ORDER BY updated DESC';
+    jql += ' ORDER BY created DESC';
     
     return await this.getIssues(jql);
   }
@@ -126,6 +126,9 @@ class JiraClient {
     for (let line of lines) {
       line = line.trim();
       
+      // Skip empty lines
+      if (!line) continue;
+      
       // Detect acceptance criteria section
       if (line.toLowerCase().includes('acceptance criteria') || 
           line.toLowerCase().includes('acceptance test')) {
@@ -138,9 +141,24 @@ class JiraClient {
         inCriteriaSection = false;
       }
       
-      // Extract criteria items
-      if (inCriteriaSection || line.match(/^[-*]\s+Given|When|Then|And/i)) {
-        const match = line.match(/^[-*]\s+(.+)/) || line.match(/^(\d+\.\s+.+)/);
+      // Extract criteria items - now includes plain lines with Given/When/Then/And
+      if (inCriteriaSection) {
+        // Match bullet points, numbered lists, or plain Given/When/Then/And lines
+        const bulletMatch = line.match(/^[-*]\s+(.+)/);
+        const numberedMatch = line.match(/^(\d+\.\s+.+)/);
+        const givenWhenThenMatch = line.match(/^(Given|When|Then|And)\s+.+/i);
+        
+        if (bulletMatch) {
+          criteria.push(bulletMatch[1].trim());
+        } else if (numberedMatch) {
+          criteria.push(numberedMatch[1].trim());
+        } else if (givenWhenThenMatch) {
+          // Plain Given/When/Then/And line
+          criteria.push(line);
+        }
+      } else if (line.match(/^[-*]\s+(Given|When|Then|And)/i)) {
+        // Catch bullet points with Given/When/Then/And outside criteria section
+        const match = line.match(/^[-*]\s+(.+)/);
         if (match) {
           criteria.push(match[1].trim());
         }

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Load environment variables
+require('dotenv').config();
+
 const JiraClient = require('./jira-client');
 const TestGenerator = require('./test-generator');
 const ChangeDetector = require('./change-detector');

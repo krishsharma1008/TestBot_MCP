@@ -1,401 +1,3037 @@
 {
-  "timestamp": "2026-01-11T16:37:04.019Z",
+  "timestamp": "2026-01-11T17:39:03.380Z",
   "jiraProject": "MSCSHIP",
   "jiraBaseUrl": "https://shreyespd12.atlassian.net",
   "mapping": {
-    "totalTests": 0,
-    "totalStories": 0,
-    "testToStory": {},
-    "storyToTests": {}
+    "totalTests": 104,
+    "totalStories": 23,
+    "testToStory": {
+      "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-given-the-cruise-search-api-endpoint-is-available": "MSCSHIP-1",
+      "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-when-a-get-request-is-made-to-/api/cruises/search-with-port-parameter-set-to-all": "MSCSHIP-1",
+      "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-then-the-api-should-return-a-list-of-all-available-cruises": "MSCSHIP-1",
+      "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-response-should-include-cruise-details-like-name,-departure-date,-and-po": "MSCSHIP-1",
+      "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-http-status-code-should-be-200": "MSCSHIP-1",
+      "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-given-user-is-authenticated-and-logged-in": "MSCSHIP-10",
+      "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-when-user-navigates-to-/reservation-page": "MSCSHIP-10",
+      "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-then-the-reservation-page-should-load-successfully": "MSCSHIP-10",
+      "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-user-should-see-the-reservation-form": "MSCSHIP-10",
+      "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-the-http-status-code-should-be-200": "MSCSHIP-10",
+      "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-given-user-is-logged-in": "MSCSHIP-11",
+      "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-when-user-clicks-on-the-user-dropdown-in-navbar": "MSCSHIP-11",
+      "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-clicks-the-logout-button": "MSCSHIP-11",
+      "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-then-user-should-be-logged-out": "MSCSHIP-11",
+      "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-should-be-redirected-to-the-home-page": "MSCSHIP-11",
+      "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-the-user-session-should-be-cleared": "MSCSHIP-11",
+      "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-given-user-is-on-the-cruises-page": "MSCSHIP-12",
+      "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-when-user-clicks-on-a-cruise-card-to-view-details": "MSCSHIP-12",
+      "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-then-a-modal-should-open-displaying-cruise-details": "MSCSHIP-12",
+      "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-modal-should-contain-a-reservation-form": "MSCSHIP-12",
+      "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-form-should-have-fields-for-passenger-details": "MSCSHIP-12",
+      "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-given-user-is-on-the-cruises-page": "MSCSHIP-13",
+      "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-when-user-selects-a-ship-name-from-the-navire-(ship)-filter-dropdown": "MSCSHIP-13",
+      "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-then-the-cruise-listings-should-update-to-show-only-cruises-for-that-ship": "MSCSHIP-13",
+      "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-results-should-be-filtered-in-real-time": "MSCSHIP-13",
+      "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-page-should-display-the-filtered-cruise-cards": "MSCSHIP-13",
+      "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-given-user-navigates-to-the-contact-page": "MSCSHIP-14",
+      "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-when-the-page-loads": "MSCSHIP-14",
+      "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-then-the-contact-page-should-display-successfully": "MSCSHIP-14",
+      "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-page-should-show-the-contact-form": "MSCSHIP-14",
+      "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-http-status-code-should-be-200": "MSCSHIP-14",
+      "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-given-user-is-on-the-contact-page": "MSCSHIP-15",
+      "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-when-the-page-loads": "MSCSHIP-15",
+      "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-then-the-form-should-display-all-required-elements": "MSCSHIP-15",
+      "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-name-input-field": "MSCSHIP-15",
+      "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-email-input-field": "MSCSHIP-15",
+      "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-message-textarea": "MSCSHIP-15",
+      "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-a-submit-button": "MSCSHIP-15",
+      "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-given-user-is-on-the-contact-form": "MSCSHIP-16",
+      "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-when-user-tries-to-submit-the-form-without-filling-required-fields": "MSCSHIP-16",
+      "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-then-the-form-should-display-validation-errors": "MSCSHIP-16",
+      "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-the-form-should-not-submit": "MSCSHIP-16",
+      "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-error-messages-should-indicate-which-fields-are-required": "MSCSHIP-16",
+      "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-given-the-contact-form-is-configured-to-use-mock-handler": "MSCSHIP-17",
+      "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-when-user-submits-the-form-with-valid-data": "MSCSHIP-17",
+      "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-then-the-mock-handler-should-receive-the-form-data": "MSCSHIP-17",
+      "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-mock-handler-should-return-the-submitted-data": "MSCSHIP-17",
+      "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-response-should-confirm-successful-submission": "MSCSHIP-17",
+      "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-given-the-contact-form-is-configured-to-use-real-handler": "MSCSHIP-18",
+      "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-when-user-submits-the-form-with-valid-data": "MSCSHIP-18",
+      "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-then-the-real-handler-should-process-the-form-data": "MSCSHIP-18",
+      "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-the-data-should-be-logged-to-the-database": "MSCSHIP-18",
+      "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-user-should-see-a-success-confirmation-message": "MSCSHIP-18",
+      "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-given-user-navigates-to-the-cruises-page": "MSCSHIP-19",
+      "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-when-the-page-loads": "MSCSHIP-19",
+      "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-then-the-cruises-page-should-display-successfully": "MSCSHIP-19",
+      "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-http-status-code-should-be-200": "MSCSHIP-19",
+      "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-page-should-be-ready-for-interaction": "MSCSHIP-19",
+      "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-given-a-valid-cruise-id-is-provided": "MSCSHIP-2",
+      "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-when-a-get-request-is-made-to-/api/cruises/detail-endpoint": "MSCSHIP-2",
+      "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-then-the-api-should-return-complete-cruise-details": "MSCSHIP-2",
+      "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-itinerary-information": "MSCSHIP-2",
+      "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-rom-(rates-and-occupancy)-data": "MSCSHIP-2",
+      "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-http-status-code-should-be-200": "MSCSHIP-2",
+      "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-given-user-is-on-the-cruises-page": "MSCSHIP-20",
+      "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-when-the-page-loads": "MSCSHIP-20",
+      "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-then-the-page-should-display-a-list-of-available-cruise-listings": "MSCSHIP-20",
+      "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-each-listing-should-show-cruise-information": "MSCSHIP-20",
+      "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-the-listings-should-be-visible-to-the-user": "MSCSHIP-20",
+      "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-given-user-is-on-the-cruises-page": "MSCSHIP-21",
+      "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-when-the-page-loads": "MSCSHIP-21",
+      "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-then-the-page-should-have-search-and-filter-functionality": "MSCSHIP-21",
+      "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-user-should-see-filter-options-for-ports,-dates,-or-ships": "MSCSHIP-21",
+      "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-the-search/filter-controls-should-be-interactive": "MSCSHIP-21",
+      "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-given-user-is-on-the-cruises-page": "MSCSHIP-22",
+      "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-when-the-page-displays-cruise-listings": "MSCSHIP-22",
+      "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-then-each-cruise-card-should-display-cruise-details": "MSCSHIP-22",
+      "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-cruise-name": "MSCSHIP-22",
+      "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-departure-date": "MSCSHIP-22",
+      "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-destination-ports": "MSCSHIP-22",
+      "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-pricing-information": "MSCSHIP-22",
+      "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-given-user-is-on-the-cruises-page": "MSCSHIP-23",
+      "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-when-user-clicks-on-a-cruise-card": "MSCSHIP-23",
+      "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-then-the-system-should-allow-viewing-detailed-cruise-information": "MSCSHIP-23",
+      "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-a-modal-or-detail-page-should-open": "MSCSHIP-23",
+      "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-the-details-should-include-full-itinerary-and-pricing": "MSCSHIP-23",
+      "mscship_3.spec.js-›-mscship-3:-regression-test:-session-check-api---reports-false-when-not-authenticated-without-authentication": "MSCSHIP-3",
+      "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-each-request-should-include-ajax-headers-and-form-data:": "MSCSHIP-4",
+      "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-system-should-handle-concurrent-load-gracefully": "MSCSHIP-4",
+      "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-given-the-contact-form-api-endpoint-is-available": "MSCSHIP-5",
+      "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-when-a-post-request-is-made-with-incomplete-payload-(missing-required-fields)": "MSCSHIP-5",
+      "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-then-the-api-should-reject-the-request": "MSCSHIP-5",
+      "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-return-http-status-code-400": "MSCSHIP-5",
+      "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-include-error-message-indicating-missing-fields": "MSCSHIP-5",
+      "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-given-the-contact-form-api-endpoint-is-available": "MSCSHIP-6",
+      "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-when-a-post-request-is-made-with-valid-payload-containing-name,-email,-and-messa": "MSCSHIP-6",
+      "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-then-the-api-should-accept-the-request": "MSCSHIP-6",
+      "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-api-should-log-the-contact-entry-to-the-database": "MSCSHIP-6",
+      "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-return-http-status-code-200": "MSCSHIP-6",
+      "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-include-success-confirmation": "MSCSHIP-6",
+      "mscship_7.spec.js-›-mscship-7:-regression-test:-contact-mock-handler---echoes-payload-for-verification-handler:-'mock'": "MSCSHIP-7",
+      "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-enter-valid-credentials-and-submit": "MSCSHIP-8",
+      "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-dropdown-menu-should-be-visible-when-clicked": "MSCSHIP-8",
+      "mscship_9.spec.js-›-mscship-9:-regression-test:-reservation-page---requires-authentication-reservation-page-should-not-be-accessible-without-authentication": "MSCSHIP-9"
+    },
+    "storyToTests": {
+      "MSCSHIP-1": [
+        "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-given-the-cruise-search-api-endpoint-is-available",
+        "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-when-a-get-request-is-made-to-/api/cruises/search-with-port-parameter-set-to-all",
+        "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-then-the-api-should-return-a-list-of-all-available-cruises",
+        "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-response-should-include-cruise-details-like-name,-departure-date,-and-po",
+        "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-http-status-code-should-be-200"
+      ],
+      "MSCSHIP-10": [
+        "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-given-user-is-authenticated-and-logged-in",
+        "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-when-user-navigates-to-/reservation-page",
+        "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-then-the-reservation-page-should-load-successfully",
+        "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-user-should-see-the-reservation-form",
+        "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-the-http-status-code-should-be-200"
+      ],
+      "MSCSHIP-11": [
+        "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-given-user-is-logged-in",
+        "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-when-user-clicks-on-the-user-dropdown-in-navbar",
+        "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-clicks-the-logout-button",
+        "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-then-user-should-be-logged-out",
+        "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-should-be-redirected-to-the-home-page",
+        "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-the-user-session-should-be-cleared"
+      ],
+      "MSCSHIP-12": [
+        "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-given-user-is-on-the-cruises-page",
+        "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-when-user-clicks-on-a-cruise-card-to-view-details",
+        "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-then-a-modal-should-open-displaying-cruise-details",
+        "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-modal-should-contain-a-reservation-form",
+        "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-form-should-have-fields-for-passenger-details"
+      ],
+      "MSCSHIP-13": [
+        "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-given-user-is-on-the-cruises-page",
+        "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-when-user-selects-a-ship-name-from-the-navire-(ship)-filter-dropdown",
+        "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-then-the-cruise-listings-should-update-to-show-only-cruises-for-that-ship",
+        "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-results-should-be-filtered-in-real-time",
+        "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-page-should-display-the-filtered-cruise-cards"
+      ],
+      "MSCSHIP-14": [
+        "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-given-user-navigates-to-the-contact-page",
+        "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-when-the-page-loads",
+        "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-then-the-contact-page-should-display-successfully",
+        "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-page-should-show-the-contact-form",
+        "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-http-status-code-should-be-200"
+      ],
+      "MSCSHIP-15": [
+        "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-given-user-is-on-the-contact-page",
+        "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-when-the-page-loads",
+        "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-then-the-form-should-display-all-required-elements",
+        "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-name-input-field",
+        "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-email-input-field",
+        "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-message-textarea",
+        "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-a-submit-button"
+      ],
+      "MSCSHIP-16": [
+        "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-given-user-is-on-the-contact-form",
+        "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-when-user-tries-to-submit-the-form-without-filling-required-fields",
+        "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-then-the-form-should-display-validation-errors",
+        "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-the-form-should-not-submit",
+        "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-error-messages-should-indicate-which-fields-are-required"
+      ],
+      "MSCSHIP-17": [
+        "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-given-the-contact-form-is-configured-to-use-mock-handler",
+        "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-when-user-submits-the-form-with-valid-data",
+        "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-then-the-mock-handler-should-receive-the-form-data",
+        "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-mock-handler-should-return-the-submitted-data",
+        "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-response-should-confirm-successful-submission"
+      ],
+      "MSCSHIP-18": [
+        "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-given-the-contact-form-is-configured-to-use-real-handler",
+        "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-when-user-submits-the-form-with-valid-data",
+        "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-then-the-real-handler-should-process-the-form-data",
+        "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-the-data-should-be-logged-to-the-database",
+        "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-user-should-see-a-success-confirmation-message"
+      ],
+      "MSCSHIP-19": [
+        "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-given-user-navigates-to-the-cruises-page",
+        "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-when-the-page-loads",
+        "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-then-the-cruises-page-should-display-successfully",
+        "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-http-status-code-should-be-200",
+        "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-page-should-be-ready-for-interaction"
+      ],
+      "MSCSHIP-2": [
+        "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-given-a-valid-cruise-id-is-provided",
+        "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-when-a-get-request-is-made-to-/api/cruises/detail-endpoint",
+        "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-then-the-api-should-return-complete-cruise-details",
+        "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-itinerary-information",
+        "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-rom-(rates-and-occupancy)-data",
+        "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-http-status-code-should-be-200"
+      ],
+      "MSCSHIP-20": [
+        "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-given-user-is-on-the-cruises-page",
+        "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-when-the-page-loads",
+        "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-then-the-page-should-display-a-list-of-available-cruise-listings",
+        "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-each-listing-should-show-cruise-information",
+        "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-the-listings-should-be-visible-to-the-user"
+      ],
+      "MSCSHIP-21": [
+        "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-given-user-is-on-the-cruises-page",
+        "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-when-the-page-loads",
+        "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-then-the-page-should-have-search-and-filter-functionality",
+        "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-user-should-see-filter-options-for-ports,-dates,-or-ships",
+        "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-the-search/filter-controls-should-be-interactive"
+      ],
+      "MSCSHIP-22": [
+        "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-given-user-is-on-the-cruises-page",
+        "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-when-the-page-displays-cruise-listings",
+        "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-then-each-cruise-card-should-display-cruise-details",
+        "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-cruise-name",
+        "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-departure-date",
+        "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-destination-ports",
+        "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-pricing-information"
+      ],
+      "MSCSHIP-23": [
+        "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-given-user-is-on-the-cruises-page",
+        "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-when-user-clicks-on-a-cruise-card",
+        "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-then-the-system-should-allow-viewing-detailed-cruise-information",
+        "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-a-modal-or-detail-page-should-open",
+        "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-the-details-should-include-full-itinerary-and-pricing"
+      ],
+      "MSCSHIP-3": [
+        "mscship_3.spec.js-›-mscship-3:-regression-test:-session-check-api---reports-false-when-not-authenticated-without-authentication"
+      ],
+      "MSCSHIP-4": [
+        "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-each-request-should-include-ajax-headers-and-form-data:",
+        "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-system-should-handle-concurrent-load-gracefully"
+      ],
+      "MSCSHIP-5": [
+        "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-given-the-contact-form-api-endpoint-is-available",
+        "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-when-a-post-request-is-made-with-incomplete-payload-(missing-required-fields)",
+        "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-then-the-api-should-reject-the-request",
+        "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-return-http-status-code-400",
+        "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-include-error-message-indicating-missing-fields"
+      ],
+      "MSCSHIP-6": [
+        "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-given-the-contact-form-api-endpoint-is-available",
+        "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-when-a-post-request-is-made-with-valid-payload-containing-name,-email,-and-messa",
+        "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-then-the-api-should-accept-the-request",
+        "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-api-should-log-the-contact-entry-to-the-database",
+        "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-return-http-status-code-200",
+        "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-include-success-confirmation"
+      ],
+      "MSCSHIP-7": [
+        "mscship_7.spec.js-›-mscship-7:-regression-test:-contact-mock-handler---echoes-payload-for-verification-handler:-'mock'"
+      ],
+      "MSCSHIP-8": [
+        "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-enter-valid-credentials-and-submit",
+        "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-dropdown-menu-should-be-visible-when-clicked"
+      ],
+      "MSCSHIP-9": [
+        "mscship_9.spec.js-›-mscship-9:-regression-test:-reservation-page---requires-authentication-reservation-page-should-not-be-accessible-without-authentication"
+      ]
+    }
   },
-  "stories": [],
+  "stories": [
+    {
+      "key": "MSCSHIP-1",
+      "summary": "Regression Test: Cruise Search API - Returns cruises for ALL ports",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-1",
+      "testResults": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-given-the-cruise-search-api-endpoint-is-available",
+            "title": "Given the cruise search API endpoint is available",
+            "status": "passed",
+            "duration": 1013
+          },
+          {
+            "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-when-a-get-request-is-made-to-/api/cruises/search-with-port-parameter-set-to-all",
+            "title": "When a GET request is made to /api/cruises/search with port parameter set to ALL",
+            "status": "passed",
+            "duration": 887
+          },
+          {
+            "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-then-the-api-should-return-a-list-of-all-available-cruises",
+            "title": "Then the API should return a list of all available cruises",
+            "status": "passed",
+            "duration": 935
+          },
+          {
+            "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-response-should-include-cruise-details-like-name,-departure-date,-and-po",
+            "title": "And the response should include cruise details like name, departure date, and po",
+            "status": "passed",
+            "duration": 864
+          },
+          {
+            "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-http-status-code-should-be-200",
+            "title": "And the HTTP status code should be 200",
+            "status": "passed",
+            "duration": 569
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-10",
+      "summary": "Regression Test: Reservation Page - Accessible for authenticated users",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-10",
+      "testResults": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-given-user-is-authenticated-and-logged-in",
+            "title": "Given user is authenticated and logged in",
+            "status": "passed",
+            "duration": 481
+          },
+          {
+            "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-when-user-navigates-to-/reservation-page",
+            "title": "When user navigates to /reservation page",
+            "status": "passed",
+            "duration": 482
+          },
+          {
+            "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-then-the-reservation-page-should-load-successfully",
+            "title": "Then the reservation page should load successfully",
+            "status": "passed",
+            "duration": 477
+          },
+          {
+            "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-user-should-see-the-reservation-form",
+            "title": "And user should see the reservation form",
+            "status": "passed",
+            "duration": 553
+          },
+          {
+            "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-the-http-status-code-should-be-200",
+            "title": "And the HTTP status code should be 200",
+            "status": "passed",
+            "duration": 557
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-11",
+      "summary": "Regression Test: User Logout - From navbar dropdown",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-11",
+      "testResults": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-given-user-is-logged-in",
+            "title": "Given user is logged in",
+            "status": "passed",
+            "duration": 531
+          },
+          {
+            "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-when-user-clicks-on-the-user-dropdown-in-navbar",
+            "title": "When user clicks on the user dropdown in navbar",
+            "status": "passed",
+            "duration": 516
+          },
+          {
+            "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-clicks-the-logout-button",
+            "title": "And user clicks the logout button",
+            "status": "passed",
+            "duration": 548
+          },
+          {
+            "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-then-user-should-be-logged-out",
+            "title": "Then user should be logged out",
+            "status": "passed",
+            "duration": 565
+          },
+          {
+            "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-should-be-redirected-to-the-home-page",
+            "title": "And user should be redirected to the home page",
+            "status": "passed",
+            "duration": 571
+          },
+          {
+            "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-the-user-session-should-be-cleared",
+            "title": "And the user session should be cleared",
+            "status": "passed",
+            "duration": 555
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-12",
+      "summary": "Regression Test: Cruise Detail Modal - Renders with reservation form",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-12",
+      "testResults": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-given-user-is-on-the-cruises-page",
+            "title": "Given user is on the cruises page",
+            "status": "passed",
+            "duration": 456
+          },
+          {
+            "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-when-user-clicks-on-a-cruise-card-to-view-details",
+            "title": "When user clicks on a cruise card to view details",
+            "status": "passed",
+            "duration": 502
+          },
+          {
+            "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-then-a-modal-should-open-displaying-cruise-details",
+            "title": "Then a modal should open displaying cruise details",
+            "status": "passed",
+            "duration": 525
+          },
+          {
+            "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-modal-should-contain-a-reservation-form",
+            "title": "And the modal should contain a reservation form",
+            "status": "passed",
+            "duration": 464
+          },
+          {
+            "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-form-should-have-fields-for-passenger-details",
+            "title": "And the form should have fields for passenger details",
+            "status": "passed",
+            "duration": 459
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-13",
+      "summary": "Regression Test: Cruise Search - Filter by Navire (Ship)",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-13",
+      "testResults": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-given-user-is-on-the-cruises-page",
+            "title": "Given user is on the cruises page",
+            "status": "passed",
+            "duration": 443
+          },
+          {
+            "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-when-user-selects-a-ship-name-from-the-navire-(ship)-filter-dropdown",
+            "title": "When user selects a ship name from the Navire (Ship) filter dropdown",
+            "status": "passed",
+            "duration": 407
+          },
+          {
+            "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-then-the-cruise-listings-should-update-to-show-only-cruises-for-that-ship",
+            "title": "Then the cruise listings should update to show only cruises for that ship",
+            "status": "passed",
+            "duration": 434
+          },
+          {
+            "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-results-should-be-filtered-in-real-time",
+            "title": "And the results should be filtered in real-time",
+            "status": "passed",
+            "duration": 471
+          },
+          {
+            "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-page-should-display-the-filtered-cruise-cards",
+            "title": "And the page should display the filtered cruise cards",
+            "status": "passed",
+            "duration": 443
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-14",
+      "summary": "Regression Test: Contact Page - Loads successfully",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-14",
+      "testResults": {
+        "total": 5,
+        "passed": 4,
+        "failed": 1,
+        "skipped": 0,
+        "passRate": 80,
+        "tests": [
+          {
+            "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-given-user-navigates-to-the-contact-page",
+            "title": "Given user navigates to the contact page",
+            "status": "passed",
+            "duration": 458
+          },
+          {
+            "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-when-the-page-loads",
+            "title": "When the page loads",
+            "status": "passed",
+            "duration": 444
+          },
+          {
+            "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-then-the-contact-page-should-display-successfully",
+            "title": "Then the contact page should display successfully",
+            "status": "failed",
+            "duration": 12540
+          },
+          {
+            "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-page-should-show-the-contact-form",
+            "title": "And the page should show the contact form",
+            "status": "passed",
+            "duration": 469
+          },
+          {
+            "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-http-status-code-should-be-200",
+            "title": "And the HTTP status code should be 200",
+            "status": "passed",
+            "duration": 450
+          }
+        ]
+      },
+      "recommendedStatus": "In Progress",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-15",
+      "summary": "Regression Test: Contact Form - Displays all form elements",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-15",
+      "testResults": {
+        "total": 7,
+        "passed": 6,
+        "failed": 1,
+        "skipped": 0,
+        "passRate": 86,
+        "tests": [
+          {
+            "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-given-user-is-on-the-contact-page",
+            "title": "Given user is on the contact page",
+            "status": "passed",
+            "duration": 475
+          },
+          {
+            "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-when-the-page-loads",
+            "title": "When the page loads",
+            "status": "passed",
+            "duration": 351
+          },
+          {
+            "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-then-the-form-should-display-all-required-elements",
+            "title": "Then the form should display all required elements",
+            "status": "failed",
+            "duration": 6197
+          },
+          {
+            "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-name-input-field",
+            "title": "And the form should have name input field",
+            "status": "passed",
+            "duration": 338
+          },
+          {
+            "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-email-input-field",
+            "title": "And the form should have email input field",
+            "status": "passed",
+            "duration": 335
+          },
+          {
+            "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-message-textarea",
+            "title": "And the form should have message textarea",
+            "status": "passed",
+            "duration": 303
+          },
+          {
+            "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-a-submit-button",
+            "title": "And the form should have a submit button",
+            "status": "passed",
+            "duration": 343
+          }
+        ]
+      },
+      "recommendedStatus": "In Progress",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-16",
+      "summary": "Regression Test: Contact Form - Validates required fields",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-16",
+      "testResults": {
+        "total": 5,
+        "passed": 4,
+        "failed": 1,
+        "skipped": 0,
+        "passRate": 80,
+        "tests": [
+          {
+            "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-given-user-is-on-the-contact-form",
+            "title": "Given user is on the contact form",
+            "status": "passed",
+            "duration": 328
+          },
+          {
+            "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-when-user-tries-to-submit-the-form-without-filling-required-fields",
+            "title": "When user tries to submit the form without filling required fields",
+            "status": "passed",
+            "duration": 299
+          },
+          {
+            "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-then-the-form-should-display-validation-errors",
+            "title": "Then the form should display validation errors",
+            "status": "failed",
+            "duration": 12844
+          },
+          {
+            "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-the-form-should-not-submit",
+            "title": "And the form should not submit",
+            "status": "passed",
+            "duration": 319
+          },
+          {
+            "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-error-messages-should-indicate-which-fields-are-required",
+            "title": "And error messages should indicate which fields are required",
+            "status": "passed",
+            "duration": 300
+          }
+        ]
+      },
+      "recommendedStatus": "In Progress",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-17",
+      "summary": "Regression Test: Contact Form - Submits via mock handler",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-17",
+      "testResults": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-given-the-contact-form-is-configured-to-use-mock-handler",
+            "title": "Given the contact form is configured to use mock handler",
+            "status": "passed",
+            "duration": 266
+          },
+          {
+            "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-when-user-submits-the-form-with-valid-data",
+            "title": "When user submits the form with valid data",
+            "status": "passed",
+            "duration": 383
+          },
+          {
+            "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-then-the-mock-handler-should-receive-the-form-data",
+            "title": "Then the mock handler should receive the form data",
+            "status": "passed",
+            "duration": 286
+          },
+          {
+            "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-mock-handler-should-return-the-submitted-data",
+            "title": "And the mock handler should return the submitted data",
+            "status": "passed",
+            "duration": 311
+          },
+          {
+            "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-response-should-confirm-successful-submission",
+            "title": "And the response should confirm successful submission",
+            "status": "passed",
+            "duration": 266
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-18",
+      "summary": "Regression Test: Contact Form - Submits via real handler and logs entry",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-18",
+      "testResults": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-given-the-contact-form-is-configured-to-use-real-handler",
+            "title": "Given the contact form is configured to use real handler",
+            "status": "passed",
+            "duration": 303
+          },
+          {
+            "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-when-user-submits-the-form-with-valid-data",
+            "title": "When user submits the form with valid data",
+            "status": "passed",
+            "duration": 295
+          },
+          {
+            "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-then-the-real-handler-should-process-the-form-data",
+            "title": "Then the real handler should process the form data",
+            "status": "passed",
+            "duration": 305
+          },
+          {
+            "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-the-data-should-be-logged-to-the-database",
+            "title": "And the data should be logged to the database",
+            "status": "passed",
+            "duration": 326
+          },
+          {
+            "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-user-should-see-a-success-confirmation-message",
+            "title": "And user should see a success confirmation message",
+            "status": "passed",
+            "duration": 348
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-19",
+      "summary": "Regression Test: Cruises Page - Loads successfully",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-19",
+      "testResults": {
+        "total": 5,
+        "passed": 4,
+        "failed": 1,
+        "skipped": 0,
+        "passRate": 80,
+        "tests": [
+          {
+            "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-given-user-navigates-to-the-cruises-page",
+            "title": "Given user navigates to the cruises page",
+            "status": "passed",
+            "duration": 411
+          },
+          {
+            "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-when-the-page-loads",
+            "title": "When the page loads",
+            "status": "passed",
+            "duration": 377
+          },
+          {
+            "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-then-the-cruises-page-should-display-successfully",
+            "title": "Then the cruises page should display successfully",
+            "status": "failed",
+            "duration": 6723
+          },
+          {
+            "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-http-status-code-should-be-200",
+            "title": "And the HTTP status code should be 200",
+            "status": "passed",
+            "duration": 373
+          },
+          {
+            "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-page-should-be-ready-for-interaction",
+            "title": "And the page should be ready for interaction",
+            "status": "passed",
+            "duration": 302
+          }
+        ]
+      },
+      "recommendedStatus": "In Progress",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-2",
+      "summary": "Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-2",
+      "testResults": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-given-a-valid-cruise-id-is-provided",
+            "title": "Given a valid cruise ID is provided",
+            "status": "passed",
+            "duration": 333
+          },
+          {
+            "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-when-a-get-request-is-made-to-/api/cruises/detail-endpoint",
+            "title": "When a GET request is made to /api/cruises/detail endpoint",
+            "status": "passed",
+            "duration": 325
+          },
+          {
+            "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-then-the-api-should-return-complete-cruise-details",
+            "title": "Then the API should return complete cruise details",
+            "status": "passed",
+            "duration": 291
+          },
+          {
+            "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-itinerary-information",
+            "title": "And the response should include itinerary information",
+            "status": "passed",
+            "duration": 560
+          },
+          {
+            "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-rom-(rates-and-occupancy)-data",
+            "title": "And the response should include ROM (rates and occupancy) data",
+            "status": "passed",
+            "duration": 385
+          },
+          {
+            "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-http-status-code-should-be-200",
+            "title": "And the HTTP status code should be 200",
+            "status": "passed",
+            "duration": 446
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-20",
+      "summary": "Regression Test: Cruises Page - Displays cruise listings",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-20",
+      "testResults": {
+        "total": 5,
+        "passed": 4,
+        "failed": 1,
+        "skipped": 0,
+        "passRate": 80,
+        "tests": [
+          {
+            "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-given-user-is-on-the-cruises-page",
+            "title": "Given user is on the cruises page",
+            "status": "passed",
+            "duration": 456
+          },
+          {
+            "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-when-the-page-loads",
+            "title": "When the page loads",
+            "status": "passed",
+            "duration": 534
+          },
+          {
+            "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-then-the-page-should-display-a-list-of-available-cruise-listings",
+            "title": "Then the page should display a list of available cruise listings",
+            "status": "failed",
+            "duration": 11397
+          },
+          {
+            "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-each-listing-should-show-cruise-information",
+            "title": "And each listing should show cruise information",
+            "status": "passed",
+            "duration": 464
+          },
+          {
+            "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-the-listings-should-be-visible-to-the-user",
+            "title": "And the listings should be visible to the user",
+            "status": "passed",
+            "duration": 638
+          }
+        ]
+      },
+      "recommendedStatus": "In Progress",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-21",
+      "summary": "Regression Test: Cruises Page - Has search/filter functionality",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-21",
+      "testResults": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-given-user-is-on-the-cruises-page",
+            "title": "Given user is on the cruises page",
+            "status": "passed",
+            "duration": 875
+          },
+          {
+            "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-when-the-page-loads",
+            "title": "When the page loads",
+            "status": "passed",
+            "duration": 459
+          },
+          {
+            "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-then-the-page-should-have-search-and-filter-functionality",
+            "title": "Then the page should have search and filter functionality",
+            "status": "passed",
+            "duration": 473
+          },
+          {
+            "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-user-should-see-filter-options-for-ports,-dates,-or-ships",
+            "title": "And user should see filter options for ports, dates, or ships",
+            "status": "passed",
+            "duration": 534
+          },
+          {
+            "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-the-search/filter-controls-should-be-interactive",
+            "title": "And the search/filter controls should be interactive",
+            "status": "passed",
+            "duration": 498
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-22",
+      "summary": "Regression Test: Cruises Page - Displays cruise cards with details",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-22",
+      "testResults": {
+        "total": 7,
+        "passed": 6,
+        "failed": 1,
+        "skipped": 0,
+        "passRate": 86,
+        "tests": [
+          {
+            "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-given-user-is-on-the-cruises-page",
+            "title": "Given user is on the cruises page",
+            "status": "passed",
+            "duration": 616
+          },
+          {
+            "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-when-the-page-displays-cruise-listings",
+            "title": "When the page displays cruise listings",
+            "status": "passed",
+            "duration": 488
+          },
+          {
+            "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-then-each-cruise-card-should-display-cruise-details",
+            "title": "Then each cruise card should display cruise details",
+            "status": "failed",
+            "duration": 6895
+          },
+          {
+            "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-cruise-name",
+            "title": "And the card should show cruise name",
+            "status": "passed",
+            "duration": 466
+          },
+          {
+            "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-departure-date",
+            "title": "And the card should show departure date",
+            "status": "passed",
+            "duration": 415
+          },
+          {
+            "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-destination-ports",
+            "title": "And the card should show destination ports",
+            "status": "passed",
+            "duration": 394
+          },
+          {
+            "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-pricing-information",
+            "title": "And the card should show pricing information",
+            "status": "passed",
+            "duration": 413
+          }
+        ]
+      },
+      "recommendedStatus": "In Progress",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-23",
+      "summary": "Regression Test: Cruises Page - Allows viewing cruise details",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-23",
+      "testResults": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-given-user-is-on-the-cruises-page",
+            "title": "Given user is on the cruises page",
+            "status": "passed",
+            "duration": 428
+          },
+          {
+            "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-when-user-clicks-on-a-cruise-card",
+            "title": "When user clicks on a cruise card",
+            "status": "passed",
+            "duration": 408
+          },
+          {
+            "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-then-the-system-should-allow-viewing-detailed-cruise-information",
+            "title": "Then the system should allow viewing detailed cruise information",
+            "status": "passed",
+            "duration": 402
+          },
+          {
+            "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-a-modal-or-detail-page-should-open",
+            "title": "And a modal or detail page should open",
+            "status": "passed",
+            "duration": 412
+          },
+          {
+            "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-the-details-should-include-full-itinerary-and-pricing",
+            "title": "And the details should include full itinerary and pricing",
+            "status": "passed",
+            "duration": 369
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-3",
+      "summary": "Regression Test: Session Check API - Reports false when not authenticated",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-3",
+      "testResults": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_3.spec.js-›-mscship-3:-regression-test:-session-check-api---reports-false-when-not-authenticated-without-authentication",
+            "title": "without authentication",
+            "status": "passed",
+            "duration": 364
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-4",
+      "summary": "Regression Test: Cruise Detail API - Handles burst traffic (5 concurrent requests)",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-4",
+      "testResults": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-each-request-should-include-ajax-headers-and-form-data:",
+            "title": "Each request should include AJAX headers and form data:",
+            "status": "passed",
+            "duration": 382
+          },
+          {
+            "id": "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-system-should-handle-concurrent-load-gracefully",
+            "title": "System should handle concurrent load gracefully",
+            "status": "passed",
+            "duration": 402
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-5",
+      "summary": "Regression Test: Contact Form API - Rejects incomplete payload",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-5",
+      "testResults": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-given-the-contact-form-api-endpoint-is-available",
+            "title": "Given the contact form API endpoint is available",
+            "status": "passed",
+            "duration": 376
+          },
+          {
+            "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-when-a-post-request-is-made-with-incomplete-payload-(missing-required-fields)",
+            "title": "When a POST request is made with incomplete payload (missing required fields)",
+            "status": "passed",
+            "duration": 391
+          },
+          {
+            "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-then-the-api-should-reject-the-request",
+            "title": "Then the API should reject the request",
+            "status": "passed",
+            "duration": 391
+          },
+          {
+            "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-return-http-status-code-400",
+            "title": "And the response should return HTTP status code 400",
+            "status": "passed",
+            "duration": 366
+          },
+          {
+            "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-include-error-message-indicating-missing-fields",
+            "title": "And the response should include error message indicating missing fields",
+            "status": "passed",
+            "duration": 379
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-6",
+      "summary": "Regression Test: Contact Form API - Accepts valid payload and logs entry",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-6",
+      "testResults": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-given-the-contact-form-api-endpoint-is-available",
+            "title": "Given the contact form API endpoint is available",
+            "status": "passed",
+            "duration": 388
+          },
+          {
+            "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-when-a-post-request-is-made-with-valid-payload-containing-name,-email,-and-messa",
+            "title": "When a POST request is made with valid payload containing name, email, and messa",
+            "status": "passed",
+            "duration": 377
+          },
+          {
+            "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-then-the-api-should-accept-the-request",
+            "title": "Then the API should accept the request",
+            "status": "passed",
+            "duration": 394
+          },
+          {
+            "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-api-should-log-the-contact-entry-to-the-database",
+            "title": "And the API should log the contact entry to the database",
+            "status": "passed",
+            "duration": 450
+          },
+          {
+            "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-return-http-status-code-200",
+            "title": "And the response should return HTTP status code 200",
+            "status": "passed",
+            "duration": 463
+          },
+          {
+            "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-include-success-confirmation",
+            "title": "And the response should include success confirmation",
+            "status": "passed",
+            "duration": 601
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-7",
+      "summary": "Regression Test: Contact Mock Handler - Echoes payload for verification",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-7",
+      "testResults": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_7.spec.js-›-mscship-7:-regression-test:-contact-mock-handler---echoes-payload-for-verification-handler:-'mock'",
+            "title": "handler: 'mock'",
+            "status": "passed",
+            "duration": 600
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-8",
+      "summary": "Regression Test: User Login - Display dropdown with username",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-8",
+      "testResults": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-enter-valid-credentials-and-submit",
+            "title": "Enter valid credentials and submit",
+            "status": "passed",
+            "duration": 501
+          },
+          {
+            "id": "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-dropdown-menu-should-be-visible-when-clicked",
+            "title": "Dropdown menu should be visible when clicked",
+            "status": "passed",
+            "duration": 495
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    },
+    {
+      "key": "MSCSHIP-9",
+      "summary": "Regression Test: Reservation Page - Requires authentication",
+      "status": "To Do",
+      "statusCategory": "new",
+      "priority": "Medium",
+      "assignee": null,
+      "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-9",
+      "testResults": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "passRate": 100,
+        "tests": [
+          {
+            "id": "mscship_9.spec.js-›-mscship-9:-regression-test:-reservation-page---requires-authentication-reservation-page-should-not-be-accessible-without-authentication",
+            "title": "Reservation page should not be accessible without authentication",
+            "status": "passed",
+            "duration": 403
+          }
+        ]
+      },
+      "recommendedStatus": "Done",
+      "needsUpdate": true
+    }
+  ],
   "testResults": [
     {
-      "id": "frontend\\authenticated.spec.js-›-authenticated-user-flows-user-can-login-and-see-dropdown-with-name",
-      "title": "user can login and see dropdown with name",
-      "suite": "frontend\\authenticated.spec.js › Authenticated user flows",
-      "file": "frontend/authenticated.spec.js",
-      "status": "failed",
-      "duration": 24286,
-      "error": {
-        "message": "ReferenceError: toHaveText is not defined",
-        "stack": "ReferenceError: toHaveText is not defined\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\frontend\\authenticated.spec.js:16:1"
-      },
-      "jiraStory": null
-    },
-    {
-      "id": "frontend\\authenticated.spec.js-›-authenticated-user-flows-reservation-page-requires-authentication",
-      "title": "reservation page requires authentication",
-      "suite": "frontend\\authenticated.spec.js › Authenticated user flows",
-      "file": "frontend/authenticated.spec.js",
+      "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-given-the-cruise-search-api-endpoint-is-available",
+      "title": "Given the cruise search API endpoint is available",
+      "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
+      "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 17888,
+      "duration": 1013,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-1",
+        "summary": "Regression Test: Cruise Search API - Returns cruises for ALL ports",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-1"
+      }
     },
     {
-      "id": "frontend\\authenticated.spec.js-›-authenticated-user-flows-logged-in-user-can-access-reservation-page",
-      "title": "logged-in user can access reservation page",
-      "suite": "frontend\\authenticated.spec.js › Authenticated user flows",
-      "file": "frontend/authenticated.spec.js",
+      "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-when-a-get-request-is-made-to-/api/cruises/search-with-port-parameter-set-to-all",
+      "title": "When a GET request is made to /api/cruises/search with port parameter set to ALL",
+      "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
+      "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 23915,
+      "duration": 887,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-1",
+        "summary": "Regression Test: Cruise Search API - Returns cruises for ALL ports",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-1"
+      }
     },
     {
-      "id": "frontend\\authenticated.spec.js-›-authenticated-user-flows-user-can-logout-from-navbar-dropdown",
-      "title": "user can logout from navbar dropdown",
-      "suite": "frontend\\authenticated.spec.js › Authenticated user flows",
-      "file": "frontend/authenticated.spec.js",
-      "status": "timedout",
-      "duration": 31981,
-      "error": {
-        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-      },
-      "jiraStory": null
-    },
-    {
-      "id": "frontend\\authenticated.spec.js-›-cruises-interactions-opening-cruise-detail-renders-modal-with-reservation-form",
-      "title": "opening cruise detail renders modal with reservation form",
-      "suite": "frontend\\authenticated.spec.js › Cruises interactions",
-      "file": "frontend/authenticated.spec.js",
-      "status": "timedout",
-      "duration": 57959,
-      "error": {
-        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-      },
-      "jiraStory": null
-    },
-    {
-      "id": "frontend\\authenticated.spec.js-›-cruises-interactions-searching-cruises-by-navire-triggers-results-update",
-      "title": "searching cruises by navire triggers results update",
-      "suite": "frontend\\authenticated.spec.js › Cruises interactions",
-      "file": "frontend/authenticated.spec.js",
-      "status": "timedout",
-      "duration": 58542,
-      "error": {
-        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-      },
-      "jiraStory": null
-    },
-    {
-      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-load-contact-page-successfully",
-      "title": "should load contact page successfully",
-      "suite": "frontend\\contact.spec.js › Contact Page Tests",
-      "file": "frontend/contact.spec.js",
+      "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-then-the-api-should-return-a-list-of-all-available-cruises",
+      "title": "Then the API should return a list of all available cruises",
+      "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
+      "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 5138,
+      "duration": 935,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-1",
+        "summary": "Regression Test: Cruise Search API - Returns cruises for ALL ports",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-1"
+      }
     },
     {
-      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-display-contact-form-elements",
-      "title": "should display contact form elements",
-      "suite": "frontend\\contact.spec.js › Contact Page Tests",
-      "file": "frontend/contact.spec.js",
+      "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-response-should-include-cruise-details-like-name,-departure-date,-and-po",
+      "title": "And the response should include cruise details like name, departure date, and po",
+      "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
+      "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 7165,
+      "duration": 864,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-1",
+        "summary": "Regression Test: Cruise Search API - Returns cruises for ALL ports",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-1"
+      }
     },
     {
-      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-validate-contact-form-fields",
-      "title": "should validate contact form fields",
-      "suite": "frontend\\contact.spec.js › Contact Page Tests",
-      "file": "frontend/contact.spec.js",
+      "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-http-status-code-should-be-200",
+      "title": "And the HTTP status code should be 200",
+      "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
+      "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 6312,
+      "duration": 569,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-1",
+        "summary": "Regression Test: Cruise Search API - Returns cruises for ALL ports",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-1"
+      }
     },
     {
-      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-submit-contact-form-via-mock-handler",
-      "title": "should submit contact form via mock handler",
-      "suite": "frontend\\contact.spec.js › Contact Page Tests",
-      "file": "frontend/contact.spec.js",
-      "status": "timedout",
-      "duration": 38489,
-      "error": {
-        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-      },
-      "jiraStory": null
-    },
-    {
-      "id": "frontend\\contact.spec.js-›-contact-page-tests-should-submit-contact-form-via-real-handler-and-log-entry",
-      "title": "should submit contact form via real handler and log entry",
-      "suite": "frontend\\contact.spec.js › Contact Page Tests",
-      "file": "frontend/contact.spec.js",
-      "status": "timedout",
-      "duration": 33984,
-      "error": {
-        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-      },
-      "jiraStory": null
-    },
-    {
-      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-load-cruises-page-successfully",
-      "title": "should load cruises page successfully",
-      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
-      "file": "frontend/cruises.spec.js",
+      "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-given-user-is-authenticated-and-logged-in",
+      "title": "Given user is authenticated and logged in",
+      "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
+      "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 1152,
+      "duration": 481,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-10",
+        "summary": "Regression Test: Reservation Page - Accessible for authenticated users",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-10"
+      }
     },
     {
-      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-display-cruise-listings",
-      "title": "should display cruise listings",
-      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
-      "file": "frontend/cruises.spec.js",
+      "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-when-user-navigates-to-/reservation-page",
+      "title": "When user navigates to /reservation page",
+      "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
+      "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 2053,
+      "duration": 482,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-10",
+        "summary": "Regression Test: Reservation Page - Accessible for authenticated users",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-10"
+      }
     },
     {
-      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-have-search/filter-functionality",
-      "title": "should have search/filter functionality",
-      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
-      "file": "frontend/cruises.spec.js",
+      "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-then-the-reservation-page-should-load-successfully",
+      "title": "Then the reservation page should load successfully",
+      "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
+      "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 2137,
+      "duration": 477,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-10",
+        "summary": "Regression Test: Reservation Page - Accessible for authenticated users",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-10"
+      }
     },
     {
-      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-display-cruise-cards-with-details",
-      "title": "should display cruise cards with details",
-      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
-      "file": "frontend/cruises.spec.js",
+      "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-user-should-see-the-reservation-form",
+      "title": "And user should see the reservation form",
+      "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
+      "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 1448,
+      "duration": 553,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-10",
+        "summary": "Regression Test: Reservation Page - Accessible for authenticated users",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-10"
+      }
     },
     {
-      "id": "frontend\\cruises.spec.js-›-cruises-page-tests-should-allow-viewing-cruise-details",
-      "title": "should allow viewing cruise details",
-      "suite": "frontend\\cruises.spec.js › Cruises Page Tests",
-      "file": "frontend/cruises.spec.js",
+      "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-the-http-status-code-should-be-200",
+      "title": "And the HTTP status code should be 200",
+      "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
+      "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 1945,
+      "duration": 557,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-10",
+        "summary": "Regression Test: Reservation Page - Accessible for authenticated users",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-10"
+      }
     },
     {
-      "id": "frontend\\home.spec.js-›-home-page-tests-should-load-home-page-successfully",
-      "title": "should load home page successfully",
-      "suite": "frontend\\home.spec.js › Home Page Tests",
-      "file": "frontend/home.spec.js",
+      "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-given-user-is-logged-in",
+      "title": "Given user is logged in",
+      "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
+      "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 5190,
+      "duration": 531,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-11",
+        "summary": "Regression Test: User Logout - From navbar dropdown",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-11"
+      }
     },
     {
-      "id": "frontend\\home.spec.js-›-home-page-tests-should-display-navigation-elements",
-      "title": "should display navigation elements",
-      "suite": "frontend\\home.spec.js › Home Page Tests",
-      "file": "frontend/home.spec.js",
+      "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-when-user-clicks-on-the-user-dropdown-in-navbar",
+      "title": "When user clicks on the user dropdown in navbar",
+      "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
+      "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 4584,
+      "duration": 516,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-11",
+        "summary": "Regression Test: User Logout - From navbar dropdown",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-11"
+      }
     },
     {
-      "id": "frontend\\home.spec.js-›-home-page-tests-should-display-cruise-listings",
-      "title": "should display cruise listings",
-      "suite": "frontend\\home.spec.js › Home Page Tests",
-      "file": "frontend/home.spec.js",
+      "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-clicks-the-logout-button",
+      "title": "And user clicks the logout button",
+      "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
+      "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 4920,
+      "duration": 548,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-11",
+        "summary": "Regression Test: User Logout - From navbar dropdown",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-11"
+      }
     },
     {
-      "id": "frontend\\home.spec.js-›-home-page-tests-should-have-login-link",
-      "title": "should have login link",
-      "suite": "frontend\\home.spec.js › Home Page Tests",
-      "file": "frontend/home.spec.js",
+      "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-then-user-should-be-logged-out",
+      "title": "Then user should be logged out",
+      "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
+      "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 4827,
+      "duration": 565,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-11",
+        "summary": "Regression Test: User Logout - From navbar dropdown",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-11"
+      }
     },
     {
-      "id": "frontend\\home.spec.js-›-home-page-tests-should-have-register-link",
-      "title": "should have register link",
-      "suite": "frontend\\home.spec.js › Home Page Tests",
-      "file": "frontend/home.spec.js",
+      "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-should-be-redirected-to-the-home-page",
+      "title": "And user should be redirected to the home page",
+      "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
+      "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 10910,
+      "duration": 571,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-11",
+        "summary": "Regression Test: User Logout - From navbar dropdown",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-11"
+      }
     },
     {
-      "id": "frontend\\login.spec.js-›-login-page-tests-should-load-login-page-successfully",
-      "title": "should load login page successfully",
-      "suite": "frontend\\login.spec.js › Login Page Tests",
-      "file": "frontend/login.spec.js",
+      "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-the-user-session-should-be-cleared",
+      "title": "And the user session should be cleared",
+      "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
+      "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 3618,
+      "duration": 555,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-11",
+        "summary": "Regression Test: User Logout - From navbar dropdown",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-11"
+      }
     },
     {
-      "id": "frontend\\login.spec.js-›-login-page-tests-should-display-login-form-elements",
-      "title": "should display login form elements",
-      "suite": "frontend\\login.spec.js › Login Page Tests",
-      "file": "frontend/login.spec.js",
+      "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-given-user-is-on-the-cruises-page",
+      "title": "Given user is on the cruises page",
+      "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
+      "file": "mscship_12.spec.js",
       "status": "passed",
-      "duration": 3835,
+      "duration": 456,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-12",
+        "summary": "Regression Test: Cruise Detail Modal - Renders with reservation form",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-12"
+      }
     },
     {
-      "id": "frontend\\login.spec.js-›-login-page-tests-should-show-error-message-for-invalid-credentials",
-      "title": "should show error message for invalid credentials",
-      "suite": "frontend\\login.spec.js › Login Page Tests",
-      "file": "frontend/login.spec.js",
+      "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-when-user-clicks-on-a-cruise-card-to-view-details",
+      "title": "When user clicks on a cruise card to view details",
+      "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
+      "file": "mscship_12.spec.js",
       "status": "passed",
-      "duration": 4647,
+      "duration": 502,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-12",
+        "summary": "Regression Test: Cruise Detail Modal - Renders with reservation form",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-12"
+      }
     },
     {
-      "id": "frontend\\login.spec.js-›-login-page-tests-should-navigate-to-register-page",
-      "title": "should navigate to register page",
-      "suite": "frontend\\login.spec.js › Login Page Tests",
-      "file": "frontend/login.spec.js",
+      "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-then-a-modal-should-open-displaying-cruise-details",
+      "title": "Then a modal should open displaying cruise details",
+      "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
+      "file": "mscship_12.spec.js",
       "status": "passed",
-      "duration": 9830,
+      "duration": 525,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-12",
+        "summary": "Regression Test: Cruise Detail Modal - Renders with reservation form",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-12"
+      }
     },
     {
-      "id": "frontend\\register.spec.js-›-register-page-tests-should-load-register-page-successfully",
-      "title": "should load register page successfully",
-      "suite": "frontend\\register.spec.js › Register Page Tests",
-      "file": "frontend/register.spec.js",
+      "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-modal-should-contain-a-reservation-form",
+      "title": "And the modal should contain a reservation form",
+      "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
+      "file": "mscship_12.spec.js",
       "status": "passed",
-      "duration": 7593,
-      "error": null,
-      "jiraStory": null
-    },
-    {
-      "id": "frontend\\register.spec.js-›-register-page-tests-should-display-registration-form-elements",
-      "title": "should display registration form elements",
-      "suite": "frontend\\register.spec.js › Register Page Tests",
-      "file": "frontend/register.spec.js",
-      "status": "passed",
-      "duration": 6783,
-      "error": null,
-      "jiraStory": null
-    },
-    {
-      "id": "frontend\\register.spec.js-›-register-page-tests-should-validate-required-fields",
-      "title": "should validate required fields",
-      "suite": "frontend\\register.spec.js › Register Page Tests",
-      "file": "frontend/register.spec.js",
-      "status": "passed",
-      "duration": 12871,
-      "error": null,
-      "jiraStory": null
-    },
-    {
-      "id": "frontend\\register.spec.js-›-register-page-tests-should-navigate-to-login-page",
-      "title": "should navigate to login page",
-      "suite": "frontend\\register.spec.js › Register Page Tests",
-      "file": "frontend/register.spec.js",
-      "status": "passed",
-      "duration": 3510,
-      "error": null,
-      "jiraStory": null
-    },
-    {
-      "id": "backend\\api.spec.js-›-cruise-catalog-apis-search-endpoint-returns-cruises-for-all-ports",
-      "title": "search endpoint returns cruises for ALL ports",
-      "suite": "backend\\api.spec.js › Cruise Catalog APIs",
-      "file": "backend/api.spec.js",
-      "status": "failed",
       "duration": 464,
-      "error": {
-        "message": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON",
-        "stack": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON\n    at fetchCruises (C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:15:115)\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:31:21"
-      },
-      "jiraStory": null
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-12",
+        "summary": "Regression Test: Cruise Detail Modal - Renders with reservation form",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-12"
+      }
     },
     {
-      "id": "backend\\api.spec.js-›-cruise-catalog-apis-cruise-detail-returns-itinerary-and-rom-data",
-      "title": "cruise detail returns itinerary and rom data",
-      "suite": "backend\\api.spec.js › Cruise Catalog APIs",
-      "file": "backend/api.spec.js",
+      "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-form-should-have-fields-for-passenger-details",
+      "title": "And the form should have fields for passenger details",
+      "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
+      "file": "mscship_12.spec.js",
+      "status": "passed",
+      "duration": 459,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-12",
+        "summary": "Regression Test: Cruise Detail Modal - Renders with reservation form",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-12"
+      }
+    },
+    {
+      "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-given-user-is-on-the-cruises-page",
+      "title": "Given user is on the cruises page",
+      "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
+      "file": "mscship_13.spec.js",
+      "status": "passed",
+      "duration": 443,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-13",
+        "summary": "Regression Test: Cruise Search - Filter by Navire (Ship)",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-13"
+      }
+    },
+    {
+      "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-when-user-selects-a-ship-name-from-the-navire-(ship)-filter-dropdown",
+      "title": "When user selects a ship name from the Navire (Ship) filter dropdown",
+      "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
+      "file": "mscship_13.spec.js",
+      "status": "passed",
+      "duration": 407,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-13",
+        "summary": "Regression Test: Cruise Search - Filter by Navire (Ship)",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-13"
+      }
+    },
+    {
+      "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-then-the-cruise-listings-should-update-to-show-only-cruises-for-that-ship",
+      "title": "Then the cruise listings should update to show only cruises for that ship",
+      "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
+      "file": "mscship_13.spec.js",
+      "status": "passed",
+      "duration": 434,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-13",
+        "summary": "Regression Test: Cruise Search - Filter by Navire (Ship)",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-13"
+      }
+    },
+    {
+      "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-results-should-be-filtered-in-real-time",
+      "title": "And the results should be filtered in real-time",
+      "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
+      "file": "mscship_13.spec.js",
+      "status": "passed",
+      "duration": 471,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-13",
+        "summary": "Regression Test: Cruise Search - Filter by Navire (Ship)",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-13"
+      }
+    },
+    {
+      "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-page-should-display-the-filtered-cruise-cards",
+      "title": "And the page should display the filtered cruise cards",
+      "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
+      "file": "mscship_13.spec.js",
+      "status": "passed",
+      "duration": 443,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-13",
+        "summary": "Regression Test: Cruise Search - Filter by Navire (Ship)",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-13"
+      }
+    },
+    {
+      "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-given-user-navigates-to-the-contact-page",
+      "title": "Given user navigates to the contact page",
+      "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
+      "file": "mscship_14.spec.js",
+      "status": "passed",
+      "duration": 458,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-14",
+        "summary": "Regression Test: Contact Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-14"
+      }
+    },
+    {
+      "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-when-the-page-loads",
+      "title": "When the page loads",
+      "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
+      "file": "mscship_14.spec.js",
+      "status": "passed",
+      "duration": 444,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-14",
+        "summary": "Regression Test: Contact Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-14"
+      }
+    },
+    {
+      "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-then-the-contact-page-should-display-successfully",
+      "title": "Then the contact page should display successfully",
+      "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
+      "file": "mscship_14.spec.js",
       "status": "failed",
+      "duration": 12540,
+      "error": {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=Successfully')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=Successfully')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=Successfully')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=Successfully')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_14.spec.js:20:49"
+      },
+      "jiraStory": {
+        "key": "MSCSHIP-14",
+        "summary": "Regression Test: Contact Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-14"
+      }
+    },
+    {
+      "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-page-should-show-the-contact-form",
+      "title": "And the page should show the contact form",
+      "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
+      "file": "mscship_14.spec.js",
+      "status": "passed",
+      "duration": 469,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-14",
+        "summary": "Regression Test: Contact Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-14"
+      }
+    },
+    {
+      "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-http-status-code-should-be-200",
+      "title": "And the HTTP status code should be 200",
+      "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
+      "file": "mscship_14.spec.js",
+      "status": "passed",
+      "duration": 450,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-14",
+        "summary": "Regression Test: Contact Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-14"
+      }
+    },
+    {
+      "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-given-user-is-on-the-contact-page",
+      "title": "Given user is on the contact page",
+      "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
+      "file": "mscship_15.spec.js",
+      "status": "passed",
+      "duration": 475,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-15",
+        "summary": "Regression Test: Contact Form - Displays all form elements",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-15"
+      }
+    },
+    {
+      "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-when-the-page-loads",
+      "title": "When the page loads",
+      "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
+      "file": "mscship_15.spec.js",
+      "status": "passed",
+      "duration": 351,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-15",
+        "summary": "Regression Test: Contact Form - Displays all form elements",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-15"
+      }
+    },
+    {
+      "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-then-the-form-should-display-all-required-elements",
+      "title": "Then the form should display all required elements",
+      "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
+      "file": "mscship_15.spec.js",
+      "status": "failed",
+      "duration": 6197,
+      "error": {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=All required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=All required elements')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=All required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=All required elements')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_15.spec.js:20:58"
+      },
+      "jiraStory": {
+        "key": "MSCSHIP-15",
+        "summary": "Regression Test: Contact Form - Displays all form elements",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-15"
+      }
+    },
+    {
+      "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-name-input-field",
+      "title": "And the form should have name input field",
+      "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
+      "file": "mscship_15.spec.js",
+      "status": "passed",
+      "duration": 338,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-15",
+        "summary": "Regression Test: Contact Form - Displays all form elements",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-15"
+      }
+    },
+    {
+      "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-email-input-field",
+      "title": "And the form should have email input field",
+      "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
+      "file": "mscship_15.spec.js",
+      "status": "passed",
+      "duration": 335,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-15",
+        "summary": "Regression Test: Contact Form - Displays all form elements",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-15"
+      }
+    },
+    {
+      "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-message-textarea",
+      "title": "And the form should have message textarea",
+      "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
+      "file": "mscship_15.spec.js",
+      "status": "passed",
+      "duration": 303,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-15",
+        "summary": "Regression Test: Contact Form - Displays all form elements",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-15"
+      }
+    },
+    {
+      "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-a-submit-button",
+      "title": "And the form should have a submit button",
+      "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
+      "file": "mscship_15.spec.js",
+      "status": "passed",
+      "duration": 343,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-15",
+        "summary": "Regression Test: Contact Form - Displays all form elements",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-15"
+      }
+    },
+    {
+      "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-given-user-is-on-the-contact-form",
+      "title": "Given user is on the contact form",
+      "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
+      "file": "mscship_16.spec.js",
+      "status": "passed",
+      "duration": 328,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-16",
+        "summary": "Regression Test: Contact Form - Validates required fields",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-16"
+      }
+    },
+    {
+      "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-when-user-tries-to-submit-the-form-without-filling-required-fields",
+      "title": "When user tries to submit the form without filling required fields",
+      "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
+      "file": "mscship_16.spec.js",
+      "status": "passed",
+      "duration": 299,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-16",
+        "summary": "Regression Test: Contact Form - Validates required fields",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-16"
+      }
+    },
+    {
+      "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-then-the-form-should-display-validation-errors",
+      "title": "Then the form should display validation errors",
+      "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
+      "file": "mscship_16.spec.js",
+      "status": "failed",
+      "duration": 12844,
+      "error": {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=validation errors')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=validation errors')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=validation errors')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=validation errors')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_16.spec.js:20:54"
+      },
+      "jiraStory": {
+        "key": "MSCSHIP-16",
+        "summary": "Regression Test: Contact Form - Validates required fields",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-16"
+      }
+    },
+    {
+      "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-the-form-should-not-submit",
+      "title": "And the form should not submit",
+      "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
+      "file": "mscship_16.spec.js",
+      "status": "passed",
+      "duration": 319,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-16",
+        "summary": "Regression Test: Contact Form - Validates required fields",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-16"
+      }
+    },
+    {
+      "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-error-messages-should-indicate-which-fields-are-required",
+      "title": "And error messages should indicate which fields are required",
+      "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
+      "file": "mscship_16.spec.js",
+      "status": "passed",
+      "duration": 300,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-16",
+        "summary": "Regression Test: Contact Form - Validates required fields",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-16"
+      }
+    },
+    {
+      "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-given-the-contact-form-is-configured-to-use-mock-handler",
+      "title": "Given the contact form is configured to use mock handler",
+      "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
+      "file": "mscship_17.spec.js",
+      "status": "passed",
+      "duration": 266,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-17",
+        "summary": "Regression Test: Contact Form - Submits via mock handler",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-17"
+      }
+    },
+    {
+      "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-when-user-submits-the-form-with-valid-data",
+      "title": "When user submits the form with valid data",
+      "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
+      "file": "mscship_17.spec.js",
+      "status": "passed",
+      "duration": 383,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-17",
+        "summary": "Regression Test: Contact Form - Submits via mock handler",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-17"
+      }
+    },
+    {
+      "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-then-the-mock-handler-should-receive-the-form-data",
+      "title": "Then the mock handler should receive the form data",
+      "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
+      "file": "mscship_17.spec.js",
+      "status": "passed",
+      "duration": 286,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-17",
+        "summary": "Regression Test: Contact Form - Submits via mock handler",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-17"
+      }
+    },
+    {
+      "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-mock-handler-should-return-the-submitted-data",
+      "title": "And the mock handler should return the submitted data",
+      "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
+      "file": "mscship_17.spec.js",
+      "status": "passed",
+      "duration": 311,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-17",
+        "summary": "Regression Test: Contact Form - Submits via mock handler",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-17"
+      }
+    },
+    {
+      "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-response-should-confirm-successful-submission",
+      "title": "And the response should confirm successful submission",
+      "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
+      "file": "mscship_17.spec.js",
+      "status": "passed",
+      "duration": 266,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-17",
+        "summary": "Regression Test: Contact Form - Submits via mock handler",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-17"
+      }
+    },
+    {
+      "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-given-the-contact-form-is-configured-to-use-real-handler",
+      "title": "Given the contact form is configured to use real handler",
+      "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
+      "file": "mscship_18.spec.js",
+      "status": "passed",
+      "duration": 303,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-18",
+        "summary": "Regression Test: Contact Form - Submits via real handler and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-18"
+      }
+    },
+    {
+      "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-when-user-submits-the-form-with-valid-data",
+      "title": "When user submits the form with valid data",
+      "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
+      "file": "mscship_18.spec.js",
+      "status": "passed",
+      "duration": 295,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-18",
+        "summary": "Regression Test: Contact Form - Submits via real handler and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-18"
+      }
+    },
+    {
+      "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-then-the-real-handler-should-process-the-form-data",
+      "title": "Then the real handler should process the form data",
+      "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
+      "file": "mscship_18.spec.js",
+      "status": "passed",
+      "duration": 305,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-18",
+        "summary": "Regression Test: Contact Form - Submits via real handler and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-18"
+      }
+    },
+    {
+      "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-the-data-should-be-logged-to-the-database",
+      "title": "And the data should be logged to the database",
+      "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
+      "file": "mscship_18.spec.js",
+      "status": "passed",
+      "duration": 326,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-18",
+        "summary": "Regression Test: Contact Form - Submits via real handler and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-18"
+      }
+    },
+    {
+      "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-user-should-see-a-success-confirmation-message",
+      "title": "And user should see a success confirmation message",
+      "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
+      "file": "mscship_18.spec.js",
+      "status": "passed",
       "duration": 348,
-      "error": {
-        "message": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON",
-        "stack": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON\n    at fetchCruises (C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:15:115)\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:36:21"
-      },
-      "jiraStory": null
-    },
-    {
-      "id": "backend\\api.spec.js-›-cruise-catalog-apis-checksession-reports-false-when-not-authenticated",
-      "title": "checkSession reports false when not authenticated",
-      "suite": "backend\\api.spec.js › Cruise Catalog APIs",
-      "file": "backend/api.spec.js",
-      "status": "passed",
-      "duration": 423,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-18",
+        "summary": "Regression Test: Contact Form - Submits via real handler and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-18"
+      }
     },
     {
-      "id": "backend\\api.spec.js-›-cruise-catalog-apis-cruise-detail-handles-burst-traffic",
-      "title": "cruise detail handles burst traffic",
-      "suite": "backend\\api.spec.js › Cruise Catalog APIs",
-      "file": "backend/api.spec.js",
+      "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-given-user-navigates-to-the-cruises-page",
+      "title": "Given user navigates to the cruises page",
+      "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
+      "file": "mscship_19.spec.js",
+      "status": "passed",
+      "duration": 411,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-19",
+        "summary": "Regression Test: Cruises Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-19"
+      }
+    },
+    {
+      "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-when-the-page-loads",
+      "title": "When the page loads",
+      "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
+      "file": "mscship_19.spec.js",
+      "status": "passed",
+      "duration": 377,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-19",
+        "summary": "Regression Test: Cruises Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-19"
+      }
+    },
+    {
+      "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-then-the-cruises-page-should-display-successfully",
+      "title": "Then the cruises page should display successfully",
+      "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
+      "file": "mscship_19.spec.js",
       "status": "failed",
-      "duration": 359,
+      "duration": 6723,
       "error": {
-        "message": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON",
-        "stack": "SyntaxError: Unexpected token '<', \"<br />\n<b>\"... is not valid JSON\n    at fetchCruises (C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:15:115)\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\backend\\api.spec.js:57:21"
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=Successfully')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=Successfully')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=Successfully')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=Successfully')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_19.spec.js:20:49"
       },
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-19",
+        "summary": "Regression Test: Cruises Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-19"
+      }
     },
     {
-      "id": "backend\\api.spec.js-›-contact-handlers-real-handler-rejects-incomplete-payload",
-      "title": "real handler rejects incomplete payload",
-      "suite": "backend\\api.spec.js › Contact handlers",
-      "file": "backend/api.spec.js",
+      "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-http-status-code-should-be-200",
+      "title": "And the HTTP status code should be 200",
+      "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
+      "file": "mscship_19.spec.js",
       "status": "passed",
-      "duration": 261,
+      "duration": 373,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-19",
+        "summary": "Regression Test: Cruises Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-19"
+      }
     },
     {
-      "id": "backend\\api.spec.js-›-contact-handlers-real-handler-accepts-valid-payload-and-logs-entry",
-      "title": "real handler accepts valid payload and logs entry",
-      "suite": "backend\\api.spec.js › Contact handlers",
-      "file": "backend/api.spec.js",
+      "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-page-should-be-ready-for-interaction",
+      "title": "And the page should be ready for interaction",
+      "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
+      "file": "mscship_19.spec.js",
       "status": "passed",
-      "duration": 327,
+      "duration": 302,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-19",
+        "summary": "Regression Test: Cruises Page - Loads successfully",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-19"
+      }
     },
     {
-      "id": "backend\\api.spec.js-›-contact-handlers-mock-handler-echoes-payload-for-fast-verification",
-      "title": "mock handler echoes payload for fast verification",
-      "suite": "backend\\api.spec.js › Contact handlers",
-      "file": "backend/api.spec.js",
+      "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-given-a-valid-cruise-id-is-provided",
+      "title": "Given a valid cruise ID is provided",
+      "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+      "file": "mscship_2.spec.js",
       "status": "passed",
-      "duration": 457,
+      "duration": 333,
       "error": null,
-      "jiraStory": null
+      "jiraStory": {
+        "key": "MSCSHIP-2",
+        "summary": "Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-2"
+      }
+    },
+    {
+      "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-when-a-get-request-is-made-to-/api/cruises/detail-endpoint",
+      "title": "When a GET request is made to /api/cruises/detail endpoint",
+      "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+      "file": "mscship_2.spec.js",
+      "status": "passed",
+      "duration": 325,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-2",
+        "summary": "Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-2"
+      }
+    },
+    {
+      "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-then-the-api-should-return-complete-cruise-details",
+      "title": "Then the API should return complete cruise details",
+      "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+      "file": "mscship_2.spec.js",
+      "status": "passed",
+      "duration": 291,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-2",
+        "summary": "Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-2"
+      }
+    },
+    {
+      "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-itinerary-information",
+      "title": "And the response should include itinerary information",
+      "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+      "file": "mscship_2.spec.js",
+      "status": "passed",
+      "duration": 560,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-2",
+        "summary": "Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-2"
+      }
+    },
+    {
+      "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-rom-(rates-and-occupancy)-data",
+      "title": "And the response should include ROM (rates and occupancy) data",
+      "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+      "file": "mscship_2.spec.js",
+      "status": "passed",
+      "duration": 385,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-2",
+        "summary": "Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-2"
+      }
+    },
+    {
+      "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-http-status-code-should-be-200",
+      "title": "And the HTTP status code should be 200",
+      "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+      "file": "mscship_2.spec.js",
+      "status": "passed",
+      "duration": 446,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-2",
+        "summary": "Regression Test: Cruise Detail API - Returns itinerary and ROM data",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-2"
+      }
+    },
+    {
+      "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-given-user-is-on-the-cruises-page",
+      "title": "Given user is on the cruises page",
+      "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
+      "file": "mscship_20.spec.js",
+      "status": "passed",
+      "duration": 456,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-20",
+        "summary": "Regression Test: Cruises Page - Displays cruise listings",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-20"
+      }
+    },
+    {
+      "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-when-the-page-loads",
+      "title": "When the page loads",
+      "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
+      "file": "mscship_20.spec.js",
+      "status": "passed",
+      "duration": 534,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-20",
+        "summary": "Regression Test: Cruises Page - Displays cruise listings",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-20"
+      }
+    },
+    {
+      "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-then-the-page-should-display-a-list-of-available-cruise-listings",
+      "title": "Then the page should display a list of available cruise listings",
+      "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
+      "file": "mscship_20.spec.js",
+      "status": "failed",
+      "duration": 11397,
+      "error": {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=a list of available cruise listings')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=a list of available cruise listings')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=a list of available cruise listings')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=a list of available cruise listings')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_20.spec.js:20:72"
+      },
+      "jiraStory": {
+        "key": "MSCSHIP-20",
+        "summary": "Regression Test: Cruises Page - Displays cruise listings",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-20"
+      }
+    },
+    {
+      "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-each-listing-should-show-cruise-information",
+      "title": "And each listing should show cruise information",
+      "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
+      "file": "mscship_20.spec.js",
+      "status": "passed",
+      "duration": 464,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-20",
+        "summary": "Regression Test: Cruises Page - Displays cruise listings",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-20"
+      }
+    },
+    {
+      "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-the-listings-should-be-visible-to-the-user",
+      "title": "And the listings should be visible to the user",
+      "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
+      "file": "mscship_20.spec.js",
+      "status": "passed",
+      "duration": 638,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-20",
+        "summary": "Regression Test: Cruises Page - Displays cruise listings",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-20"
+      }
+    },
+    {
+      "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-given-user-is-on-the-cruises-page",
+      "title": "Given user is on the cruises page",
+      "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
+      "file": "mscship_21.spec.js",
+      "status": "passed",
+      "duration": 875,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-21",
+        "summary": "Regression Test: Cruises Page - Has search/filter functionality",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-21"
+      }
+    },
+    {
+      "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-when-the-page-loads",
+      "title": "When the page loads",
+      "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
+      "file": "mscship_21.spec.js",
+      "status": "passed",
+      "duration": 459,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-21",
+        "summary": "Regression Test: Cruises Page - Has search/filter functionality",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-21"
+      }
+    },
+    {
+      "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-then-the-page-should-have-search-and-filter-functionality",
+      "title": "Then the page should have search and filter functionality",
+      "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
+      "file": "mscship_21.spec.js",
+      "status": "passed",
+      "duration": 473,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-21",
+        "summary": "Regression Test: Cruises Page - Has search/filter functionality",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-21"
+      }
+    },
+    {
+      "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-user-should-see-filter-options-for-ports,-dates,-or-ships",
+      "title": "And user should see filter options for ports, dates, or ships",
+      "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
+      "file": "mscship_21.spec.js",
+      "status": "passed",
+      "duration": 534,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-21",
+        "summary": "Regression Test: Cruises Page - Has search/filter functionality",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-21"
+      }
+    },
+    {
+      "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-the-search/filter-controls-should-be-interactive",
+      "title": "And the search/filter controls should be interactive",
+      "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
+      "file": "mscship_21.spec.js",
+      "status": "passed",
+      "duration": 498,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-21",
+        "summary": "Regression Test: Cruises Page - Has search/filter functionality",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-21"
+      }
+    },
+    {
+      "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-given-user-is-on-the-cruises-page",
+      "title": "Given user is on the cruises page",
+      "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
+      "file": "mscship_22.spec.js",
+      "status": "passed",
+      "duration": 616,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-22",
+        "summary": "Regression Test: Cruises Page - Displays cruise cards with details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-22"
+      }
+    },
+    {
+      "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-when-the-page-displays-cruise-listings",
+      "title": "When the page displays cruise listings",
+      "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
+      "file": "mscship_22.spec.js",
+      "status": "passed",
+      "duration": 488,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-22",
+        "summary": "Regression Test: Cruises Page - Displays cruise cards with details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-22"
+      }
+    },
+    {
+      "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-then-each-cruise-card-should-display-cruise-details",
+      "title": "Then each cruise card should display cruise details",
+      "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
+      "file": "mscship_22.spec.js",
+      "status": "failed",
+      "duration": 6895,
+      "error": {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=/cruise details/i')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=/cruise details/i')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=/cruise details/i')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=/cruise details/i')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_22.spec.js:20:54"
+      },
+      "jiraStory": {
+        "key": "MSCSHIP-22",
+        "summary": "Regression Test: Cruises Page - Displays cruise cards with details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-22"
+      }
+    },
+    {
+      "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-cruise-name",
+      "title": "And the card should show cruise name",
+      "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
+      "file": "mscship_22.spec.js",
+      "status": "passed",
+      "duration": 466,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-22",
+        "summary": "Regression Test: Cruises Page - Displays cruise cards with details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-22"
+      }
+    },
+    {
+      "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-departure-date",
+      "title": "And the card should show departure date",
+      "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
+      "file": "mscship_22.spec.js",
+      "status": "passed",
+      "duration": 415,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-22",
+        "summary": "Regression Test: Cruises Page - Displays cruise cards with details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-22"
+      }
+    },
+    {
+      "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-destination-ports",
+      "title": "And the card should show destination ports",
+      "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
+      "file": "mscship_22.spec.js",
+      "status": "passed",
+      "duration": 394,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-22",
+        "summary": "Regression Test: Cruises Page - Displays cruise cards with details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-22"
+      }
+    },
+    {
+      "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-pricing-information",
+      "title": "And the card should show pricing information",
+      "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
+      "file": "mscship_22.spec.js",
+      "status": "passed",
+      "duration": 413,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-22",
+        "summary": "Regression Test: Cruises Page - Displays cruise cards with details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-22"
+      }
+    },
+    {
+      "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-given-user-is-on-the-cruises-page",
+      "title": "Given user is on the cruises page",
+      "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
+      "file": "mscship_23.spec.js",
+      "status": "passed",
+      "duration": 428,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-23",
+        "summary": "Regression Test: Cruises Page - Allows viewing cruise details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-23"
+      }
+    },
+    {
+      "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-when-user-clicks-on-a-cruise-card",
+      "title": "When user clicks on a cruise card",
+      "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
+      "file": "mscship_23.spec.js",
+      "status": "passed",
+      "duration": 408,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-23",
+        "summary": "Regression Test: Cruises Page - Allows viewing cruise details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-23"
+      }
+    },
+    {
+      "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-then-the-system-should-allow-viewing-detailed-cruise-information",
+      "title": "Then the system should allow viewing detailed cruise information",
+      "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
+      "file": "mscship_23.spec.js",
+      "status": "passed",
+      "duration": 402,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-23",
+        "summary": "Regression Test: Cruises Page - Allows viewing cruise details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-23"
+      }
+    },
+    {
+      "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-a-modal-or-detail-page-should-open",
+      "title": "And a modal or detail page should open",
+      "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
+      "file": "mscship_23.spec.js",
+      "status": "passed",
+      "duration": 412,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-23",
+        "summary": "Regression Test: Cruises Page - Allows viewing cruise details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-23"
+      }
+    },
+    {
+      "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-the-details-should-include-full-itinerary-and-pricing",
+      "title": "And the details should include full itinerary and pricing",
+      "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
+      "file": "mscship_23.spec.js",
+      "status": "passed",
+      "duration": 369,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-23",
+        "summary": "Regression Test: Cruises Page - Allows viewing cruise details",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-23"
+      }
+    },
+    {
+      "id": "mscship_3.spec.js-›-mscship-3:-regression-test:-session-check-api---reports-false-when-not-authenticated-without-authentication",
+      "title": "without authentication",
+      "suite": "mscship_3.spec.js › MSCSHIP-3: Regression Test: Session Check API - Reports false when not authenticated",
+      "file": "mscship_3.spec.js",
+      "status": "passed",
+      "duration": 364,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-3",
+        "summary": "Regression Test: Session Check API - Reports false when not authenticated",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-3"
+      }
+    },
+    {
+      "id": "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-each-request-should-include-ajax-headers-and-form-data:",
+      "title": "Each request should include AJAX headers and form data:",
+      "suite": "mscship_4.spec.js › MSCSHIP-4: Regression Test: Cruise Detail API - Handles burst traffic (5 concurrent requests)",
+      "file": "mscship_4.spec.js",
+      "status": "passed",
+      "duration": 382,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-4",
+        "summary": "Regression Test: Cruise Detail API - Handles burst traffic (5 concurrent requests)",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-4"
+      }
+    },
+    {
+      "id": "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-system-should-handle-concurrent-load-gracefully",
+      "title": "System should handle concurrent load gracefully",
+      "suite": "mscship_4.spec.js › MSCSHIP-4: Regression Test: Cruise Detail API - Handles burst traffic (5 concurrent requests)",
+      "file": "mscship_4.spec.js",
+      "status": "passed",
+      "duration": 402,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-4",
+        "summary": "Regression Test: Cruise Detail API - Handles burst traffic (5 concurrent requests)",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-4"
+      }
+    },
+    {
+      "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-given-the-contact-form-api-endpoint-is-available",
+      "title": "Given the contact form API endpoint is available",
+      "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
+      "file": "mscship_5.spec.js",
+      "status": "passed",
+      "duration": 376,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-5",
+        "summary": "Regression Test: Contact Form API - Rejects incomplete payload",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-5"
+      }
+    },
+    {
+      "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-when-a-post-request-is-made-with-incomplete-payload-(missing-required-fields)",
+      "title": "When a POST request is made with incomplete payload (missing required fields)",
+      "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
+      "file": "mscship_5.spec.js",
+      "status": "passed",
+      "duration": 391,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-5",
+        "summary": "Regression Test: Contact Form API - Rejects incomplete payload",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-5"
+      }
+    },
+    {
+      "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-then-the-api-should-reject-the-request",
+      "title": "Then the API should reject the request",
+      "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
+      "file": "mscship_5.spec.js",
+      "status": "passed",
+      "duration": 391,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-5",
+        "summary": "Regression Test: Contact Form API - Rejects incomplete payload",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-5"
+      }
+    },
+    {
+      "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-return-http-status-code-400",
+      "title": "And the response should return HTTP status code 400",
+      "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
+      "file": "mscship_5.spec.js",
+      "status": "passed",
+      "duration": 366,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-5",
+        "summary": "Regression Test: Contact Form API - Rejects incomplete payload",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-5"
+      }
+    },
+    {
+      "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-include-error-message-indicating-missing-fields",
+      "title": "And the response should include error message indicating missing fields",
+      "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
+      "file": "mscship_5.spec.js",
+      "status": "passed",
+      "duration": 379,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-5",
+        "summary": "Regression Test: Contact Form API - Rejects incomplete payload",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-5"
+      }
+    },
+    {
+      "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-given-the-contact-form-api-endpoint-is-available",
+      "title": "Given the contact form API endpoint is available",
+      "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
+      "file": "mscship_6.spec.js",
+      "status": "passed",
+      "duration": 388,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-6",
+        "summary": "Regression Test: Contact Form API - Accepts valid payload and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-6"
+      }
+    },
+    {
+      "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-when-a-post-request-is-made-with-valid-payload-containing-name,-email,-and-messa",
+      "title": "When a POST request is made with valid payload containing name, email, and messa",
+      "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
+      "file": "mscship_6.spec.js",
+      "status": "passed",
+      "duration": 377,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-6",
+        "summary": "Regression Test: Contact Form API - Accepts valid payload and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-6"
+      }
+    },
+    {
+      "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-then-the-api-should-accept-the-request",
+      "title": "Then the API should accept the request",
+      "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
+      "file": "mscship_6.spec.js",
+      "status": "passed",
+      "duration": 394,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-6",
+        "summary": "Regression Test: Contact Form API - Accepts valid payload and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-6"
+      }
+    },
+    {
+      "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-api-should-log-the-contact-entry-to-the-database",
+      "title": "And the API should log the contact entry to the database",
+      "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
+      "file": "mscship_6.spec.js",
+      "status": "passed",
+      "duration": 450,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-6",
+        "summary": "Regression Test: Contact Form API - Accepts valid payload and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-6"
+      }
+    },
+    {
+      "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-return-http-status-code-200",
+      "title": "And the response should return HTTP status code 200",
+      "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
+      "file": "mscship_6.spec.js",
+      "status": "passed",
+      "duration": 463,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-6",
+        "summary": "Regression Test: Contact Form API - Accepts valid payload and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-6"
+      }
+    },
+    {
+      "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-include-success-confirmation",
+      "title": "And the response should include success confirmation",
+      "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
+      "file": "mscship_6.spec.js",
+      "status": "passed",
+      "duration": 601,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-6",
+        "summary": "Regression Test: Contact Form API - Accepts valid payload and logs entry",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-6"
+      }
+    },
+    {
+      "id": "mscship_7.spec.js-›-mscship-7:-regression-test:-contact-mock-handler---echoes-payload-for-verification-handler:-'mock'",
+      "title": "handler: 'mock'",
+      "suite": "mscship_7.spec.js › MSCSHIP-7: Regression Test: Contact Mock Handler - Echoes payload for verification",
+      "file": "mscship_7.spec.js",
+      "status": "passed",
+      "duration": 600,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-7",
+        "summary": "Regression Test: Contact Mock Handler - Echoes payload for verification",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-7"
+      }
+    },
+    {
+      "id": "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-enter-valid-credentials-and-submit",
+      "title": "Enter valid credentials and submit",
+      "suite": "mscship_8.spec.js › MSCSHIP-8: Regression Test: User Login - Display dropdown with username",
+      "file": "mscship_8.spec.js",
+      "status": "passed",
+      "duration": 501,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-8",
+        "summary": "Regression Test: User Login - Display dropdown with username",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-8"
+      }
+    },
+    {
+      "id": "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-dropdown-menu-should-be-visible-when-clicked",
+      "title": "Dropdown menu should be visible when clicked",
+      "suite": "mscship_8.spec.js › MSCSHIP-8: Regression Test: User Login - Display dropdown with username",
+      "file": "mscship_8.spec.js",
+      "status": "passed",
+      "duration": 495,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-8",
+        "summary": "Regression Test: User Login - Display dropdown with username",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-8"
+      }
+    },
+    {
+      "id": "mscship_9.spec.js-›-mscship-9:-regression-test:-reservation-page---requires-authentication-reservation-page-should-not-be-accessible-without-authentication",
+      "title": "Reservation page should not be accessible without authentication",
+      "suite": "mscship_9.spec.js › MSCSHIP-9: Regression Test: Reservation Page - Requires authentication",
+      "file": "mscship_9.spec.js",
+      "status": "passed",
+      "duration": 403,
+      "error": null,
+      "jiraStory": {
+        "key": "MSCSHIP-9",
+        "summary": "Regression Test: Reservation Page - Requires authentication",
+        "status": "To Do",
+        "priority": "Medium",
+        "url": "https://shreyespd12.atlassian.net/browse/MSCSHIP-9"
+      }
     }
   ]
 }

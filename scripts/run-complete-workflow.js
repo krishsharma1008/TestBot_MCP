@@ -21,6 +21,9 @@ const steps = {
 
 async function runWorkflow() {
   try {
+    // Enable Jira-only test mode
+    process.env.JIRA_ONLY_TESTS = 'true';
+    
     // Step 1: Scan Jira and Generate Tests
     console.log('\n📋 Step 1: Scanning Jira stories and generating tests...');
     console.log('─'.repeat(80));
@@ -78,8 +81,9 @@ async function runWorkflow() {
       
       // Start dashboard server
       dashboardServer = await startDashboardServer();
+      const dashboardPort = dashboardServer.port || 3000;
       console.log('📊 Opening test dashboard in browser...');
-      await openInBrowser('http://localhost:3000');
+      await openInBrowser(`http://localhost:${dashboardPort}`);
       
       // Summary
       console.log('\n' + '═'.repeat(80));
@@ -87,7 +91,7 @@ async function runWorkflow() {
       console.log('═'.repeat(80));
       console.log('\n📊 Servers Running:');
       console.log('   🌐 Website: http://localhost:8000');
-      console.log('   📊 Dashboard: http://localhost:3000');
+      console.log(`   📊 Dashboard: http://localhost:${dashboardPort}`);
       console.log('\n' + '─'.repeat(80));
       console.log('⏸️  Servers are running. Press ENTER to stop servers and exit...');
       console.log('─'.repeat(80));
@@ -161,8 +165,9 @@ async function runWorkflow() {
     
     // Start live server for dashboard
     dashboardServer = await startDashboardServer();
+    const dashboardPort = dashboardServer.port || 3000;
     console.log('📊 Opening test dashboard in browser...');
-    await openInBrowser('http://localhost:3000');
+    await openInBrowser(`http://localhost:${dashboardPort}`);
     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for browser to open
     
     // Step 8: Create Pull Request
@@ -192,8 +197,8 @@ async function runWorkflow() {
     }
     console.log('\n📊 Servers Running:');
     console.log('   🌐 Website: http://localhost:8000');
-    console.log('   📊 Dashboard: http://localhost:3000');
-    console.log('\n📊 View dashboard: http://localhost:3000');
+    console.log(`   📊 Dashboard: http://localhost:${dashboardPort}`);
+    console.log(`\n📊 View dashboard: http://localhost:${dashboardPort}`);
     console.log('📊 View AI report: ai-agent-reports/latest-report.json');
     console.log('\n' + '─'.repeat(80));
     console.log('⏸️  Servers are running. Press ENTER to stop servers and exit...');
@@ -245,8 +250,8 @@ async function openInBrowser(url) {
   });
 }
 
-async function startDashboardServer() {
-  console.log('Starting dashboard server on port 3000...');
+async function startDashboardServer(port = 3000) {
+  console.log(`Starting dashboard server on port ${port}...`);
   
   const http = require('http');
   const dashboardDir = path.join(process.cwd(), 'custom-report');
@@ -296,15 +301,33 @@ async function startDashboardServer() {
     });
   });
   
-  server.listen(3000);
-  
-  // Return a mock process object with kill method
-  return {
-    kill: () => {
-      server.close();
-      console.log('✅ Dashboard server stopped');
-    }
-  };
+  return new Promise((resolve, reject) => {
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.log(`⚠️  Port ${port} is in use, trying port ${port + 1}...`);
+        server.close();
+        // Try next port
+        if (port < 3010) {
+          resolve(startDashboardServer(port + 1));
+        } else {
+          reject(new Error('Could not find available port for dashboard server'));
+        }
+      } else {
+        reject(error);
+      }
+    });
+    
+    server.listen(port, () => {
+      console.log(`✅ Dashboard server started on port ${port}`);
+      resolve({
+        port,
+        kill: () => {
+          server.close();
+          console.log('✅ Dashboard server stopped');
+        }
+      });
+    });
+  });
 }
 
 function startProjectServer() {
@@ -346,10 +369,20 @@ async function waitForServer(url, timeout = 30000) {
 }
 
 function runTests() {
-  console.log('Running Playwright tests...');
+  const jiraOnlyTests = process.env.JIRA_ONLY_TESTS === 'true';
+  
+  if (jiraOnlyTests) {
+    console.log('Running Jira-generated tests only...');
+  } else {
+    console.log('Running Playwright tests...');
+  }
   
   try {
-    execSync('npx playwright test', {
+    const testCommand = jiraOnlyTests 
+      ? 'npx playwright test --config=playwright.jira.config.js'
+      : 'npx playwright test';
+    
+    execSync(testCommand, {
       stdio: 'inherit',
       cwd: process.cwd()
     });
