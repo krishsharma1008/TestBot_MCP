@@ -59,6 +59,20 @@ class TestDataParser {
     /**
      * Load AI analysis data if available
      */
+    async loadAttachmentsManifest(jsonPath = 'attachments-manifest.json') {
+        try {
+            const response = await fetch(jsonPath);
+            if (!response.ok) {
+                console.log('No attachments manifest found (this is normal if no tests failed)');
+                return;
+            }
+            this.attachmentsManifest = await response.json();
+            console.log('✅ Loaded attachments manifest');
+        } catch (error) {
+            console.log('No attachments manifest available');
+        }
+    }
+
     async loadAIAnalysis() {
         try {
             const response = await fetch('ai-analysis.json');
