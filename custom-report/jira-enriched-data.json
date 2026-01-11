@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-11T18:12:35.904Z",
+  "timestamp": "2026-01-11T18:19:23.768Z",
   "jiraProject": "MSCSHIP",
   "jiraBaseUrl": "https://shreyespd12.atlassian.net",
   "mapping": {
@@ -284,31 +284,31 @@
             "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-given-the-cruise-search-api-endpoint-is-available",
             "title": "Given the cruise search API endpoint is available",
             "status": "passed",
-            "duration": 609
+            "duration": 742
           },
           {
             "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-when-a-get-request-is-made-to-/api/cruises/search-with-port-parameter-set-to-all",
             "title": "When a GET request is made to /api/cruises/search with port parameter set to ALL",
             "status": "passed",
-            "duration": 653
+            "duration": 758
           },
           {
             "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-then-the-api-should-return-a-list-of-all-available-cruises",
             "title": "Then the API should return a list of all available cruises",
             "status": "passed",
-            "duration": 589
+            "duration": 720
           },
           {
             "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-response-should-include-cruise-details-like-name,-departure-date,-and-po",
             "title": "And the response should include cruise details like name, departure date, and po",
             "status": "passed",
-            "duration": 631
+            "duration": 696
           },
           {
             "id": "mscship_1.spec.js-›-mscship-1:-regression-test:-cruise-search-api---returns-cruises-for-all-ports-and-the-http-status-code-should-be-200",
             "title": "And the HTTP status code should be 200",
             "status": "passed",
-            "duration": 419
+            "duration": 556
           }
         ]
       },
@@ -334,31 +334,31 @@
             "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-given-user-is-authenticated-and-logged-in",
             "title": "Given user is authenticated and logged in",
             "status": "passed",
-            "duration": 430
+            "duration": 570
           },
           {
             "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-when-user-navigates-to-/reservation-page",
             "title": "When user navigates to /reservation page",
             "status": "passed",
-            "duration": 418
+            "duration": 579
           },
           {
             "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-then-the-reservation-page-should-load-successfully",
             "title": "Then the reservation page should load successfully",
             "status": "passed",
-            "duration": 449
+            "duration": 547
           },
           {
             "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-user-should-see-the-reservation-form",
             "title": "And user should see the reservation form",
             "status": "passed",
-            "duration": 411
+            "duration": 573
           },
           {
             "id": "mscship_10.spec.js-›-mscship-10:-regression-test:-reservation-page---accessible-for-authenticated-users-and-the-http-status-code-should-be-200",
             "title": "And the HTTP status code should be 200",
             "status": "passed",
-            "duration": 414
+            "duration": 606
           }
         ]
       },
@@ -384,37 +384,37 @@
             "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-given-user-is-logged-in",
             "title": "Given user is logged in",
             "status": "passed",
-            "duration": 417
+            "duration": 558
           },
           {
             "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-when-user-clicks-on-the-user-dropdown-in-navbar",
             "title": "When user clicks on the user dropdown in navbar",
             "status": "passed",
-            "duration": 456
+            "duration": 561
           },
           {
             "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-clicks-the-logout-button",
             "title": "And user clicks the logout button",
             "status": "passed",
-            "duration": 410
+            "duration": 557
           },
           {
             "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-then-user-should-be-logged-out",
             "title": "Then user should be logged out",
             "status": "passed",
-            "duration": 365
+            "duration": 485
           },
           {
             "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-user-should-be-redirected-to-the-home-page",
             "title": "And user should be redirected to the home page",
             "status": "passed",
-            "duration": 388
+            "duration": 499
           },
           {
             "id": "mscship_11.spec.js-›-mscship-11:-regression-test:-user-logout---from-navbar-dropdown-and-the-user-session-should-be-cleared",
             "title": "And the user session should be cleared",
             "status": "passed",
-            "duration": 395
+            "duration": 468
           }
         ]
       },
@@ -440,31 +440,31 @@
             "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-given-user-is-on-the-cruises-page",
             "title": "Given user is on the cruises page",
             "status": "passed",
-            "duration": 393
+            "duration": 729
           },
           {
             "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-when-user-clicks-on-a-cruise-card-to-view-details",
             "title": "When user clicks on a cruise card to view details",
             "status": "passed",
-            "duration": 369
+            "duration": 761
           },
           {
             "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-then-a-modal-should-open-displaying-cruise-details",
             "title": "Then a modal should open displaying cruise details",
             "status": "passed",
-            "duration": 373
+            "duration": 639
           },
           {
             "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-modal-should-contain-a-reservation-form",
             "title": "And the modal should contain a reservation form",
             "status": "passed",
-            "duration": 435
+            "duration": 563
           },
           {
             "id": "mscship_12.spec.js-›-mscship-12:-regression-test:-cruise-detail-modal---renders-with-reservation-form-and-the-form-should-have-fields-for-passenger-details",
             "title": "And the form should have fields for passenger details",
             "status": "passed",
-            "duration": 401
+            "duration": 509
           }
         ]
       },
@@ -490,31 +490,31 @@
             "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-given-user-is-on-the-cruises-page",
             "title": "Given user is on the cruises page",
             "status": "passed",
-            "duration": 405
+            "duration": 508
           },
           {
             "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-when-user-selects-a-ship-name-from-the-navire-(ship)-filter-dropdown",
             "title": "When user selects a ship name from the Navire (Ship) filter dropdown",
             "status": "passed",
-            "duration": 391
+            "duration": 533
           },
           {
             "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-then-the-cruise-listings-should-update-to-show-only-cruises-for-that-ship",
             "title": "Then the cruise listings should update to show only cruises for that ship",
             "status": "passed",
-            "duration": 422
+            "duration": 479
           },
           {
             "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-results-should-be-filtered-in-real-time",
             "title": "And the results should be filtered in real-time",
             "status": "passed",
-            "duration": 451
+            "duration": 488
           },
           {
             "id": "mscship_13.spec.js-›-mscship-13:-regression-test:-cruise-search---filter-by-navire-(ship)-and-the-page-should-display-the-filtered-cruise-cards",
             "title": "And the page should display the filtered cruise cards",
             "status": "passed",
-            "duration": 444
+            "duration": 494
           }
         ]
       },
@@ -540,31 +540,31 @@
             "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-given-user-navigates-to-the-contact-page",
             "title": "Given user navigates to the contact page",
             "status": "passed",
-            "duration": 452
+            "duration": 488
           },
           {
             "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-when-the-page-loads",
             "title": "When the page loads",
             "status": "passed",
-            "duration": 427
+            "duration": 486
           },
           {
             "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-then-the-contact-page-should-display-successfully",
             "title": "Then the contact page should display successfully",
             "status": "failed",
-            "duration": 11205
+            "duration": 6086
           },
           {
             "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-page-should-show-the-contact-form",
             "title": "And the page should show the contact form",
             "status": "passed",
-            "duration": 391
+            "duration": 447
           },
           {
             "id": "mscship_14.spec.js-›-mscship-14:-regression-test:-contact-page---loads-successfully-and-the-http-status-code-should-be-200",
             "title": "And the HTTP status code should be 200",
             "status": "passed",
-            "duration": 351
+            "duration": 469
           }
         ]
       },
@@ -590,43 +590,43 @@
             "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-given-user-is-on-the-contact-page",
             "title": "Given user is on the contact page",
             "status": "passed",
-            "duration": 345
+            "duration": 496
           },
           {
             "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-when-the-page-loads",
             "title": "When the page loads",
             "status": "passed",
-            "duration": 287
+            "duration": 526
           },
           {
             "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-then-the-form-should-display-all-required-elements",
             "title": "Then the form should display all required elements",
             "status": "failed",
-            "duration": 5808
+            "duration": 6161
           },
           {
             "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-name-input-field",
             "title": "And the form should have name input field",
             "status": "passed",
-            "duration": 256
+            "duration": 509
           },
           {
             "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-email-input-field",
             "title": "And the form should have email input field",
             "status": "passed",
-            "duration": 274
+            "duration": 392
           },
           {
             "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-message-textarea",
             "title": "And the form should have message textarea",
             "status": "passed",
-            "duration": 260
+            "duration": 337
           },
           {
             "id": "mscship_15.spec.js-›-mscship-15:-regression-test:-contact-form---displays-all-form-elements-and-the-form-should-have-a-submit-button",
             "title": "And the form should have a submit button",
             "status": "passed",
-            "duration": 247
+            "duration": 323
           }
         ]
       },
@@ -652,31 +652,31 @@
             "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-given-user-is-on-the-contact-form",
             "title": "Given user is on the contact form",
             "status": "passed",
-            "duration": 276
+            "duration": 341
           },
           {
             "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-when-user-tries-to-submit-the-form-without-filling-required-fields",
             "title": "When user tries to submit the form without filling required fields",
             "status": "passed",
-            "duration": 277
+            "duration": 340
           },
           {
             "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-then-the-form-should-display-validation-errors",
             "title": "Then the form should display validation errors",
             "status": "failed",
-            "duration": 300
+            "duration": 11714
           },
           {
             "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-the-form-should-not-submit",
             "title": "And the form should not submit",
             "status": "passed",
-            "duration": 255
+            "duration": 337
           },
           {
             "id": "mscship_16.spec.js-›-mscship-16:-regression-test:-contact-form---validates-required-fields-and-error-messages-should-indicate-which-fields-are-required",
             "title": "And error messages should indicate which fields are required",
             "status": "passed",
-            "duration": 242
+            "duration": 261
           }
         ]
       },
@@ -702,31 +702,31 @@
             "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-given-the-contact-form-is-configured-to-use-mock-handler",
             "title": "Given the contact form is configured to use mock handler",
             "status": "passed",
-            "duration": 362
+            "duration": 293
           },
           {
             "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-when-user-submits-the-form-with-valid-data",
             "title": "When user submits the form with valid data",
             "status": "passed",
-            "duration": 227
+            "duration": 285
           },
           {
             "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-then-the-mock-handler-should-receive-the-form-data",
             "title": "Then the mock handler should receive the form data",
             "status": "passed",
-            "duration": 219
+            "duration": 346
           },
           {
             "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-mock-handler-should-return-the-submitted-data",
             "title": "And the mock handler should return the submitted data",
             "status": "passed",
-            "duration": 135
+            "duration": 274
           },
           {
             "id": "mscship_17.spec.js-›-mscship-17:-regression-test:-contact-form---submits-via-mock-handler-and-the-response-should-confirm-successful-submission",
             "title": "And the response should confirm successful submission",
             "status": "passed",
-            "duration": 266
+            "duration": 281
           }
         ]
       },
@@ -752,31 +752,31 @@
             "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-given-the-contact-form-is-configured-to-use-real-handler",
             "title": "Given the contact form is configured to use real handler",
             "status": "passed",
-            "duration": 315
+            "duration": 268
           },
           {
             "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-when-user-submits-the-form-with-valid-data",
             "title": "When user submits the form with valid data",
             "status": "passed",
-            "duration": 303
+            "duration": 286
           },
           {
             "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-then-the-real-handler-should-process-the-form-data",
             "title": "Then the real handler should process the form data",
             "status": "passed",
-            "duration": 298
+            "duration": 327
           },
           {
             "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-the-data-should-be-logged-to-the-database",
             "title": "And the data should be logged to the database",
             "status": "passed",
-            "duration": 301
+            "duration": 313
           },
           {
             "id": "mscship_18.spec.js-›-mscship-18:-regression-test:-contact-form---submits-via-real-handler-and-logs-entry-and-user-should-see-a-success-confirmation-message",
             "title": "And user should see a success confirmation message",
             "status": "passed",
-            "duration": 286
+            "duration": 338
           }
         ]
       },
@@ -802,31 +802,31 @@
             "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-given-user-navigates-to-the-cruises-page",
             "title": "Given user navigates to the cruises page",
             "status": "passed",
-            "duration": 285
+            "duration": 343
           },
           {
             "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-when-the-page-loads",
             "title": "When the page loads",
             "status": "passed",
-            "duration": 300
+            "duration": 365
           },
           {
             "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-then-the-cruises-page-should-display-successfully",
             "title": "Then the cruises page should display successfully",
             "status": "failed",
-            "duration": 12432
+            "duration": 6062
           },
           {
             "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-http-status-code-should-be-200",
             "title": "And the HTTP status code should be 200",
             "status": "passed",
-            "duration": 261
+            "duration": 399
           },
           {
             "id": "mscship_19.spec.js-›-mscship-19:-regression-test:-cruises-page---loads-successfully-and-the-page-should-be-ready-for-interaction",
             "title": "And the page should be ready for interaction",
             "status": "passed",
-            "duration": 202
+            "duration": 349
           }
         ]
       },
@@ -852,37 +852,37 @@
             "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-given-a-valid-cruise-id-is-provided",
             "title": "Given a valid cruise ID is provided",
             "status": "passed",
-            "duration": 232
+            "duration": 367
           },
           {
             "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-when-a-get-request-is-made-to-/api/cruises/detail-endpoint",
             "title": "When a GET request is made to /api/cruises/detail endpoint",
             "status": "passed",
-            "duration": 204
+            "duration": 333
           },
           {
             "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-then-the-api-should-return-complete-cruise-details",
             "title": "Then the API should return complete cruise details",
             "status": "passed",
-            "duration": 251
+            "duration": 360
           },
           {
             "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-itinerary-information",
             "title": "And the response should include itinerary information",
             "status": "passed",
-            "duration": 260
+            "duration": 339
           },
           {
             "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-response-should-include-rom-(rates-and-occupancy)-data",
             "title": "And the response should include ROM (rates and occupancy) data",
             "status": "passed",
-            "duration": 141
+            "duration": 357
           },
           {
             "id": "mscship_2.spec.js-›-mscship-2:-regression-test:-cruise-detail-api---returns-itinerary-and-rom-data-and-the-http-status-code-should-be-200",
             "title": "And the HTTP status code should be 200",
             "status": "passed",
-            "duration": 305
+            "duration": 333
           }
         ]
       },
@@ -908,31 +908,31 @@
             "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-given-user-is-on-the-cruises-page",
             "title": "Given user is on the cruises page",
             "status": "passed",
-            "duration": 275
+            "duration": 341
           },
           {
             "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-when-the-page-loads",
             "title": "When the page loads",
             "status": "passed",
-            "duration": 245
+            "duration": 329
           },
           {
             "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-then-the-page-should-display-a-list-of-available-cruise-listings",
             "title": "Then the page should display a list of available cruise listings",
             "status": "failed",
-            "duration": 6143
+            "duration": 6212
           },
           {
             "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-each-listing-should-show-cruise-information",
             "title": "And each listing should show cruise information",
             "status": "passed",
-            "duration": 203
+            "duration": 329
           },
           {
             "id": "mscship_20.spec.js-›-mscship-20:-regression-test:-cruises-page---displays-cruise-listings-and-the-listings-should-be-visible-to-the-user",
             "title": "And the listings should be visible to the user",
             "status": "passed",
-            "duration": 221
+            "duration": 262
           }
         ]
       },
@@ -958,31 +958,31 @@
             "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-given-user-is-on-the-cruises-page",
             "title": "Given user is on the cruises page",
             "status": "passed",
-            "duration": 221
+            "duration": 274
           },
           {
             "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-when-the-page-loads",
             "title": "When the page loads",
             "status": "passed",
-            "duration": 211
+            "duration": 278
           },
           {
             "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-then-the-page-should-have-search-and-filter-functionality",
             "title": "Then the page should have search and filter functionality",
             "status": "passed",
-            "duration": 225
+            "duration": 313
           },
           {
             "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-user-should-see-filter-options-for-ports,-dates,-or-ships",
             "title": "And user should see filter options for ports, dates, or ships",
             "status": "passed",
-            "duration": 209
+            "duration": 364
           },
           {
             "id": "mscship_21.spec.js-›-mscship-21:-regression-test:-cruises-page---has-search/filter-functionality-and-the-search/filter-controls-should-be-interactive",
             "title": "And the search/filter controls should be interactive",
             "status": "passed",
-            "duration": 214
+            "duration": 332
           }
         ]
       },
@@ -1008,43 +1008,43 @@
             "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-given-user-is-on-the-cruises-page",
             "title": "Given user is on the cruises page",
             "status": "passed",
-            "duration": 219
+            "duration": 362
           },
           {
             "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-when-the-page-displays-cruise-listings",
             "title": "When the page displays cruise listings",
             "status": "passed",
-            "duration": 212
+            "duration": 317
           },
           {
             "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-then-each-cruise-card-should-display-cruise-details",
             "title": "Then each cruise card should display cruise details",
             "status": "failed",
-            "duration": 228
+            "duration": 6443
           },
           {
             "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-cruise-name",
             "title": "And the card should show cruise name",
             "status": "passed",
-            "duration": 309
+            "duration": 420
           },
           {
             "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-departure-date",
             "title": "And the card should show departure date",
             "status": "passed",
-            "duration": 415
+            "duration": 298
           },
           {
             "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-destination-ports",
             "title": "And the card should show destination ports",
             "status": "passed",
-            "duration": 227
+            "duration": 361
           },
           {
             "id": "mscship_22.spec.js-›-mscship-22:-regression-test:-cruises-page---displays-cruise-cards-with-details-and-the-card-should-show-pricing-information",
             "title": "And the card should show pricing information",
             "status": "passed",
-            "duration": 348
+            "duration": 395
           }
         ]
       },
@@ -1070,31 +1070,31 @@
             "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-given-user-is-on-the-cruises-page",
             "title": "Given user is on the cruises page",
             "status": "passed",
-            "duration": 301
+            "duration": 360
           },
           {
             "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-when-user-clicks-on-a-cruise-card",
             "title": "When user clicks on a cruise card",
             "status": "passed",
-            "duration": 539
+            "duration": 378
           },
           {
             "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-then-the-system-should-allow-viewing-detailed-cruise-information",
             "title": "Then the system should allow viewing detailed cruise information",
             "status": "passed",
-            "duration": 534
+            "duration": 374
           },
           {
             "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-a-modal-or-detail-page-should-open",
             "title": "And a modal or detail page should open",
             "status": "passed",
-            "duration": 364
+            "duration": 618
           },
           {
             "id": "mscship_23.spec.js-›-mscship-23:-regression-test:-cruises-page---allows-viewing-cruise-details-and-the-details-should-include-full-itinerary-and-pricing",
             "title": "And the details should include full itinerary and pricing",
             "status": "passed",
-            "duration": 325
+            "duration": 583
           }
         ]
       },
@@ -1120,7 +1120,7 @@
             "id": "mscship_3.spec.js-›-mscship-3:-regression-test:-session-check-api---reports-false-when-not-authenticated-without-authentication",
             "title": "without authentication",
             "status": "passed",
-            "duration": 317
+            "duration": 630
           }
         ]
       },
@@ -1146,13 +1146,13 @@
             "id": "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-each-request-should-include-ajax-headers-and-form-data:",
             "title": "Each request should include AJAX headers and form data:",
             "status": "passed",
-            "duration": 334
+            "duration": 426
           },
           {
             "id": "mscship_4.spec.js-›-mscship-4:-regression-test:-cruise-detail-api---handles-burst-traffic-(5-concurrent-requests)-system-should-handle-concurrent-load-gracefully",
             "title": "System should handle concurrent load gracefully",
             "status": "passed",
-            "duration": 334
+            "duration": 379
           }
         ]
       },
@@ -1178,31 +1178,31 @@
             "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-given-the-contact-form-api-endpoint-is-available",
             "title": "Given the contact form API endpoint is available",
             "status": "passed",
-            "duration": 343
+            "duration": 354
           },
           {
             "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-when-a-post-request-is-made-with-incomplete-payload-(missing-required-fields)",
             "title": "When a POST request is made with incomplete payload (missing required fields)",
             "status": "passed",
-            "duration": 382
+            "duration": 358
           },
           {
             "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-then-the-api-should-reject-the-request",
             "title": "Then the API should reject the request",
             "status": "passed",
-            "duration": 417
+            "duration": 413
           },
           {
             "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-return-http-status-code-400",
             "title": "And the response should return HTTP status code 400",
             "status": "passed",
-            "duration": 456
+            "duration": 417
           },
           {
             "id": "mscship_5.spec.js-›-mscship-5:-regression-test:-contact-form-api---rejects-incomplete-payload-and-the-response-should-include-error-message-indicating-missing-fields",
             "title": "And the response should include error message indicating missing fields",
             "status": "passed",
-            "duration": 482
+            "duration": 421
           }
         ]
       },
@@ -1228,37 +1228,37 @@
             "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-given-the-contact-form-api-endpoint-is-available",
             "title": "Given the contact form API endpoint is available",
             "status": "passed",
-            "duration": 442
+            "duration": 528
           },
           {
             "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-when-a-post-request-is-made-with-valid-payload-containing-name,-email,-and-messa",
             "title": "When a POST request is made with valid payload containing name, email, and messa",
             "status": "passed",
-            "duration": 448
+            "duration": 529
           },
           {
             "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-then-the-api-should-accept-the-request",
             "title": "Then the API should accept the request",
             "status": "passed",
-            "duration": 448
+            "duration": 417
           },
           {
             "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-api-should-log-the-contact-entry-to-the-database",
             "title": "And the API should log the contact entry to the database",
             "status": "passed",
-            "duration": 423
+            "duration": 414
           },
           {
             "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-return-http-status-code-200",
             "title": "And the response should return HTTP status code 200",
             "status": "passed",
-            "duration": 435
+            "duration": 434
           },
           {
             "id": "mscship_6.spec.js-›-mscship-6:-regression-test:-contact-form-api---accepts-valid-payload-and-logs-entry-and-the-response-should-include-success-confirmation",
             "title": "And the response should include success confirmation",
             "status": "passed",
-            "duration": 433
+            "duration": 315
           }
         ]
       },
@@ -1284,7 +1284,7 @@
             "id": "mscship_7.spec.js-›-mscship-7:-regression-test:-contact-mock-handler---echoes-payload-for-verification-handler:-'mock'",
             "title": "handler: 'mock'",
             "status": "passed",
-            "duration": 444
+            "duration": 452
           }
         ]
       },
@@ -1310,13 +1310,13 @@
             "id": "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-enter-valid-credentials-and-submit",
             "title": "Enter valid credentials and submit",
             "status": "passed",
-            "duration": 413
+            "duration": 493
           },
           {
             "id": "mscship_8.spec.js-›-mscship-8:-regression-test:-user-login---display-dropdown-with-username-dropdown-menu-should-be-visible-when-clicked",
             "title": "Dropdown menu should be visible when clicked",
             "status": "passed",
-            "duration": 424
+            "duration": 457
           }
         ]
       },
@@ -1342,7 +1342,7 @@
             "id": "mscship_9.spec.js-›-mscship-9:-regression-test:-reservation-page---requires-authentication-reservation-page-should-not-be-accessible-without-authentication",
             "title": "Reservation page should not be accessible without authentication",
             "status": "passed",
-            "duration": 409
+            "duration": 380
           }
         ]
       },
@@ -1357,7 +1357,7 @@
       "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
       "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 609,
+      "duration": 742,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-1",
@@ -1373,7 +1373,7 @@
       "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
       "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 653,
+      "duration": 758,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-1",
@@ -1389,7 +1389,7 @@
       "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
       "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 589,
+      "duration": 720,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-1",
@@ -1405,7 +1405,7 @@
       "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
       "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 631,
+      "duration": 696,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-1",
@@ -1421,7 +1421,7 @@
       "suite": "mscship_1.spec.js › MSCSHIP-1: Regression Test: Cruise Search API - Returns cruises for ALL ports",
       "file": "mscship_1.spec.js",
       "status": "passed",
-      "duration": 419,
+      "duration": 556,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-1",
@@ -1437,7 +1437,7 @@
       "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
       "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 430,
+      "duration": 570,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-10",
@@ -1453,7 +1453,7 @@
       "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
       "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 418,
+      "duration": 579,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-10",
@@ -1469,7 +1469,7 @@
       "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
       "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 449,
+      "duration": 547,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-10",
@@ -1485,7 +1485,7 @@
       "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
       "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 411,
+      "duration": 573,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-10",
@@ -1501,7 +1501,7 @@
       "suite": "mscship_10.spec.js › MSCSHIP-10: Regression Test: Reservation Page - Accessible for authenticated users",
       "file": "mscship_10.spec.js",
       "status": "passed",
-      "duration": 414,
+      "duration": 606,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-10",
@@ -1517,7 +1517,7 @@
       "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
       "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 417,
+      "duration": 558,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-11",
@@ -1533,7 +1533,7 @@
       "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
       "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 456,
+      "duration": 561,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-11",
@@ -1549,7 +1549,7 @@
       "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
       "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 410,
+      "duration": 557,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-11",
@@ -1565,7 +1565,7 @@
       "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
       "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 365,
+      "duration": 485,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-11",
@@ -1581,7 +1581,7 @@
       "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
       "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 388,
+      "duration": 499,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-11",
@@ -1597,7 +1597,7 @@
       "suite": "mscship_11.spec.js › MSCSHIP-11: Regression Test: User Logout - From navbar dropdown",
       "file": "mscship_11.spec.js",
       "status": "passed",
-      "duration": 395,
+      "duration": 468,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-11",
@@ -1613,7 +1613,7 @@
       "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
       "file": "mscship_12.spec.js",
       "status": "passed",
-      "duration": 393,
+      "duration": 729,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-12",
@@ -1629,7 +1629,7 @@
       "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
       "file": "mscship_12.spec.js",
       "status": "passed",
-      "duration": 369,
+      "duration": 761,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-12",
@@ -1645,7 +1645,7 @@
       "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
       "file": "mscship_12.spec.js",
       "status": "passed",
-      "duration": 373,
+      "duration": 639,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-12",
@@ -1661,7 +1661,7 @@
       "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
       "file": "mscship_12.spec.js",
       "status": "passed",
-      "duration": 435,
+      "duration": 563,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-12",
@@ -1677,7 +1677,7 @@
       "suite": "mscship_12.spec.js › MSCSHIP-12: Regression Test: Cruise Detail Modal - Renders with reservation form",
       "file": "mscship_12.spec.js",
       "status": "passed",
-      "duration": 401,
+      "duration": 509,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-12",
@@ -1693,7 +1693,7 @@
       "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
       "file": "mscship_13.spec.js",
       "status": "passed",
-      "duration": 405,
+      "duration": 508,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-13",
@@ -1709,7 +1709,7 @@
       "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
       "file": "mscship_13.spec.js",
       "status": "passed",
-      "duration": 391,
+      "duration": 533,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-13",
@@ -1725,7 +1725,7 @@
       "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
       "file": "mscship_13.spec.js",
       "status": "passed",
-      "duration": 422,
+      "duration": 479,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-13",
@@ -1741,7 +1741,7 @@
       "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
       "file": "mscship_13.spec.js",
       "status": "passed",
-      "duration": 451,
+      "duration": 488,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-13",
@@ -1757,7 +1757,7 @@
       "suite": "mscship_13.spec.js › MSCSHIP-13: Regression Test: Cruise Search - Filter by Navire (Ship)",
       "file": "mscship_13.spec.js",
       "status": "passed",
-      "duration": 444,
+      "duration": 494,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-13",
@@ -1773,7 +1773,7 @@
       "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
       "file": "mscship_14.spec.js",
       "status": "passed",
-      "duration": 452,
+      "duration": 488,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-14",
@@ -1789,7 +1789,7 @@
       "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
       "file": "mscship_14.spec.js",
       "status": "passed",
-      "duration": 427,
+      "duration": 486,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-14",
@@ -1805,10 +1805,10 @@
       "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
       "file": "mscship_14.spec.js",
       "status": "failed",
-      "duration": 11205,
+      "duration": 6086,
       "error": {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=successfully')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=successfully')\u001b[22m\n",
-        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=successfully')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=successfully')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_14.spec.js:20:49"
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=Success! Your message has been sent.')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=Success! Your message has been sent.')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=Success! Your message has been sent.')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=Success! Your message has been sent.')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_14.spec.js:20:73"
       },
       "jiraStory": {
         "key": "MSCSHIP-14",
@@ -1824,7 +1824,7 @@
       "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
       "file": "mscship_14.spec.js",
       "status": "passed",
-      "duration": 391,
+      "duration": 447,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-14",
@@ -1840,7 +1840,7 @@
       "suite": "mscship_14.spec.js › MSCSHIP-14: Regression Test: Contact Page - Loads successfully",
       "file": "mscship_14.spec.js",
       "status": "passed",
-      "duration": 351,
+      "duration": 469,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-14",
@@ -1856,7 +1856,7 @@
       "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
       "file": "mscship_15.spec.js",
       "status": "passed",
-      "duration": 345,
+      "duration": 496,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-15",
@@ -1872,7 +1872,7 @@
       "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
       "file": "mscship_15.spec.js",
       "status": "passed",
-      "duration": 287,
+      "duration": 526,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-15",
@@ -1888,10 +1888,10 @@
       "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
       "file": "mscship_15.spec.js",
       "status": "failed",
-      "duration": 5808,
+      "duration": 6161,
       "error": {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=All required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=All required elements')\u001b[22m\n",
-        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=All required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=All required elements')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_15.spec.js:20:58"
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-testid=\"required-elements\"]')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid=\"required-elements\"]')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-testid=\"required-elements\"]')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid=\"required-elements\"]')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_15.spec.js:20:65"
       },
       "jiraStory": {
         "key": "MSCSHIP-15",
@@ -1907,7 +1907,7 @@
       "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
       "file": "mscship_15.spec.js",
       "status": "passed",
-      "duration": 256,
+      "duration": 509,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-15",
@@ -1923,7 +1923,7 @@
       "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
       "file": "mscship_15.spec.js",
       "status": "passed",
-      "duration": 274,
+      "duration": 392,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-15",
@@ -1939,7 +1939,7 @@
       "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
       "file": "mscship_15.spec.js",
       "status": "passed",
-      "duration": 260,
+      "duration": 337,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-15",
@@ -1955,7 +1955,7 @@
       "suite": "mscship_15.spec.js › MSCSHIP-15: Regression Test: Contact Form - Displays all form elements",
       "file": "mscship_15.spec.js",
       "status": "passed",
-      "duration": 247,
+      "duration": 323,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-15",
@@ -1971,7 +1971,7 @@
       "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
       "file": "mscship_16.spec.js",
       "status": "passed",
-      "duration": 276,
+      "duration": 341,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-16",
@@ -1987,7 +1987,7 @@
       "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
       "file": "mscship_16.spec.js",
       "status": "passed",
-      "duration": 277,
+      "duration": 340,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-16",
@@ -2003,10 +2003,10 @@
       "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
       "file": "mscship_16.spec.js",
       "status": "failed",
-      "duration": 300,
+      "duration": 11714,
       "error": {
-        "message": "ReferenceError: locator is not defined",
-        "stack": "ReferenceError: locator is not defined\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_16.spec.js:20:1"
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=validation errors')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=validation errors')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=validation errors')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=validation errors')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_16.spec.js:20:54"
       },
       "jiraStory": {
         "key": "MSCSHIP-16",
@@ -2022,7 +2022,7 @@
       "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
       "file": "mscship_16.spec.js",
       "status": "passed",
-      "duration": 255,
+      "duration": 337,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-16",
@@ -2038,7 +2038,7 @@
       "suite": "mscship_16.spec.js › MSCSHIP-16: Regression Test: Contact Form - Validates required fields",
       "file": "mscship_16.spec.js",
       "status": "passed",
-      "duration": 242,
+      "duration": 261,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-16",
@@ -2054,7 +2054,7 @@
       "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
       "file": "mscship_17.spec.js",
       "status": "passed",
-      "duration": 362,
+      "duration": 293,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-17",
@@ -2070,7 +2070,7 @@
       "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
       "file": "mscship_17.spec.js",
       "status": "passed",
-      "duration": 227,
+      "duration": 285,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-17",
@@ -2086,7 +2086,7 @@
       "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
       "file": "mscship_17.spec.js",
       "status": "passed",
-      "duration": 219,
+      "duration": 346,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-17",
@@ -2102,7 +2102,7 @@
       "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
       "file": "mscship_17.spec.js",
       "status": "passed",
-      "duration": 135,
+      "duration": 274,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-17",
@@ -2118,7 +2118,7 @@
       "suite": "mscship_17.spec.js › MSCSHIP-17: Regression Test: Contact Form - Submits via mock handler",
       "file": "mscship_17.spec.js",
       "status": "passed",
-      "duration": 266,
+      "duration": 281,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-17",
@@ -2134,7 +2134,7 @@
       "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
       "file": "mscship_18.spec.js",
       "status": "passed",
-      "duration": 315,
+      "duration": 268,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-18",
@@ -2150,7 +2150,7 @@
       "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
       "file": "mscship_18.spec.js",
       "status": "passed",
-      "duration": 303,
+      "duration": 286,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-18",
@@ -2166,7 +2166,7 @@
       "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
       "file": "mscship_18.spec.js",
       "status": "passed",
-      "duration": 298,
+      "duration": 327,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-18",
@@ -2182,7 +2182,7 @@
       "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
       "file": "mscship_18.spec.js",
       "status": "passed",
-      "duration": 301,
+      "duration": 313,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-18",
@@ -2198,7 +2198,7 @@
       "suite": "mscship_18.spec.js › MSCSHIP-18: Regression Test: Contact Form - Submits via real handler and logs entry",
       "file": "mscship_18.spec.js",
       "status": "passed",
-      "duration": 286,
+      "duration": 338,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-18",
@@ -2214,7 +2214,7 @@
       "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
       "file": "mscship_19.spec.js",
       "status": "passed",
-      "duration": 285,
+      "duration": 343,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-19",
@@ -2230,7 +2230,7 @@
       "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
       "file": "mscship_19.spec.js",
       "status": "passed",
-      "duration": 300,
+      "duration": 365,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-19",
@@ -2246,10 +2246,10 @@
       "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
       "file": "mscship_19.spec.js",
       "status": "failed",
-      "duration": 12432,
+      "duration": 6062,
       "error": {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=successfully')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=successfully')\u001b[22m\n",
-        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=successfully')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=successfully')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_19.spec.js:20:49"
+        "message": "TimeoutError: page.waitForSelector: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('text=successfully') to be visible\u001b[22m\n",
+        "stack": "TimeoutError: page.waitForSelector: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('text=successfully') to be visible\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_19.spec.js:20:12"
       },
       "jiraStory": {
         "key": "MSCSHIP-19",
@@ -2265,7 +2265,7 @@
       "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
       "file": "mscship_19.spec.js",
       "status": "passed",
-      "duration": 261,
+      "duration": 399,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-19",
@@ -2281,7 +2281,7 @@
       "suite": "mscship_19.spec.js › MSCSHIP-19: Regression Test: Cruises Page - Loads successfully",
       "file": "mscship_19.spec.js",
       "status": "passed",
-      "duration": 202,
+      "duration": 349,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-19",
@@ -2297,7 +2297,7 @@
       "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
       "file": "mscship_2.spec.js",
       "status": "passed",
-      "duration": 232,
+      "duration": 367,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-2",
@@ -2313,7 +2313,7 @@
       "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
       "file": "mscship_2.spec.js",
       "status": "passed",
-      "duration": 204,
+      "duration": 333,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-2",
@@ -2329,7 +2329,7 @@
       "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
       "file": "mscship_2.spec.js",
       "status": "passed",
-      "duration": 251,
+      "duration": 360,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-2",
@@ -2345,7 +2345,7 @@
       "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
       "file": "mscship_2.spec.js",
       "status": "passed",
-      "duration": 260,
+      "duration": 339,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-2",
@@ -2361,7 +2361,7 @@
       "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
       "file": "mscship_2.spec.js",
       "status": "passed",
-      "duration": 141,
+      "duration": 357,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-2",
@@ -2377,7 +2377,7 @@
       "suite": "mscship_2.spec.js › MSCSHIP-2: Regression Test: Cruise Detail API - Returns itinerary and ROM data",
       "file": "mscship_2.spec.js",
       "status": "passed",
-      "duration": 305,
+      "duration": 333,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-2",
@@ -2393,7 +2393,7 @@
       "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
       "file": "mscship_20.spec.js",
       "status": "passed",
-      "duration": 275,
+      "duration": 341,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-20",
@@ -2409,7 +2409,7 @@
       "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
       "file": "mscship_20.spec.js",
       "status": "passed",
-      "duration": 245,
+      "duration": 329,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-20",
@@ -2425,7 +2425,7 @@
       "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
       "file": "mscship_20.spec.js",
       "status": "failed",
-      "duration": 6143,
+      "duration": 6212,
       "error": {
         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=Available Cruise Listings')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=Available Cruise Listings')\u001b[22m\n",
         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=Available Cruise Listings')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=Available Cruise Listings')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_20.spec.js:20:62"
@@ -2444,7 +2444,7 @@
       "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
       "file": "mscship_20.spec.js",
       "status": "passed",
-      "duration": 203,
+      "duration": 329,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-20",
@@ -2460,7 +2460,7 @@
       "suite": "mscship_20.spec.js › MSCSHIP-20: Regression Test: Cruises Page - Displays cruise listings",
       "file": "mscship_20.spec.js",
       "status": "passed",
-      "duration": 221,
+      "duration": 262,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-20",
@@ -2476,7 +2476,7 @@
       "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
       "file": "mscship_21.spec.js",
       "status": "passed",
-      "duration": 221,
+      "duration": 274,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-21",
@@ -2492,7 +2492,7 @@
       "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
       "file": "mscship_21.spec.js",
       "status": "passed",
-      "duration": 211,
+      "duration": 278,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-21",
@@ -2508,7 +2508,7 @@
       "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
       "file": "mscship_21.spec.js",
       "status": "passed",
-      "duration": 225,
+      "duration": 313,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-21",
@@ -2524,7 +2524,7 @@
       "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
       "file": "mscship_21.spec.js",
       "status": "passed",
-      "duration": 209,
+      "duration": 364,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-21",
@@ -2540,7 +2540,7 @@
       "suite": "mscship_21.spec.js › MSCSHIP-21: Regression Test: Cruises Page - Has search/filter functionality",
       "file": "mscship_21.spec.js",
       "status": "passed",
-      "duration": 214,
+      "duration": 332,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-21",
@@ -2556,7 +2556,7 @@
       "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
       "file": "mscship_22.spec.js",
       "status": "passed",
-      "duration": 219,
+      "duration": 362,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-22",
@@ -2572,7 +2572,7 @@
       "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
       "file": "mscship_22.spec.js",
       "status": "passed",
-      "duration": 212,
+      "duration": 317,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-22",
@@ -2588,10 +2588,10 @@
       "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
       "file": "mscship_22.spec.js",
       "status": "failed",
-      "duration": 228,
+      "duration": 6443,
       "error": {
-        "message": "ReferenceError: locator is not defined",
-        "stack": "ReferenceError: locator is not defined\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_22.spec.js:20:1"
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=CRUISE DETAILS')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=CRUISE DETAILS')\u001b[22m\n",
+        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=CRUISE DETAILS')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=CRUISE DETAILS')\u001b[22m\n\n    at C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\tests\\jira-generated\\mscship_22.spec.js:20:51"
       },
       "jiraStory": {
         "key": "MSCSHIP-22",
@@ -2607,7 +2607,7 @@
       "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
       "file": "mscship_22.spec.js",
       "status": "passed",
-      "duration": 309,
+      "duration": 420,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-22",
@@ -2623,7 +2623,7 @@
       "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
       "file": "mscship_22.spec.js",
       "status": "passed",
-      "duration": 415,
+      "duration": 298,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-22",
@@ -2639,7 +2639,7 @@
       "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
       "file": "mscship_22.spec.js",
       "status": "passed",
-      "duration": 227,
+      "duration": 361,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-22",
@@ -2655,7 +2655,7 @@
       "suite": "mscship_22.spec.js › MSCSHIP-22: Regression Test: Cruises Page - Displays cruise cards with details",
       "file": "mscship_22.spec.js",
       "status": "passed",
-      "duration": 348,
+      "duration": 395,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-22",
@@ -2671,7 +2671,7 @@
       "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
       "file": "mscship_23.spec.js",
       "status": "passed",
-      "duration": 301,
+      "duration": 360,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-23",
@@ -2687,7 +2687,7 @@
       "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
       "file": "mscship_23.spec.js",
       "status": "passed",
-      "duration": 539,
+      "duration": 378,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-23",
@@ -2703,7 +2703,7 @@
       "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
       "file": "mscship_23.spec.js",
       "status": "passed",
-      "duration": 534,
+      "duration": 374,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-23",
@@ -2719,7 +2719,7 @@
       "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
       "file": "mscship_23.spec.js",
       "status": "passed",
-      "duration": 364,
+      "duration": 618,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-23",
@@ -2735,7 +2735,7 @@
       "suite": "mscship_23.spec.js › MSCSHIP-23: Regression Test: Cruises Page - Allows viewing cruise details",
       "file": "mscship_23.spec.js",
       "status": "passed",
-      "duration": 325,
+      "duration": 583,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-23",
@@ -2751,7 +2751,7 @@
       "suite": "mscship_3.spec.js › MSCSHIP-3: Regression Test: Session Check API - Reports false when not authenticated",
       "file": "mscship_3.spec.js",
       "status": "passed",
-      "duration": 317,
+      "duration": 630,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-3",
@@ -2767,7 +2767,7 @@
       "suite": "mscship_4.spec.js › MSCSHIP-4: Regression Test: Cruise Detail API - Handles burst traffic (5 concurrent requests)",
       "file": "mscship_4.spec.js",
       "status": "passed",
-      "duration": 334,
+      "duration": 426,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-4",
@@ -2783,7 +2783,7 @@
       "suite": "mscship_4.spec.js › MSCSHIP-4: Regression Test: Cruise Detail API - Handles burst traffic (5 concurrent requests)",
       "file": "mscship_4.spec.js",
       "status": "passed",
-      "duration": 334,
+      "duration": 379,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-4",
@@ -2799,7 +2799,7 @@
       "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
       "file": "mscship_5.spec.js",
       "status": "passed",
-      "duration": 343,
+      "duration": 354,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-5",
@@ -2815,7 +2815,7 @@
       "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
       "file": "mscship_5.spec.js",
       "status": "passed",
-      "duration": 382,
+      "duration": 358,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-5",
@@ -2831,7 +2831,7 @@
       "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
       "file": "mscship_5.spec.js",
       "status": "passed",
-      "duration": 417,
+      "duration": 413,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-5",
@@ -2847,7 +2847,7 @@
       "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
       "file": "mscship_5.spec.js",
       "status": "passed",
-      "duration": 456,
+      "duration": 417,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-5",
@@ -2863,7 +2863,7 @@
       "suite": "mscship_5.spec.js › MSCSHIP-5: Regression Test: Contact Form API - Rejects incomplete payload",
       "file": "mscship_5.spec.js",
       "status": "passed",
-      "duration": 482,
+      "duration": 421,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-5",
@@ -2879,7 +2879,7 @@
       "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
       "file": "mscship_6.spec.js",
       "status": "passed",
-      "duration": 442,
+      "duration": 528,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-6",
@@ -2895,7 +2895,7 @@
       "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
       "file": "mscship_6.spec.js",
       "status": "passed",
-      "duration": 448,
+      "duration": 529,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-6",
@@ -2911,7 +2911,7 @@
       "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
       "file": "mscship_6.spec.js",
       "status": "passed",
-      "duration": 448,
+      "duration": 417,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-6",
@@ -2927,7 +2927,7 @@
       "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
       "file": "mscship_6.spec.js",
       "status": "passed",
-      "duration": 423,
+      "duration": 414,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-6",
@@ -2943,7 +2943,7 @@
       "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
       "file": "mscship_6.spec.js",
       "status": "passed",
-      "duration": 435,
+      "duration": 434,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-6",
@@ -2959,7 +2959,7 @@
       "suite": "mscship_6.spec.js › MSCSHIP-6: Regression Test: Contact Form API - Accepts valid payload and logs entry",
       "file": "mscship_6.spec.js",
       "status": "passed",
-      "duration": 433,
+      "duration": 315,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-6",
@@ -2975,7 +2975,7 @@
       "suite": "mscship_7.spec.js › MSCSHIP-7: Regression Test: Contact Mock Handler - Echoes payload for verification",
       "file": "mscship_7.spec.js",
       "status": "passed",
-      "duration": 444,
+      "duration": 452,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-7",
@@ -2991,7 +2991,7 @@
       "suite": "mscship_8.spec.js › MSCSHIP-8: Regression Test: User Login - Display dropdown with username",
       "file": "mscship_8.spec.js",
       "status": "passed",
-      "duration": 413,
+      "duration": 493,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-8",
@@ -3007,7 +3007,7 @@
       "suite": "mscship_8.spec.js › MSCSHIP-8: Regression Test: User Login - Display dropdown with username",
       "file": "mscship_8.spec.js",
       "status": "passed",
-      "duration": 424,
+      "duration": 457,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-8",
@@ -3023,7 +3023,7 @@
       "suite": "mscship_9.spec.js › MSCSHIP-9: Regression Test: Reservation Page - Requires authentication",
       "file": "mscship_9.spec.js",
       "status": "passed",
-      "duration": 409,
+      "duration": 380,
       "error": null,
       "jiraStory": {
         "key": "MSCSHIP-9",

@@ -47,6 +47,28 @@ body {
     min-height: 100vh;
 }
 
+/* Jira Link Styles */
+.jira-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: #0052CC;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: var(--transition);
+}
+
+.jira-link:hover {
+    background-color: #E9F2FF;
+    color: #0747A6;
+}
+
+.jira-link i {
+    font-size: 1rem;
+}
+
 .container {
     max-width: 1400px;
     margin: 0 auto;

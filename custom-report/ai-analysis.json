@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-11T18:11:58.561Z",
+  "timestamp": "2026-01-11T18:18:39.144Z",
   "aiProvider": "sarvam",
   "model": "sarvam-m",
   "totalFailures": 6,
@@ -14,11 +14,11 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test is failing because the locator 'text=successfully' is not finding the element within the specified timeout. This could be due to the text 'successfully' not being present on the page, a timing issue where the element takes longer to appear, or the text being slightly different (e.g., case sensitivity, extra spaces).",
+        "analysis": "The test is failing because the locator 'text=successfully' is not finding the element within the specified timeout. This could be due to the text 'successfully' not being present on the page, the element not being visible within the 5-second timeout, or the locator strategy being incorrect.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Adjust the locator to be more robust or increase the timeout to ensure the element is visible.",
+          "description": "Adjust the locator to match the actual text or element on the page and ensure the page has enough time to load.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_14.spec.js",
@@ -26,7 +26,7 @@
               "lineStart": 20,
               "lineEnd": 20,
               "oldCode": "await expect(page.locator('text=successfully')).toBeVisible();",
-              "newCode": "await expect(page.locator('text=successfully')).toBeVisible({ timeout: 10000 });"
+              "newCode": "await expect(page.locator('text=Success! Your message has been sent.')).toBeVisible();"
             }
           ]
         },
@@ -66,11 +66,11 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test is failing because the locator 'text=all required elements' is not finding the expected element on the page within the specified timeout. This could be due to the text not being exactly present in the DOM, the element not being visible at the time of the test, or the locator strategy being incorrect.",
+        "analysis": "The test is failing because the element with the text 'all required elements' is not visible within the specified timeout. This could be due to the element not being present in the DOM, not being visible due to CSS styling, or the text content not matching exactly.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Update the locator to match the exact text or use a more reliable locator strategy such as a test ID or CSS selector.",
+          "description": "Update the locator strategy to ensure the element is correctly identified. If the element has a unique identifier (like a test ID), use that instead of text content. If not, verify the exact text content and adjust the locator accordingly.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_15.spec.js",
@@ -78,7 +78,7 @@
               "lineStart": 20,
               "lineEnd": 20,
               "oldCode": "await expect(page.locator('text=all required elements')).toBeVisible();",
-              "newCode": "await expect(page.locator('text=All required elements')).toBeVisible();"
+              "newCode": "await expect(page.locator('[data-testid=\"required-elements\"]')).toBeVisible();"
             }
           ]
         },
@@ -118,19 +118,19 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test is failing because the locator 'text=validation errors' is not finding the element within the specified timeout. This could be due to the text not being present in the DOM, the element not being visible, or the text not matching exactly.",
+        "analysis": "The test is failing because the locator 'text=validation errors' is not finding the element within the specified timeout. This could be due to the text not being present in the DOM, the element not being visible, or a timing issue where the element takes longer than 5000ms to appear.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Update the locator to use a more specific selector or adjust the expected text to match the actual content.",
+          "description": "Increase the timeout for the `toBeVisible` assertion to allow more time for the validation errors to appear.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_16.spec.js",
               "action": "replace",
               "lineStart": 20,
               "lineEnd": 20,
-              "oldCode": "locator('text=validation errors')",
-              "newCode": "locator('text=Validation Errors')"
+              "oldCode": "await expect(page.locator('text=validation errors')).toBeVisible();",
+              "newCode": "await expect(page.locator('text=validation errors')).toBeVisible({ timeout: 10000 });"
             }
           ]
         },
@@ -153,7 +153,7 @@
           {
             "path": "C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\test-results\\mscship_16-MSCSHIP-16-Regr-234fb-d-display-validation-errors-jira-generated\\video.webm",
             "name": "video.webm",
-            "size": 6713,
+            "size": 6746,
             "exists": true
           }
         ],
@@ -170,11 +170,11 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test is failing because the element with the text 'successfully' is not visible within the specified timeout. This could be due to the element not being present in the DOM, not being visible due to styling, or the page not having enough time to load the content.",
+        "analysis": "The test failure occurs because the locator 'text=successfully' is not finding the element within the specified timeout. This could be due to the text 'successfully' not being present on the page, the element being hidden, or the page not loading completely within the timeout period.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Adjust the locator strategy to ensure the 'successfully' text is correctly identified and visible.",
+          "description": "Adjust the locator to match the exact text or ensure the page has finished loading before checking for the element's visibility.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_19.spec.js",
@@ -182,7 +182,7 @@
               "lineStart": 20,
               "lineEnd": 20,
               "oldCode": "await expect(page.locator('text=successfully')).toBeVisible();",
-              "newCode": "await expect(page.locator('text=successfully')).toBeVisible({ timeout: 10000 });"
+              "newCode": "await page.waitForSelector('text=successfully', { timeout: 5000 });\nawait expect(page.locator('text=successfully')).toBeVisible();"
             }
           ]
         },
@@ -226,7 +226,7 @@
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Update the locator to match the exact text or adjust the waiting strategy to ensure the element is visible.",
+          "description": "Update the locator to match the actual text or ensure the element is present and visible before asserting visibility.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_20.spec.js",
@@ -278,15 +278,15 @@
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Update the locator to use a more specific selector or adjust the text to match the actual content in the cruise card.",
+          "description": "Update the locator to match the exact text or use a more reliable locator strategy to find the 'cruise details' element.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_22.spec.js",
               "action": "replace",
               "lineStart": 20,
               "lineEnd": 20,
-              "oldCode": "locator('text=cruise details')",
-              "newCode": "locator('text=Cruise Details')"
+              "oldCode": "await expect(page.locator('text=cruise details')).toBeVisible();",
+              "newCode": "await expect(page.locator('text=CRUISE DETAILS')).toBeVisible();"
             }
           ]
         },
@@ -309,7 +309,7 @@
           {
             "path": "C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\test-results\\mscship_22-MSCSHIP-22-Regr-409de-ould-display-cruise-details-jira-generated\\video.webm",
             "name": "video.webm",
-            "size": 6746,
+            "size": 6812,
             "exists": true
           }
         ],

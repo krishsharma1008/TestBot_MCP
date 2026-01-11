@@ -28,23 +28,8 @@
             <div class="scope-tabs" role="tablist">
                 <button class="scope-tab active" data-scope="all" role="tab" aria-selected="true">
                     <i class="fas fa-layer-group"></i>
-                    All
+                    All Jira Tests
                     <span class="scope-count" id="scopeAllCount">0</span>
-                </button>
-                <button class="scope-tab" data-scope="frontend" role="tab" aria-selected="false">
-                    <i class="fas fa-desktop"></i>
-                    Frontend
-                    <span class="scope-count" id="scopeFrontendCount">0</span>
-                </button>
-                <button class="scope-tab" data-scope="backend" role="tab" aria-selected="false">
-                    <i class="fas fa-database"></i>
-                    Backend
-                    <span class="scope-count" id="scopeBackendCount">0</span>
-                </button>
-                <button class="scope-tab" data-scope="smoke" role="tab" aria-selected="false">
-                    <i class="fas fa-fire"></i>
-                    Smoke Testing
-                    <span class="scope-count" id="scopeSmokeCount">0</span>
                 </button>
             </div>
         </div>
@@ -269,6 +254,9 @@
                                 </th>
                                 <th class="sortable" data-sort="suite">
                                     Suite <i class="fas fa-sort"></i>
+                                </th>
+                                <th class="sortable" data-sort="jira">
+                                    Jira Story <i class="fas fa-sort"></i>
                                 </th>
                                 <th class="sortable" data-sort="status">
                                     Status <i class="fas fa-sort"></i>

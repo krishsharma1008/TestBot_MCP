@@ -356,18 +356,19 @@ class TestDataParser {
         // Convert Windows backslashes to forward slashes
         let normalized = absolutePath.replace(/\\/g, '/');
         
-        // Try to find test-results directory and convert to absolute URL via PHP server
-        const testResultsIndex = normalized.indexOf('/test-results/');
-        if (testResultsIndex !== -1) {
-            // Return absolute URL pointing to PHP server on port 8000
-            const relativePath = normalized.substring(testResultsIndex + 1); // Remove leading slash
-            return `http://localhost:8000/${relativePath}`;
+        // Extract just the filename from test-results directory
+        // Paths look like: C:/Users/.../test-results/mscship_XX-...-screenshot-1.png
+        const testResultsMatch = normalized.match(/test-results\/(.+)$/);
+        if (testResultsMatch) {
+            // Return relative path from dashboard location
+            // Dashboard is in custom-report/, test-results/ is at same level
+            return `../test-results/${testResultsMatch[1]}`;
         }
         
-        // Fallback: try to extract just the test-results path
-        const testResultsMatch = normalized.match(/test-results\/.+$/);
-        if (testResultsMatch) {
-            return `http://localhost:8000/${testResultsMatch[0]}`;
+        // Try alternative pattern with backslashes
+        const testResultsMatch2 = normalized.match(/test-results[\/\\](.+)$/);
+        if (testResultsMatch2) {
+            return `../test-results/${testResultsMatch2[1]}`;
         }
         
         // Last resort: return the path as-is

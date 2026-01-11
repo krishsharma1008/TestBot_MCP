@@ -682,6 +682,17 @@ function createTestRow(test) {
     if (test.status === 'unexpected') normalizedStatus = 'failed';
     if (test.status === 'pending') normalizedStatus = 'skipped';
     
+    // Extract Jira story key from file name (e.g., mscship_1.spec.js -> MSCSHIP-1)
+    let jiraStoryKey = '';
+    let jiraLink = '';
+    if (test.file) {
+        const match = test.file.match(/mscship[_-]?(\d+)/i);
+        if (match) {
+            jiraStoryKey = `MSCSHIP-${match[1]}`;
+            jiraLink = `https://shreyespd12.atlassian.net/browse/${jiraStoryKey}`;
+        }
+    }
+    
     tr.innerHTML = `
         <td>
             <div class="test-name">
@@ -691,6 +702,11 @@ function createTestRow(test) {
             ${test.retries > 0 ? `<small style="color: var(--color-warning)">Retried ${test.retries} time(s)</small>` : ''}
         </td>
         <td>${escapeHtml(test.suite.split(' › ').pop())}</td>
+        <td>
+            ${jiraStoryKey ? `<a href="${jiraLink}" target="_blank" class="jira-link" title="View in Jira">
+                <i class="fab fa-jira"></i> ${jiraStoryKey}
+            </a>` : '<span style="color: #999;">N/A</span>'}
+        </td>
         <td>
             <span class="status-badge status-${normalizedStatus}">
                 ${TestDataParser.getStatusIcon(normalizedStatus)}
