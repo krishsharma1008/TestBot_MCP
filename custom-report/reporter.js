@@ -148,36 +148,65 @@ function updateCategoryKpiCard({ totalEl, passedEl, failedEl, passRateEl, barEl,
     barNode.style.width = `${passRate}%`;
 }
 
+let currentSuiteCardIndex = 0;
+let suiteCards = [];
+
 function renderCategoryCards() {
-    const categories = parser.getCategoryStats().filter(cat => {
-        if (currentScope === 'all') return true;
-        return cat.name.toLowerCase() === currentScope;
-    });
+    // Use suite stats and filter to only show suites that actually ran (total > 0)
+    const allSuites = parser.getSuiteStats();
+    const activeSuites = allSuites.filter(suite => suite.total > 0);
+    
     const container = document.getElementById('categoryCards');
     if (!container) return;
-    container.innerHTML = '';
+    
+    // Store for carousel navigation
+    suiteCards = activeSuites;
+    currentSuiteCardIndex = 0;
+    
+    // Clear and set up carousel structure
+    container.innerHTML = `
+        <div class="suite-carousel-wrapper">
+            <button class="suite-carousel-nav suite-carousel-prev" id="suiteCarouselPrev" ${activeSuites.length <= 1 ? 'disabled' : ''}>
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="suite-carousel-container" id="suiteCarouselContainer">
+                <!-- Cards will be inserted here -->
+            </div>
+            <button class="suite-carousel-nav suite-carousel-next" id="suiteCarouselNext" ${activeSuites.length <= 1 ? 'disabled' : ''}>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+        <div class="suite-carousel-counter" id="suiteCarouselCounter">
+            ${activeSuites.length > 0 ? `1 / ${activeSuites.length}` : '0 / 0'}
+        </div>
+    `;
+    
+    const carouselContainer = document.getElementById('suiteCarouselContainer');
+    if (!carouselContainer) return;
 
-    categories.forEach(cat => {
+    activeSuites.forEach((suite, index) => {
         const card = document.createElement('div');
-        card.className = 'category-card';
-        const passRate = cat.total ? Math.round((cat.passed / cat.total) * 100) : 0;
+        card.className = 'category-card suite-carousel-card';
+        if (index === 0) card.classList.add('active');
+        
+        const passRate = suite.total ? Math.round((suite.passed / suite.total) * 100) : 0;
         card.innerHTML = `
             <div class="category-card__header">
-                <h3>${escapeHtml(cat.name)}</h3>
-                <span class="badge">${cat.total} tests</span>
+                <h3>${escapeHtml(suite.name)}</h3>
+                <span class="badge">${suite.total} tests</span>
             </div>
             <div class="category-card__metrics">
                 <div>
                     <span class="label">Passed</span>
-                    <strong>${cat.passed}</strong>
+                    <strong>${suite.passed}</strong>
                 </div>
                 <div>
                     <span class="label">Failed</span>
-                    <strong>${cat.failed}</strong>
+                    <strong>${suite.failed}</strong>
                 </div>
                 <div>
                     <span class="label">Skipped</span>
-                    <strong>${cat.skipped}</strong>
+                    <strong>${suite.skipped}</strong>
                 </div>
             </div>
             <div class="category-card__progress">
@@ -188,8 +217,52 @@ function renderCategoryCards() {
                 <span class="pass-rate">${passRate}%</span>
             </div>
         `;
-        container.appendChild(card);
+        carouselContainer.appendChild(card);
     });
+    
+    // Setup navigation
+    setupSuiteCarouselNavigation();
+}
+
+function setupSuiteCarouselNavigation() {
+    const prevBtn = document.getElementById('suiteCarouselPrev');
+    const nextBtn = document.getElementById('suiteCarouselNext');
+    
+    if (!prevBtn || !nextBtn) return;
+    
+    prevBtn.addEventListener('click', () => navigateSuiteCarousel(-1));
+    nextBtn.addEventListener('click', () => navigateSuiteCarousel(1));
+}
+
+function navigateSuiteCarousel(direction) {
+    const container = document.getElementById('suiteCarouselContainer');
+    if (!container || suiteCards.length === 0) return;
+    
+    const cards = container.querySelectorAll('.suite-carousel-card');
+    if (cards.length === 0) return;
+    
+    // Remove active class from current card
+    cards[currentSuiteCardIndex].classList.remove('active');
+    
+    // Update index
+    currentSuiteCardIndex += direction;
+    if (currentSuiteCardIndex < 0) currentSuiteCardIndex = cards.length - 1;
+    if (currentSuiteCardIndex >= cards.length) currentSuiteCardIndex = 0;
+    
+    // Add active class to new card
+    cards[currentSuiteCardIndex].classList.add('active');
+    
+    // Update counter
+    const counter = document.getElementById('suiteCarouselCounter');
+    if (counter) {
+        counter.textContent = `${currentSuiteCardIndex + 1} / ${cards.length}`;
+    }
+    
+    // Update button states
+    const prevBtn = document.getElementById('suiteCarouselPrev');
+    const nextBtn = document.getElementById('suiteCarouselNext');
+    if (prevBtn) prevBtn.disabled = false;
+    if (nextBtn) nextBtn.disabled = false;
 }
 
 /**
@@ -411,15 +484,6 @@ function createAISummaryCard(test) {
                     </div>
                 </div>
             ` : ''}
-        </div>
-        
-        <div class="ai-summary-card-footer">
-            <button class="btn-apply-fix" 
-                    data-test-file="${escapeHtml(test.file)}" 
-                    data-test-title="${escapeHtml(test.title)}"
-                    onclick="applyAIFix('${escapeHtml(test.file)}', '${escapeHtml(test.title)}')">
-                <i class="fas fa-magic"></i> Apply Fix
-            </button>
         </div>
     `;
     
