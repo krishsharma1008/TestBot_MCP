@@ -115,7 +115,18 @@ class TestDataParser {
      * Parse a test suite recursively
      */
     parseSuite(suite, parentSuiteName = '') {
-        const suiteName = parentSuiteName ? `${parentSuiteName} › ${suite.title}` : suite.title;
+        // Build suite name - extract from file path for jira-generated tests
+        let suiteName = parentSuiteName 
+            ? `${parentSuiteName} › ${suite.title}` 
+            : suite.title;
+        
+        // For jira-generated tests, extract story key from file path
+        if (suite.file && suite.file.includes('jira-generated')) {
+            const match = suite.file.match(/mscship[_-]?(\d+)/i);
+            if (match) {
+                suiteName = `MSCSHIP-${match[1]}`;
+            }
+        }
 
         // Initialize suite stats if not exists
         if (!this.suites.has(suiteName)) {

@@ -412,15 +412,6 @@ function createAISummaryCard(test) {
                 </div>
             ` : ''}
         </div>
-        
-        <div class="ai-summary-card-footer">
-            <button class="btn-apply-fix" 
-                    data-test-file="${escapeHtml(test.file)}" 
-                    data-test-title="${escapeHtml(test.title)}"
-                    onclick="applyAIFix('${escapeHtml(test.file)}', '${escapeHtml(test.title)}')">
-                <i class="fas fa-magic"></i> Apply Fix
-            </button>
-        </div>
     `;
     
     return card;
