@@ -229,6 +229,130 @@
                 </div>
             </section>
 
+            <!-- Regression Comparison Section -->
+            <section class="regression-comparison-section" id="regressionComparisonSection">
+                <h2 class="section-title">
+                    <i class="fas fa-code-branch"></i> Regression Comparison
+                </h2>
+                <div class="comparison-container">
+                    <!-- Branch Cards -->
+                    <div class="comparison-branches">
+                        <div class="branch-card branch-baseline">
+                            <div class="branch-card-header">
+                                <i class="fas fa-check-circle"></i>
+                                <span class="branch-name">Main Branch (Baseline)</span>
+                            </div>
+                            <div class="branch-stats">
+                                <div class="branch-stat-item">
+                                    <span class="stat-label">Pass Rate</span>
+                                    <span class="stat-value" id="baselinePassRate">100%</span>
+                                </div>
+                                <div class="branch-stat-item">
+                                    <span class="stat-label">Total Tests</span>
+                                    <span class="stat-value" id="baselineTotal">0</span>
+                                </div>
+                                <div class="branch-stat-item">
+                                    <span class="stat-label">Passed</span>
+                                    <span class="stat-value stat-passed" id="baselinePassed">0</span>
+                                </div>
+                                <div class="branch-stat-item">
+                                    <span class="stat-label">Failed</span>
+                                    <span class="stat-value stat-failed" id="baselineFailed">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="comparison-arrow">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+
+                        <div class="branch-card branch-current">
+                            <div class="branch-card-header">
+                                <i class="fas fa-code-branch"></i>
+                                <span class="branch-name">Current Branch</span>
+                            </div>
+                            <div class="branch-stats">
+                                <div class="branch-stat-item">
+                                    <span class="stat-label">Pass Rate</span>
+                                    <span class="stat-value" id="currentPassRate">0%</span>
+                                </div>
+                                <div class="branch-stat-item">
+                                    <span class="stat-label">Total Tests</span>
+                                    <span class="stat-value" id="currentTotal">0</span>
+                                </div>
+                                <div class="branch-stat-item">
+                                    <span class="stat-label">Passed</span>
+                                    <span class="stat-value stat-passed" id="currentPassed">0</span>
+                                </div>
+                                <div class="branch-stat-item">
+                                    <span class="stat-label">Failed</span>
+                                    <span class="stat-value stat-failed" id="currentFailed">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Metrics -->
+                    <div class="comparison-metrics">
+                        <div class="comparison-metric-card metric-trend" id="trendCard">
+                            <div class="metric-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="metric-content">
+                                <span class="metric-label">Overall Trend</span>
+                                <span class="metric-value" id="trendValue">-</span>
+                                <span class="metric-change" id="trendChange">-</span>
+                            </div>
+                        </div>
+
+                        <div class="comparison-metric-card metric-failures">
+                            <div class="metric-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="metric-content">
+                                <span class="metric-label">New Failures</span>
+                                <span class="metric-value" id="newFailuresValue">0</span>
+                                <span class="metric-subtitle">Tests that failed in current branch</span>
+                            </div>
+                        </div>
+
+                        <div class="comparison-metric-card metric-difference">
+                            <div class="metric-icon">
+                                <i class="fas fa-exchange-alt"></i>
+                            </div>
+                            <div class="metric-content">
+                                <span class="metric-label">Pass Rate Change</span>
+                                <span class="metric-value" id="passRateDiff">0%</span>
+                                <span class="metric-subtitle">Difference from baseline</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visual Comparison Chart -->
+                    <div class="comparison-chart-container">
+                        <h3 class="comparison-chart-title">Pass Rate Comparison</h3>
+                        <div class="comparison-bars">
+                            <div class="comparison-bar-item">
+                                <span class="bar-label">Main Branch</span>
+                                <div class="bar-wrapper">
+                                    <div class="bar bar-baseline" style="width: 100%">
+                                        <span class="bar-value">100%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="comparison-bar-item">
+                                <span class="bar-label">Current Branch</span>
+                                <div class="bar-wrapper">
+                                    <div class="bar bar-current" id="currentBar" style="width: 0%">
+                                        <span class="bar-value" id="currentBarValue">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Footer -->
             <footer class="dashboard-footer">
                 <div class="footer-links">
