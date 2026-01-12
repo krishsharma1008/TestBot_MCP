@@ -41,7 +41,8 @@ function generateAttachmentsManifest() {
             screenshots: [],
             videos: [],
             traces: [],
-            other: []
+            other: [],
+            folderName: folderName // Store folder name for reference
         };
         
         files.forEach(fileName => {
@@ -65,7 +66,7 @@ function generateAttachmentsManifest() {
                     path: relativePath,
                     contentType: 'application/zip'
                 });
-            } else {
+            } else if (!fileName.endsWith('.md')) { // Exclude markdown files
                 attachments.other.push({
                     name: fileName,
                     path: relativePath,
@@ -79,7 +80,22 @@ function generateAttachmentsManifest() {
             attachments.videos.length > 0 || 
             attachments.traces.length > 0 || 
             attachments.other.length > 0) {
-            manifest[testFile] = attachments;
+            // Store by folder name as well for easier lookup
+            manifest[folderName] = attachments;
+            // Also store by test file path for backward compatibility
+            if (!manifest[testFile]) {
+                manifest[testFile] = {
+                    screenshots: [],
+                    videos: [],
+                    traces: [],
+                    other: []
+                };
+            }
+            // Merge attachments into the test file entry
+            manifest[testFile].screenshots.push(...attachments.screenshots);
+            manifest[testFile].videos.push(...attachments.videos);
+            manifest[testFile].traces.push(...attachments.traces);
+            manifest[testFile].other.push(...attachments.other);
         }
     });
     

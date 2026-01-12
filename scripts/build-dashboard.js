@@ -101,21 +101,71 @@ function buildDashboard() {
     if (fs.existsSync(TEST_RESULTS_FILE)) {
         try {
             const targetResultsPath = path.join(TARGET_DIR, 'test-results.json');
-            // Use read/write instead of copyFileSync to avoid permission issues
-            const testData = fs.readFileSync(TEST_RESULTS_FILE, 'utf8');
-            fs.writeFileSync(targetResultsPath, testData, 'utf8');
+            fs.copyFileSync(TEST_RESULTS_FILE, targetResultsPath);
             console.log('✓ Copied test results');
         } catch (error) {
             console.warn('⚠️  Warning: Could not copy test results:', error.message);
         }
+
+        // Copy test-results folder with attachments (screenshots, videos, etc.)
+        try {
+            const testResultsDir = path.join(__dirname, '..', 'test-results');
+            const targetTestResultsDir = path.join(TARGET_DIR, 'test-results');
+            
+            if (fs.existsSync(testResultsDir)) {
+                // Create test-results directory in custom-report
+                if (!fs.existsSync(targetTestResultsDir)) {
+                    fs.mkdirSync(targetTestResultsDir, { recursive: true });
+                }
+                
+                // Copy all test result folders
+                const folders = fs.readdirSync(testResultsDir, { withFileTypes: true })
+                    .filter(dirent => dirent.isDirectory())
+                    .map(dirent => dirent.name);
+                
+                let copiedCount = 0;
+                folders.forEach(folderName => {
+                    const sourceFolderPath = path.join(testResultsDir, folderName);
+                    const targetFolderPath = path.join(targetTestResultsDir, folderName);
+                    
+                    // Create target folder
+                    if (!fs.existsSync(targetFolderPath)) {
+                        fs.mkdirSync(targetFolderPath, { recursive: true });
+                    }
+                    
+                    // Copy all files in the folder
+                    const files = fs.readdirSync(sourceFolderPath);
+                    files.forEach(fileName => {
+                        const sourceFilePath = path.join(sourceFolderPath, fileName);
+                        const targetFilePath = path.join(targetFolderPath, fileName);
+                        
+                        if (fs.statSync(sourceFilePath).isFile()) {
+                            fs.copyFileSync(sourceFilePath, targetFilePath);
+                        }
+                    });
+                    copiedCount++;
+                });
+                
+                console.log(`✓ Copied test-results folder (${copiedCount} test folders with attachments)`);
+            }
+        } catch (error) {
+            console.warn('⚠️  Warning: Could not copy test-results folder:', error.message);
+        }
     }
 
     // Copy AI analysis if it exists
-    const AI_ANALYSIS_FILE = path.join(TARGET_DIR, 'ai-analysis.json');
-    if (fs.existsSync(AI_ANALYSIS_FILE)) {
-        console.log('✓ AI analysis already in target directory');
-    } else {
-        console.log('ℹ️  No AI analysis available yet (run tests with AI analysis to generate)');
+    try {
+        const aiAnalysisPath = path.join(__dirname, '..', 'ai-agent-reports', 'latest-report.json');
+        const targetAiPath = path.join(TARGET_DIR, 'ai-analysis.json');
+        
+        if (fs.existsSync(aiAnalysisPath)) {
+            fs.copyFileSync(aiAnalysisPath, targetAiPath);
+            console.log('✓ Copied AI analysis');
+        } else if (fs.existsSync(targetAiPath)) {
+            console.log('✓ AI analysis already in target directory');
+        }
+    } catch (error) {
+        console.warn('⚠️  Warning: Could not copy AI analysis:', error.message);
     }
 
     console.log('\n✨ Dashboard built successfully!');
