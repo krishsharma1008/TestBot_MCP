@@ -24,6 +24,7 @@ function refreshDashboard() {
     setActiveScopeTab(currentScope);
     updateScopeCounts();
     updateKPIs();
+    renderRegressionComparison();
     renderAISummary();
     renderCategoryCards();
     renderCharts();
@@ -146,6 +147,78 @@ function updateCategoryKpiCard({ totalEl, passedEl, failedEl, passRateEl, barEl,
     failedNode.textContent = failed;
     passRateNode.textContent = `Pass Rate: ${passRate}%`;
     barNode.style.width = `${passRate}%`;
+}
+
+/**
+ * Render regression comparison section
+ */
+function renderRegressionComparison() {
+    if (!parser) return;
+    
+    const comparison = parser.getComparisonData();
+    if (!comparison) return;
+    
+    // Update baseline stats
+    document.getElementById('baselinePassRate').textContent = `${comparison.baseline.passRate}%`;
+    document.getElementById('baselineTotal').textContent = comparison.baseline.total;
+    document.getElementById('baselinePassed').textContent = comparison.baseline.passed;
+    document.getElementById('baselineFailed').textContent = comparison.baseline.failed;
+    
+    // Update current stats
+    document.getElementById('currentPassRate').textContent = `${comparison.current.passRate}%`;
+    document.getElementById('currentTotal').textContent = comparison.current.total;
+    document.getElementById('currentPassed').textContent = comparison.current.passed;
+    document.getElementById('currentFailed').textContent = comparison.current.failed;
+    
+    // Update trend
+    const trendCard = document.getElementById('trendCard');
+    const trendValue = document.getElementById('trendValue');
+    const trendChange = document.getElementById('trendChange');
+    
+    if (comparison.comparison.trend === 'improved') {
+        trendCard.classList.remove('degraded');
+        trendCard.classList.add('improved');
+        trendValue.textContent = '✓ Improved';
+        trendValue.style.color = 'var(--color-success)';
+    } else if (comparison.comparison.trend === 'degraded') {
+        trendCard.classList.remove('improved');
+        trendCard.classList.add('degraded');
+        trendValue.textContent = '✗ Degraded';
+        trendValue.style.color = 'var(--color-danger)';
+    } else {
+        trendCard.classList.remove('improved', 'degraded');
+        trendValue.textContent = '= Stable';
+        trendValue.style.color = 'var(--color-info)';
+    }
+    
+    const changeText = comparison.comparison.passRateDifference >= 0 
+        ? `+${comparison.comparison.passRateDifference.toFixed(1)}%` 
+        : `${comparison.comparison.passRateDifference.toFixed(1)}%`;
+    trendChange.textContent = changeText;
+    trendChange.className = 'metric-change ' + (comparison.comparison.passRateDifference >= 0 ? 'positive' : 'negative');
+    
+    // Update new failures
+    document.getElementById('newFailuresValue').textContent = comparison.comparison.newFailures;
+    
+    // Update pass rate difference
+    const passRateDiff = document.getElementById('passRateDiff');
+    passRateDiff.textContent = changeText;
+    passRateDiff.style.color = comparison.comparison.passRateDifference >= 0 
+        ? 'var(--color-success)' 
+        : 'var(--color-danger)';
+    
+    // Update visual bars
+    const currentBar = document.getElementById('currentBar');
+    const currentBarValue = document.getElementById('currentBarValue');
+    currentBar.style.width = `${comparison.current.passRate}%`;
+    currentBarValue.textContent = `${comparison.current.passRate}%`;
+    
+    // Change bar color based on performance
+    if (comparison.current.passRate < 80) {
+        currentBar.style.background = 'linear-gradient(90deg, var(--color-danger) 0%, #dc2626 100%)';
+    } else if (comparison.current.passRate < 95) {
+        currentBar.style.background = 'linear-gradient(90deg, var(--color-warning) 0%, #f59e0b 100%)';
+    }
 }
 
 let currentSuiteCardIndex = 0;

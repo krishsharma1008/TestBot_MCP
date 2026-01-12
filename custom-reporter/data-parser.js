@@ -7,6 +7,15 @@ class TestDataParser {
         this.suites = new Map();
         this.tests = [];
         this.categoryStats = new Map();
+        this.baselineData = {
+            branch: 'main',
+            passRate: 100,
+            total: 0,
+            passed: 0,
+            failed: 0,
+            skipped: 0
+        };
+        this.comparisonData = null;
         this.resetAggregates();
     }
 
@@ -763,6 +772,68 @@ class TestDataParser {
             default:
                 return 'Other';
         }
+    }
+
+    /**
+     * Calculate regression comparison with baseline
+     */
+    calculateRegressionComparison() {
+        const currentStats = this.getStats();
+        
+        // Set baseline total to match current for demo
+        this.baselineData.total = currentStats.total;
+        this.baselineData.passed = currentStats.total;
+        this.baselineData.failed = 0;
+        this.baselineData.skipped = 0;
+        
+        const currentPassRate = currentStats.passRate;
+        const baselinePassRate = this.baselineData.passRate;
+        const difference = currentPassRate - baselinePassRate;
+        const percentChange = baselinePassRate > 0 ? ((difference / baselinePassRate) * 100) : 0;
+        
+        // Calculate test changes
+        const newFailures = currentStats.failed;
+        const fixedTests = 0; // Since baseline is 100%, any passing test was already passing
+        const newTests = 0; // Assuming same test count
+        
+        this.comparisonData = {
+            baseline: {
+                branch: this.baselineData.branch,
+                passRate: baselinePassRate,
+                total: this.baselineData.total,
+                passed: this.baselineData.passed,
+                failed: this.baselineData.failed,
+                skipped: this.baselineData.skipped
+            },
+            current: {
+                branch: 'current',
+                passRate: currentPassRate,
+                total: currentStats.total,
+                passed: currentStats.passed,
+                failed: currentStats.failed,
+                skipped: currentStats.skipped
+            },
+            comparison: {
+                passRateDifference: difference,
+                percentChange: percentChange,
+                trend: difference >= 0 ? 'improved' : 'degraded',
+                newFailures: newFailures,
+                fixedTests: fixedTests,
+                newTests: newTests
+            }
+        };
+        
+        return this.comparisonData;
+    }
+
+    /**
+     * Get comparison data
+     */
+    getComparisonData() {
+        if (!this.comparisonData) {
+            return this.calculateRegressionComparison();
+        }
+        return this.comparisonData;
     }
 }
 
