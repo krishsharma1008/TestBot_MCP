@@ -219,6 +219,93 @@ function renderRegressionComparison() {
     } else if (comparison.current.passRate < 95) {
         currentBar.style.background = 'linear-gradient(90deg, var(--color-warning) 0%, #f59e0b 100%)';
     }
+    
+    // Render suite-wise comparison
+    renderSuiteWiseComparison(comparison);
+}
+
+/**
+ * Render suite-wise comparison table
+ */
+function renderSuiteWiseComparison(comparison) {
+    if (!comparison || !comparison.suites || comparison.suites.length === 0) {
+        return;
+    }
+    
+    const tbody = document.getElementById('suiteComparisonTableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    comparison.suites.forEach(suite => {
+        const row = document.createElement('tr');
+        
+        // Suite Name
+        const nameCell = document.createElement('td');
+        nameCell.className = 'suite-name-cell';
+        nameCell.textContent = suite.name;
+        row.appendChild(nameCell);
+        
+        // Main Branch (Baseline)
+        const baselineCell = document.createElement('td');
+        baselineCell.innerHTML = `
+            <div class="suite-pass-rate">
+                <div class="suite-pass-rate-bar">
+                    <div class="suite-pass-rate-fill baseline" style="width: ${suite.baseline.passRate}%"></div>
+                </div>
+                <span class="suite-pass-rate-text">${suite.baseline.passRate}%</span>
+            </div>
+        `;
+        row.appendChild(baselineCell);
+        
+        // Current Branch
+        const currentCell = document.createElement('td');
+        currentCell.innerHTML = `
+            <div class="suite-pass-rate">
+                <div class="suite-pass-rate-bar">
+                    <div class="suite-pass-rate-fill ${suite.status}" style="width: ${suite.current.passRate}%"></div>
+                </div>
+                <span class="suite-pass-rate-text">${suite.current.passRate}%</span>
+            </div>
+        `;
+        row.appendChild(currentCell);
+        
+        // Difference
+        const diffCell = document.createElement('td');
+        const diffClass = suite.difference > 0 ? 'positive' : suite.difference < 0 ? 'negative' : 'neutral';
+        const diffSign = suite.difference > 0 ? '+' : '';
+        diffCell.innerHTML = `<span class="suite-difference ${diffClass}">${diffSign}${suite.difference}%</span>`;
+        row.appendChild(diffCell);
+        
+        // Status
+        const statusCell = document.createElement('td');
+        let statusIcon = '';
+        let statusText = '';
+        
+        switch (suite.status) {
+            case 'perfect':
+                statusIcon = '<i class="fas fa-check-circle"></i>';
+                statusText = 'Perfect';
+                break;
+            case 'good':
+                statusIcon = '<i class="fas fa-check"></i>';
+                statusText = 'Good';
+                break;
+            case 'warning':
+                statusIcon = '<i class="fas fa-exclamation-triangle"></i>';
+                statusText = 'Warning';
+                break;
+            case 'critical':
+                statusIcon = '<i class="fas fa-times-circle"></i>';
+                statusText = 'Critical';
+                break;
+        }
+        
+        statusCell.innerHTML = `<span class="suite-status-badge ${suite.status}">${statusIcon} ${statusText}</span>`;
+        row.appendChild(statusCell);
+        
+        tbody.appendChild(row);
+    });
 }
 
 let currentSuiteCardIndex = 0;
@@ -994,6 +1081,28 @@ function setupEventListeners() {
             }
         }
     });
+    
+    // Regression comparison collapse/expand button
+    const regressionCollapseBtn = document.getElementById('regressionCollapseBtn');
+    const regressionContent = document.getElementById('regressionComparisonContent');
+    
+    if (regressionCollapseBtn && regressionContent) {
+        regressionCollapseBtn.addEventListener('click', () => {
+            const isExpanded = regressionCollapseBtn.getAttribute('aria-expanded') === 'true';
+            
+            if (isExpanded) {
+                // Collapse
+                regressionContent.classList.add('collapsed');
+                regressionCollapseBtn.setAttribute('aria-expanded', 'false');
+                regressionCollapseBtn.querySelector('.toggle-text').textContent = 'Expand';
+            } else {
+                // Expand
+                regressionContent.classList.remove('collapsed');
+                regressionCollapseBtn.setAttribute('aria-expanded', 'true');
+                regressionCollapseBtn.querySelector('.toggle-text').textContent = 'Collapse';
+            }
+        });
+    }
 }
 
 /**

@@ -231,10 +231,16 @@
 
             <!-- Regression Comparison Section -->
             <section class="regression-comparison-section" id="regressionComparisonSection">
-                <h2 class="section-title">
-                    <i class="fas fa-code-branch"></i> Regression Comparison
-                </h2>
-                <div class="comparison-container">
+                <div class="section-header-with-toggle">
+                    <h2 class="section-title">
+                        <i class="fas fa-code-branch"></i> Comparison
+                    </h2>
+                    <button class="collapse-toggle-btn" id="regressionCollapseBtn" aria-expanded="false" aria-controls="regressionComparisonContent">
+                        <i class="fas fa-chevron-up"></i>
+                        <span class="toggle-text">Expand</span>
+                    </button>
+                </div>
+                <div class="comparison-container collapsible-content collapsed" id="regressionComparisonContent">
                     <!-- Branch Cards -->
                     <div class="comparison-branches">
                         <div class="branch-card branch-baseline">
@@ -330,7 +336,7 @@
 
                     <!-- Visual Comparison Chart -->
                     <div class="comparison-chart-container">
-                        <h3 class="comparison-chart-title">Pass Rate Comparison</h3>
+                        <h3 class="comparison-chart-title">Overall Pass Rate Comparison</h3>
                         <div class="comparison-bars">
                             <div class="comparison-bar-item">
                                 <span class="bar-label">Main Branch</span>
@@ -348,6 +354,29 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Suite-wise Comparison -->
+                    <div class="suite-comparison-container">
+                        <h3 class="suite-comparison-title">
+                            <i class="fas fa-layer-group"></i> Suite-wise Pass Rate Comparison
+                        </h3>
+                        <div class="suite-comparison-table-wrapper">
+                            <table class="suite-comparison-table" id="suiteComparisonTable">
+                                <thead>
+                                    <tr>
+                                        <th>Suite Name</th>
+                                        <th>Main Branch</th>
+                                        <th>Current Branch</th>
+                                        <th>Difference</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="suiteComparisonTableBody">
+                                    <!-- Suite comparison rows will be injected here -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
