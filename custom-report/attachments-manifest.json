@@ -184,6 +184,43 @@
     "traces": [],
     "other": []
   },
+  "mscship_21-MSCSHIP-21-Regr-4592b-ch-and-filter-functionality-jira-generated": {
+    "screenshots": [
+      {
+        "name": "test-failed-1.png",
+        "path": "../test-results/mscship_21-MSCSHIP-21-Regr-4592b-ch-and-filter-functionality-jira-generated/test-failed-1.png",
+        "contentType": "image/png"
+      }
+    ],
+    "videos": [
+      {
+        "name": "video.webm",
+        "path": "../test-results/mscship_21-MSCSHIP-21-Regr-4592b-ch-and-filter-functionality-jira-generated/video.webm",
+        "contentType": "video/webm"
+      }
+    ],
+    "traces": [],
+    "other": [],
+    "folderName": "mscship_21-MSCSHIP-21-Regr-4592b-ch-and-filter-functionality-jira-generated"
+  },
+  "tests/jira-generated/mscship_21.spec.js": {
+    "screenshots": [
+      {
+        "name": "test-failed-1.png",
+        "path": "../test-results/mscship_21-MSCSHIP-21-Regr-4592b-ch-and-filter-functionality-jira-generated/test-failed-1.png",
+        "contentType": "image/png"
+      }
+    ],
+    "videos": [
+      {
+        "name": "video.webm",
+        "path": "../test-results/mscship_21-MSCSHIP-21-Regr-4592b-ch-and-filter-functionality-jira-generated/video.webm",
+        "contentType": "video/webm"
+      }
+    ],
+    "traces": [],
+    "other": []
+  },
   "mscship_22-MSCSHIP-22-Regr-409de-ould-display-cruise-details-jira-generated": {
     "screenshots": [
       {
