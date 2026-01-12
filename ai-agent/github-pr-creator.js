@@ -74,13 +74,17 @@ class GitHubPRCreator {
     this.pushBranch(branchName);
     
     const prDetails = this.generatePRDetails(analysisResults, fixResults);
-    const prUrl = await this.createGitHubPR(branchName, prDetails);
+    const prResult = await this.createGitHubPR(branchName, prDetails);
     
-    console.log(`✅ Pull Request created: ${prUrl}`);
+    if (prResult.prNumber) {
+      await this.addReviewers(prResult.prNumber, ['krishsharma1008']);
+    }
+    
+    console.log(`✅ Pull Request created: ${prResult.url}`);
     
     return {
       success: true,
-      prUrl,
+      prUrl: prResult.url,
       branchName,
       commitMessage
     };
@@ -202,7 +206,10 @@ This PR was generated automatically by the AI Agent system. The fixes were analy
       console.log('\n⚠️  GitHub token not found. Please create PR manually:');
       console.log(`   Branch: ${branchName}`);
       console.log(`   Title: ${prDetails.title}`);
-      return `https://github.com/${this.config.repoOwner}/${this.config.repoName}/compare/${branchName}`;
+      return { 
+        url: `https://github.com/${this.config.repoOwner}/${this.config.repoName}/compare/${branchName}`,
+        prNumber: null
+      };
     }
 
     try {
@@ -234,10 +241,16 @@ This PR was generated automatically by the AI Agent system. The fixes were analy
       }
 
       const pr = await response.json();
-      return pr.html_url;
+      return { 
+        url: pr.html_url,
+        prNumber: pr.number
+      };
     } catch (error) {
       console.error(`❌ Failed to create PR via API: ${error.message}`);
-      return `https://github.com/${this.config.repoOwner}/${this.config.repoName}/compare/${branchName}`;
+      return { 
+        url: `https://github.com/${this.config.repoOwner}/${this.config.repoName}/compare/${branchName}`,
+        prNumber: null
+      };
     }
   }
 
