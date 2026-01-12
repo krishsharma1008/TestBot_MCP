@@ -15,7 +15,13 @@
       }
     ],
     "traces": [],
-    "other": []
+    "other": [
+      {
+        "name": "error-context.md",
+        "path": "../test-results/mscship_14-MSCSHIP-14-Cont-67b33-should-display-successfully-jira-generated/error-context.md",
+        "contentType": "application/octet-stream"
+      }
+    ]
   },
   "tests/jira-generated/mscship_15.spec.js": {
     "screenshots": [
@@ -33,7 +39,13 @@
       }
     ],
     "traces": [],
-    "other": []
+    "other": [
+      {
+        "name": "error-context.md",
+        "path": "../test-results/mscship_15-MSCSHIP-15-Regr-333bb-splay-all-required-elements-jira-generated/error-context.md",
+        "contentType": "application/octet-stream"
+      }
+    ]
   },
   "tests/jira-generated/mscship_16.spec.js": {
     "screenshots": [
@@ -51,7 +63,13 @@
       }
     ],
     "traces": [],
-    "other": []
+    "other": [
+      {
+        "name": "error-context.md",
+        "path": "../test-results/mscship_16-MSCSHIP-16-Regr-234fb-d-display-validation-errors-jira-generated/error-context.md",
+        "contentType": "application/octet-stream"
+      }
+    ]
   },
   "tests/jira-generated/mscship_19.spec.js": {
     "screenshots": [
@@ -69,7 +87,13 @@
       }
     ],
     "traces": [],
-    "other": []
+    "other": [
+      {
+        "name": "error-context.md",
+        "path": "../test-results/mscship_19-MSCSHIP-19-Regr-1d704-should-display-successfully-jira-generated/error-context.md",
+        "contentType": "application/octet-stream"
+      }
+    ]
   },
   "tests/jira-generated/mscship_20.spec.js": {
     "screenshots": [
@@ -87,7 +111,37 @@
       }
     ],
     "traces": [],
-    "other": []
+    "other": [
+      {
+        "name": "error-context.md",
+        "path": "../test-results/mscship_20-MSCSHIP-20-Regr-64d79-f-available-cruise-listings-jira-generated/error-context.md",
+        "contentType": "application/octet-stream"
+      }
+    ]
+  },
+  "tests/jira-generated/mscship_21.spec.js": {
+    "screenshots": [
+      {
+        "name": "test-failed-1.png",
+        "path": "../test-results/mscship_21-MSCSHIP-21-Regr-4592b-ch-and-filter-functionality-jira-generated/test-failed-1.png",
+        "contentType": "image/png"
+      }
+    ],
+    "videos": [
+      {
+        "name": "video.webm",
+        "path": "../test-results/mscship_21-MSCSHIP-21-Regr-4592b-ch-and-filter-functionality-jira-generated/video.webm",
+        "contentType": "video/webm"
+      }
+    ],
+    "traces": [],
+    "other": [
+      {
+        "name": "error-context.md",
+        "path": "../test-results/mscship_21-MSCSHIP-21-Regr-4592b-ch-and-filter-functionality-jira-generated/error-context.md",
+        "contentType": "application/octet-stream"
+      }
+    ]
   },
   "tests/jira-generated/mscship_22.spec.js": {
     "screenshots": [
@@ -105,6 +159,12 @@
       }
     ],
     "traces": [],
-    "other": []
+    "other": [
+      {
+        "name": "error-context.md",
+        "path": "../test-results/mscship_22-MSCSHIP-22-Regr-409de-ould-display-cruise-details-jira-generated/error-context.md",
+        "contentType": "application/octet-stream"
+      }
+    ]
   }
 }

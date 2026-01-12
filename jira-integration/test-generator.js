@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const PlaywrightMCPGenerator = require('./playwright-mcp-generator');
 
 class TestGenerator {
   constructor(config) {
@@ -10,18 +11,41 @@ class TestGenerator {
     if (!fs.existsSync(this.testsDir)) {
       fs.mkdirSync(this.testsDir, { recursive: true });
     }
+    
+    // Initialize Playwright MCP generator if enabled
+    if (this.config.usePlaywrightMCP) {
+      this.mcpGenerator = new PlaywrightMCPGenerator({
+        ...this.config,
+        baseURL: this.config.baseURL || process.env.BASE_URL || 'http://localhost:8000',
+        headless: this.config.mcpHeadless !== false,
+        recordVideo: this.config.mcpRecordVideo || false
+      });
+    }
   }
 
   async generateTestsFromStory(storyDetails, aiProvider = null) {
     console.log(`\n📝 Generating tests for story: ${storyDetails.key} - ${storyDetails.summary}`);
     
-    const testScenarios = this.extractTestScenarios(storyDetails);
+    // Priority 1: Use Playwright MCP if enabled
+    if (this.config.usePlaywrightMCP && this.mcpGenerator) {
+      try {
+        console.log('🎭 Using Playwright MCP for test generation...');
+        const result = await this.mcpGenerator.generateTestsFromStory(storyDetails);
+        return result;
+      } catch (error) {
+        console.warn('⚠️  MCP generation failed, falling back to template:', error.message);
+        // Fall through to template-based generation
+      }
+    }
     
+    // Priority 2: Use AI if configured
+    const testScenarios = this.extractTestScenarios(storyDetails);
     if (aiProvider && this.config.useAI) {
       return await this.generateWithAI(storyDetails, testScenarios, aiProvider);
-    } else {
-      return this.generateFromTemplate(storyDetails, testScenarios);
     }
+    
+    // Priority 3: Use template-based generation
+    return this.generateFromTemplate(storyDetails, testScenarios);
   }
 
   extractTestScenarios(storyDetails) {
@@ -307,6 +331,20 @@ Generate a complete, runnable Playwright test file.`;
     
     console.log(`📝 Updating existing test file: ${filepath}`);
     
+    // Use MCP generator if enabled
+    if (this.config.usePlaywrightMCP && this.mcpGenerator) {
+      try {
+        const result = await this.mcpGenerator.generateTestsFromStory(storyDetails);
+        return {
+          ...result,
+          updated: true
+        };
+      } catch (error) {
+        console.warn('⚠️  MCP update failed, falling back to template:', error.message);
+        // Fall through to template-based update
+      }
+    }
+    
     const existingContent = fs.readFileSync(filepath, 'utf-8');
     const scenarios = this.extractTestScenarios(storyDetails);
     const newTestCode = this.buildTestCode(storyDetails, scenarios);
@@ -334,6 +372,18 @@ Generate a complete, runnable Playwright test file.`;
     }
     
     return false;
+  }
+
+  async cleanup() {
+    // Cleanup MCP generator resources
+    if (this.mcpGenerator) {
+      try {
+        await this.mcpGenerator.cleanup();
+        console.log('✅ MCP generator cleaned up');
+      } catch (error) {
+        console.warn('⚠️  MCP cleanup warning:', error.message);
+      }
+    }
   }
 }
 

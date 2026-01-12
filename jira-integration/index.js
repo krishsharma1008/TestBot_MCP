@@ -37,6 +37,10 @@ class JiraIntegration {
       jiraEmail: process.env.JIRA_EMAIL || fileConfig.jiraEmail,
       jiraApiToken: process.env.JIRA_API_TOKEN || fileConfig.jiraApiToken,
       jiraProjectKey: process.env.JIRA_PROJECT_KEY || fileConfig.jiraProjectKey,
+      usePlaywrightMCP: fileConfig.usePlaywrightMCP !== undefined ? fileConfig.usePlaywrightMCP : true,
+      mcpHeadless: fileConfig.mcpHeadless !== undefined ? fileConfig.mcpHeadless : true,
+      mcpRecordVideo: fileConfig.mcpRecordVideo !== undefined ? fileConfig.mcpRecordVideo : false,
+      baseURL: process.env.BASE_URL || fileConfig.baseURL || 'http://localhost:8000',
       useAI: fileConfig.useAI !== undefined ? fileConfig.useAI : false,
       alwaysUpdateTests: fileConfig.alwaysUpdateTests !== undefined ? fileConfig.alwaysUpdateTests : false,
       deleteTestsForDeletedStories: fileConfig.deleteTestsForDeletedStories !== undefined ? fileConfig.deleteTestsForDeletedStories : false,
@@ -61,7 +65,9 @@ class JiraIntegration {
       }
 
       if (options.sync) {
-        return await this.syncAllStories();
+        const result = await this.syncAllStories();
+        await this.cleanup();
+        return result;
       }
 
       if (options.watch) {
@@ -69,15 +75,27 @@ class JiraIntegration {
       }
 
       if (options.story) {
-        return await this.processSpecificStory(options.story);
+        const result = await this.processSpecificStory(options.story);
+        await this.cleanup();
+        return result;
       }
 
       // Default: detect changes and run regression
-      return await this.detectAndRun();
+      const result = await this.detectAndRun();
+      await this.cleanup();
+      return result;
 
     } catch (error) {
       console.error('\n❌ Error:', error.message);
+      await this.cleanup();
       throw error;
+    }
+  }
+
+  async cleanup() {
+    // Cleanup test generator resources (including MCP browser)
+    if (this.testGenerator) {
+      await this.testGenerator.cleanup();
     }
   }
 

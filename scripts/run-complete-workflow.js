@@ -24,15 +24,8 @@ async function runWorkflow() {
     // Enable Jira-only test mode
     process.env.JIRA_ONLY_TESTS = 'true';
     
-    // Step 1: Scan Jira and Generate Tests
-    console.log('\n📋 Step 1: Scanning Jira stories and generating tests...');
-    console.log('─'.repeat(80));
-    
-    await scanJiraAndGenerateTests();
-    console.log('✅ Jira stories scanned and tests generated');
-    
-    // Step 2: Start the project
-    console.log('\n📋 Step 2: Starting the project...');
+    // Step 1: Start the project server FIRST
+    console.log('\n📋 Step 1: Starting the project server...');
     console.log('─'.repeat(80));
     
     const serverProcess = startProjectServer();
@@ -41,7 +34,15 @@ async function runWorkflow() {
     
     // Wait for server to be ready
     await waitForServer('http://localhost:8000', 30000);
-    console.log('✅ Server is ready');
+    console.log('✅ Server is ready and accepting connections');
+    
+    // Step 2: Scan Jira and Generate Tests (with server running)
+    console.log('\n📋 Step 2: Scanning Jira stories and generating tests...');
+    console.log('─'.repeat(80));
+    console.log('ℹ️  Server is running - MCP can now discover elements from live pages');
+    
+    await scanJiraAndGenerateTests();
+    console.log('✅ Jira stories scanned and tests generated with live element discovery');
     
     // Auto-launch website in browser
     console.log('🌐 Opening website in browser...');

@@ -6,6 +6,11 @@ module.exports = {
   jiraProjectKey: process.env.JIRA_PROJECT_KEY || 'PROJ',
 
   // Test Generation Settings
+  usePlaywrightMCP: true, // Use Playwright MCP for intelligent test generation (RECOMMENDED)
+  mcpHeadless: true, // Run browser in headless mode during test generation
+  mcpRecordVideo: false, // Record video during test generation (for debugging)
+  baseURL: process.env.BASE_URL || 'http://localhost:8000', // Base URL for test generation
+  
   useAI: false, // Use AI to generate enhanced test code (requires AI provider setup)
   alwaysUpdateTests: false, // Update tests even if acceptance criteria hasn't changed
   
