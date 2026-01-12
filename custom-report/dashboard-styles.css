@@ -1704,6 +1704,66 @@ body {
     margin-bottom: 3rem;
 }
 
+.section-header-with-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    gap: 1rem;
+}
+
+.section-header-with-toggle .section-title {
+    margin-bottom: 0;
+}
+
+.collapse-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.collapse-toggle-btn:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.collapse-toggle-btn:active {
+    transform: translateY(0);
+}
+
+.collapse-toggle-btn i {
+    font-size: 1rem;
+    transition: transform 0.3s ease;
+}
+
+.collapse-toggle-btn[aria-expanded="false"] i {
+    transform: rotate(180deg);
+}
+
+.collapsible-content {
+    max-height: 5000px;
+    overflow: hidden;
+    transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out;
+    opacity: 1;
+}
+
+.collapsible-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+}
+
 .comparison-container {
     display: flex;
     flex-direction: column;
@@ -2013,5 +2073,188 @@ body {
     
     .comparison-metrics {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Suite-wise Comparison Table */
+.suite-comparison-container {
+    background: var(--color-surface);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+    margin-top: 2rem;
+}
+
+.suite-comparison-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.suite-comparison-title i {
+    color: var(--color-primary);
+}
+
+.suite-comparison-table-wrapper {
+    overflow-x: auto;
+}
+
+.suite-comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.suite-comparison-table thead {
+    background: var(--color-bg);
+}
+
+.suite-comparison-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    border-bottom: 2px solid var(--color-border);
+    white-space: nowrap;
+}
+
+.suite-comparison-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.875rem;
+}
+
+.suite-comparison-table tbody tr {
+    transition: var(--transition);
+}
+
+.suite-comparison-table tbody tr:hover {
+    background: var(--color-bg);
+}
+
+.suite-comparison-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.suite-name-cell {
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.suite-pass-rate {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.suite-pass-rate-bar {
+    flex: 1;
+    height: 0.5rem;
+    background: var(--color-border);
+    border-radius: 1rem;
+    overflow: hidden;
+    min-width: 80px;
+}
+
+.suite-pass-rate-fill {
+    height: 100%;
+    border-radius: 1rem;
+    transition: width 0.5s ease;
+}
+
+.suite-pass-rate-fill.baseline {
+    background: linear-gradient(90deg, var(--color-success) 0%, #059669 100%);
+}
+
+.suite-pass-rate-fill.current {
+    background: linear-gradient(90deg, var(--color-primary) 0%, #2563eb 100%);
+}
+
+.suite-pass-rate-fill.perfect {
+    background: linear-gradient(90deg, var(--color-success) 0%, #059669 100%);
+}
+
+.suite-pass-rate-fill.good {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+.suite-pass-rate-fill.warning {
+    background: linear-gradient(90deg, var(--color-warning) 0%, #f59e0b 100%);
+}
+
+.suite-pass-rate-fill.critical {
+    background: linear-gradient(90deg, var(--color-danger) 0%, #dc2626 100%);
+}
+
+.suite-pass-rate-text {
+    font-weight: 600;
+    min-width: 45px;
+    text-align: right;
+}
+
+.suite-difference {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.suite-difference.positive {
+    color: var(--color-success);
+}
+
+.suite-difference.negative {
+    color: var(--color-danger);
+}
+
+.suite-difference.neutral {
+    color: var(--color-text-secondary);
+}
+
+.suite-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.suite-status-badge.perfect {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--color-success);
+}
+
+.suite-status-badge.good {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+.suite-status-badge.warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--color-warning);
+}
+
+.suite-status-badge.critical {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--color-danger);
+}
+
+.suite-status-badge i {
+    font-size: 0.875rem;
+}
+
+/* Responsive for Suite Comparison Table */
+@media (max-width: 768px) {
+    .suite-comparison-table {
+        min-width: 600px;
+    }
+    
+    .suite-pass-rate-bar {
+        min-width: 60px;
     }
 }

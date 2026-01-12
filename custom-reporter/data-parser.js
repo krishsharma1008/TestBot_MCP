@@ -796,6 +796,9 @@ class TestDataParser {
         const fixedTests = 0; // Since baseline is 100%, any passing test was already passing
         const newTests = 0; // Assuming same test count
         
+        // Calculate suite-wise comparisons
+        const suiteComparisons = this.calculateSuiteWiseComparison();
+        
         this.comparisonData = {
             baseline: {
                 branch: this.baselineData.branch,
@@ -820,10 +823,51 @@ class TestDataParser {
                 newFailures: newFailures,
                 fixedTests: fixedTests,
                 newTests: newTests
-            }
+            },
+            suites: suiteComparisons
         };
         
         return this.comparisonData;
+    }
+
+    /**
+     * Calculate suite-wise comparison with baseline
+     */
+    calculateSuiteWiseComparison() {
+        const suiteComparisons = [];
+        const currentSuites = this.getSuiteStats();
+        
+        currentSuites.forEach(suite => {
+            if (suite.total === 0) return; // Skip empty suites
+            
+            const currentPassRate = suite.total > 0 ? Math.round((suite.passed / suite.total) * 100) : 0;
+            const baselinePassRate = 100; // Baseline is always 100%
+            const difference = currentPassRate - baselinePassRate;
+            
+            suiteComparisons.push({
+                name: suite.name,
+                baseline: {
+                    total: suite.total,
+                    passed: suite.total,
+                    failed: 0,
+                    passRate: baselinePassRate
+                },
+                current: {
+                    total: suite.total,
+                    passed: suite.passed,
+                    failed: suite.failed,
+                    passRate: currentPassRate
+                },
+                difference: difference,
+                trend: difference >= 0 ? 'stable' : 'degraded',
+                status: currentPassRate === 100 ? 'perfect' : currentPassRate >= 80 ? 'good' : currentPassRate >= 50 ? 'warning' : 'critical'
+            });
+        });
+        
+        // Sort by difference (worst performing first)
+        suiteComparisons.sort((a, b) => a.difference - b.difference);
+        
+        return suiteComparisons;
     }
 
     /**
