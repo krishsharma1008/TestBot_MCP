@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-11T20:12:14.028Z",
+  "timestamp": "2026-01-12T05:56:16.655Z",
   "aiProvider": "sarvam",
   "model": "sarvam-m",
   "totalFailures": 6,
@@ -14,11 +14,11 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test failure occurs because the locator 'text=successfully' is not finding the element within the specified timeout. This could be due to the text 'successfully' not being present on the page, the element not being visible within the 5000ms timeout, or the locator strategy being incorrect.",
+        "analysis": "The test failure occurs because the locator 'text=successfully' is not finding the element within the specified timeout. This could be due to the text 'successfully' not being present on the page, the element not being visible, or the page not loading completely within the timeout period.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Adjust the locator to use a more specific selector or increase the timeout to ensure the element is visible.",
+          "description": "Adjust the locator to match the exact text or ensure the page loads completely before checking for the element.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_14.spec.js",
@@ -26,7 +26,7 @@
               "lineStart": 20,
               "lineEnd": 20,
               "oldCode": "await expect(page.locator('text=successfully')).toBeVisible();",
-              "newCode": "await expect(page.locator('text=successfully')).toBeVisible({ timeout: 10000 });"
+              "newCode": "await page.waitForTimeout(2000);\nawait expect(page.locator('text=successfully')).toBeVisible();"
             }
           ]
         },
@@ -38,7 +38,7 @@
       "artifacts": {
         "screenshots": [
           {
-            "path": "C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\test-results\\mscship_14-MSCSHIP-14-Regr-8743d-should-display-successfully-jira-generated\\test-failed-1.png",
+            "path": "C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\test-results\\mscship_14-MSCSHIP-14-Cont-67b33-should-display-successfully-jira-generated\\test-failed-1.png",
             "name": "test-failed-1.png",
             "size": 4253,
             "base64": "iVBORw0KGgoAAAANSUhEUgAABQAAAALQCAIAAABAH0oBAAAQAElEQVR4nOzXQQEAMAgAIR/2r+x67KAFe3cDAAAAv9sBAACAAAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQYAgAIBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgAQBBgAAdsBD6AAAAEZJREFUIEGAAQAASBBgAAAAEgQYAACABAEGAAAgQYABAABIEGAAAAASBBgAAIAEAQYAACBBgAEAAEgQYAAAABIEGAAAgIQHAAD//93CXf0AAAAGSURBVAMAkKsOPoHtCG4AAAAASUVORK5CYII=",
@@ -47,7 +47,7 @@
         ],
         "videos": [
           {
-            "path": "C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\test-results\\mscship_14-MSCSHIP-14-Regr-8743d-should-display-successfully-jira-generated\\video.webm",
+            "path": "C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\test-results\\mscship_14-MSCSHIP-14-Cont-67b33-should-display-successfully-jira-generated\\video.webm",
             "name": "video.webm",
             "size": 6779,
             "exists": true
@@ -66,19 +66,19 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test is failing because the locator 'text=all required elements' is not finding the element in the expected time. This could be due to the text not being present in the DOM, a timing issue, or a mismatch in the locator strategy.",
+        "analysis": "The test is failing because the element with the text 'all required elements' is not visible within the specified timeout. This could be due to the element not being present in the DOM, not being visible due to CSS styling, or the test not waiting long enough for the element to load.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Update the locator to match the exact text or use a more reliable locator strategy such as a test ID or CSS selector.",
+          "description": "Adjust the locator strategy to ensure the element is correctly identified and visible. Increase the timeout if necessary.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_15.spec.js",
               "action": "replace",
               "lineStart": 20,
               "lineEnd": 20,
-              "oldCode": "locator('text=all required elements')",
-              "newCode": "locator('text=All required elements')"
+              "oldCode": "await expect(page.locator('text=all required elements')).toBeVisible();",
+              "newCode": "await expect(page.locator('text=all required elements')).toBeVisible({ timeout: 10000 });"
             }
           ]
         },
@@ -118,19 +118,19 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test is failing because the locator 'text=validation errors' is not finding the element within the specified timeout. This could be due to the text not being exactly present in the UI, the element not being visible due to timing issues, or the locator strategy being incorrect.",
+        "analysis": "The test is failing because the locator 'text=validation errors' is not finding the element within the specified timeout. This could be due to the text not being present in the DOM, the element not being visible, or the text not matching exactly.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Update the locator to match the exact text or use a more specific selector to reliably locate the validation errors element.",
+          "description": "Update the locator to match the exact text or adjust the test to wait for the element to be present and visible.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_16.spec.js",
               "action": "replace",
               "lineStart": 20,
               "lineEnd": 20,
-              "oldCode": "locator('text=validation errors')",
-              "newCode": "locator('text=Validation Errors')"
+              "oldCode": "await expect(page.locator('text=validation errors')).toBeVisible();",
+              "newCode": "await expect(page.locator('text=validation errors')).toBeVisible({ timeout: 10000 });"
             }
           ]
         },
@@ -170,11 +170,11 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test is failing because the element with the text 'successfully' is not visible within the specified timeout. This could be due to the element not being present in the DOM, not being visible due to styling, or the page not having enough time to load the content.",
+        "analysis": "The test failure occurs because the locator 'text=successfully' is not finding the element within the specified timeout. This could be due to the text 'successfully' not being present on the page, the element being visible but not containing the exact text, or the page not loading completely within the timeout period.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Adjust the locator to match the exact text or ensure the page has enough time to load the element.",
+          "description": "Adjust the locator to match the exact text or ensure the page loads completely before checking for the element.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_19.spec.js",
@@ -182,7 +182,7 @@
               "lineStart": 20,
               "lineEnd": 20,
               "oldCode": "await expect(page.locator('text=successfully')).toBeVisible();",
-              "newCode": "await expect(page.locator('text=successfully', { timeout: 10000 })).toBeVisible();"
+              "newCode": "await page.waitForTimeout(2000);\nawait expect(page.locator('text=successfully')).toBeVisible();"
             }
           ]
         },
@@ -205,7 +205,7 @@
           {
             "path": "C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\test-results\\mscship_19-MSCSHIP-19-Regr-1d704-should-display-successfully-jira-generated\\video.webm",
             "name": "video.webm",
-            "size": 6746,
+            "size": 6812,
             "exists": true
           }
         ],
@@ -222,19 +222,19 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test is failing because the element with the text 'a list of available cruise listings' is not visible within the specified timeout. This could be due to the element not being present in the DOM, being hidden, or having incorrect text.",
+        "analysis": "The test is failing because the locator 'text=a list of available cruise listings' is not finding the element within the specified timeout. This could be due to the text not being exactly present on the page, the element not being visible at the time of the test, or the locator strategy being incorrect.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Adjust the locator strategy to ensure the element is correctly identified and visible. This could involve using a more specific locator or adding a wait condition.",
+          "description": "Update the locator to match the exact text or use a more reliable locator strategy such as a test ID or CSS selector.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_20.spec.js",
               "action": "replace",
               "lineStart": 20,
               "lineEnd": 20,
-              "oldCode": "await expect(page.locator('text=a list of available cruise listings')).toBeVisible();",
-              "newCode": "await expect(page.locator('text=a list of available cruise listings')).toBeVisible({ timeout: 10000 });"
+              "oldCode": "locator('text=a list of available cruise listings')",
+              "newCode": "locator('text=List of available cruise listings')"
             }
           ]
         },
@@ -274,11 +274,11 @@
         "stack": ""
       },
       "aiAnalysis": {
-        "analysis": "The test is failing because the locator 'text=cruise details' is not finding the element within the specified timeout. This could be due to the text not being present in the DOM, being inside a shadow root, or having a typo.",
+        "analysis": "The test failure occurs because the locator 'text=cruise details' is not finding the element within the specified timeout. This could be due to the text not being present in the DOM, being inside a shadow root, or having a typo.",
         "rootCause": "",
         "confidence": 0.95,
         "suggestedFix": {
-          "description": "Update the locator to use a more specific selector or ensure the element is present and visible before checking.",
+          "description": "Update the locator strategy to ensure the 'cruise details' text is correctly identified and visible.",
           "changes": [
             {
               "file": "tests/jira-generated/mscship_22.spec.js",
@@ -309,7 +309,7 @@
           {
             "path": "C:\\Users\\ShreyesPrabhuDesai\\PersProjects\\ShipCruiseTour_POC\\test-results\\mscship_22-MSCSHIP-22-Regr-409de-ould-display-cruise-details-jira-generated\\video.webm",
             "name": "video.webm",
-            "size": 6812,
+            "size": 6746,
             "exists": true
           }
         ],

@@ -3,14 +3,14 @@
     "screenshots": [
       {
         "name": "test-failed-1.png",
-        "path": "../test-results/mscship_14-MSCSHIP-14-Regr-8743d-should-display-successfully-jira-generated/test-failed-1.png",
+        "path": "../test-results/mscship_14-MSCSHIP-14-Cont-67b33-should-display-successfully-jira-generated/test-failed-1.png",
         "contentType": "image/png"
       }
     ],
     "videos": [
       {
         "name": "video.webm",
-        "path": "../test-results/mscship_14-MSCSHIP-14-Regr-8743d-should-display-successfully-jira-generated/video.webm",
+        "path": "../test-results/mscship_14-MSCSHIP-14-Cont-67b33-should-display-successfully-jira-generated/video.webm",
         "contentType": "video/webm"
       }
     ],
