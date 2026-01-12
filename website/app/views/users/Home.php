@@ -2,9 +2,9 @@
 
 <!-- ======= Banner Image ======= -->
 <div class="banner-image w-100 vh-100 d-flex justify-content-center align-items-center flex-column justify-content-evenly"
-     style="background-image: url(<?= url('images/home-9.jpg') ?>); background-size: cover;" id="bannerImage">
+     style="background-image: url(<?= url('images/cruise-ship-hero.jpg') ?>); background-size: cover;" id="bannerImage">
     <div style="position: absolute; width: 100%; height: 100%; background-color: rgba(1,1,1,.3);z-index: 5;  transition: all 0.38s ease;"></div>
-    <img class="banner-image" src="<?= url('images/home-9.jpg') ?>" alt="#" style="filter: brightness(.7);">
+    <img class="banner-image" src="<?= url('images/cruise-ship-hero.jpg') ?>" alt="#" style="filter: brightness(.7);">
     <div class="mb-xxl-1"></div>
     <div></div>
     <div></div>
