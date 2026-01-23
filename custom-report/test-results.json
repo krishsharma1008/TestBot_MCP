@@ -94,12 +94,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 693,
+                      "duration": 703,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:35.757Z",
+                      "startTime": "2026-01-23T09:53:51.888Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -128,12 +128,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 717,
+                      "duration": 653,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:35.754Z",
+                      "startTime": "2026-01-23T09:53:51.888Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -162,12 +162,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 695,
+                      "duration": 644,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:35.755Z",
+                      "startTime": "2026-01-23T09:53:51.888Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -196,12 +196,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 643,
+                      "duration": 675,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:35.758Z",
+                      "startTime": "2026-01-23T09:53:51.890Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -230,12 +230,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 682,
+                      "duration": 677,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:35.754Z",
+                      "startTime": "2026-01-23T09:53:51.890Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -281,12 +281,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 200,
+                      "duration": 193,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:35.756Z",
+                      "startTime": "2026-01-23T09:53:51.889Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -315,12 +315,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 90,
+                      "duration": 91,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.171Z",
+                      "startTime": "2026-01-23T09:53:52.385Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -349,12 +349,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 87,
+                      "duration": 85,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.266Z",
+                      "startTime": "2026-01-23T09:53:52.482Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -383,12 +383,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 86,
+                      "duration": 85,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.358Z",
+                      "startTime": "2026-01-23T09:53:52.573Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -417,12 +417,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 87,
+                      "duration": 88,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.450Z",
+                      "startTime": "2026-01-23T09:53:52.664Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -468,12 +468,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 96,
+                      "duration": 93,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.542Z",
+                      "startTime": "2026-01-23T09:53:52.758Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -499,15 +499,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 103,
+                      "duration": 111,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.620Z",
+                      "startTime": "2026-01-23T09:53:52.838Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -533,15 +533,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 114,
+                      "duration": 111,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.645Z",
+                      "startTime": "2026-01-23T09:53:52.852Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -567,15 +567,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
+                      "workerIndex": 5,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 113,
+                      "duration": 115,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.658Z",
+                      "startTime": "2026-01-23T09:53:52.857Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -601,15 +601,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 932,
+                      "duration": 935,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.667Z",
+                      "startTime": "2026-01-23T09:53:52.870Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -635,15 +635,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 120,
+                      "duration": 114,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.671Z",
+                      "startTime": "2026-01-23T09:53:52.872Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -686,15 +686,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 605,
+                      "duration": 618,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.693Z",
+                      "startTime": "2026-01-23T09:53:52.900Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -720,15 +720,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 606,
+                      "duration": 616,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.732Z",
+                      "startTime": "2026-01-23T09:53:52.958Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -754,15 +754,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 607,
+                      "duration": 604,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.767Z",
+                      "startTime": "2026-01-23T09:53:52.972Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -788,15 +788,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
+                      "workerIndex": 5,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 605,
+                      "duration": 609,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.780Z",
+                      "startTime": "2026-01-23T09:53:52.980Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -822,15 +822,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 605,
+                      "duration": 615,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:36.801Z",
+                      "startTime": "2026-01-23T09:53:52.999Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -873,15 +873,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 601,
+                      "duration": 632,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:37.308Z",
+                      "startTime": "2026-01-23T09:53:53.528Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -907,15 +907,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 608,
+                      "duration": 614,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:37.352Z",
+                      "startTime": "2026-01-23T09:53:53.585Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -941,15 +941,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 619,
+                      "duration": 613,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:37.381Z",
+                      "startTime": "2026-01-23T09:53:53.587Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -975,15 +975,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
+                      "workerIndex": 5,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 626,
+                      "duration": 615,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:37.395Z",
+                      "startTime": "2026-01-23T09:53:53.598Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1009,15 +1009,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 614,
+                      "duration": 612,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:37.414Z",
+                      "startTime": "2026-01-23T09:53:53.623Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1060,15 +1060,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 1195,
+                      "duration": 1410,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:37.608Z",
+                      "startTime": "2026-01-23T09:53:53.813Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1094,15 +1094,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1398,
+                      "duration": 1270,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:37.916Z",
+                      "startTime": "2026-01-23T09:53:54.169Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1128,34 +1128,34 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "failed",
-                      "duration": 6230,
+                      "duration": 11121,
                       "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/successfully/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/successfully/i)\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/successfully/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/successfully/i)\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_14.spec.js:30:67",
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/successfully/i)\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/successfully/i)\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/successfully/i)\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/successfully/i)\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_14.spec.js:30:47",
                         "location": {
                           "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_14.spec.js",
-                          "column": 67,
+                          "column": 47,
                           "line": 30
                         },
-                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/successfully/i\u001b[39m)\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the page should show the contact form'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
+                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/successfully/i\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the page should show the contact form'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_14.spec.js",
-                            "column": 67,
+                            "column": 47,
                             "line": 30
                           },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/successfully/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/successfully/i)\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/successfully/i\u001b[39m)\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the page should show the contact form'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_14.spec.js:30:67\u001b[22m"
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/successfully/i)\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/successfully/i)\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/successfully/i\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the page should show the contact form'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_14.spec.js:30:47\u001b[22m"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:37.971Z",
+                      "startTime": "2026-01-23T09:53:54.207Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1176,7 +1176,7 @@
                       ],
                       "errorLocation": {
                         "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_14.spec.js",
-                        "column": 67,
+                        "column": 47,
                         "line": 30
                       }
                     }
@@ -1202,15 +1202,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1321,
+                      "duration": 1258,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:38.012Z",
+                      "startTime": "2026-01-23T09:53:54.209Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1236,15 +1236,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
+                      "workerIndex": 5,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 1657,
+                      "duration": 1616,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:38.029Z",
+                      "startTime": "2026-01-23T09:53:54.223Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1287,15 +1287,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1451,
+                      "duration": 1351,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:38.042Z",
+                      "startTime": "2026-01-23T09:53:54.243Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1321,15 +1321,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 1504,
+                      "duration": 1588,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:38.822Z",
+                      "startTime": "2026-01-23T09:53:55.240Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1355,19 +1355,19 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "failed",
-                      "duration": 6439,
+                      "duration": 6345,
                       "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('All required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('All required elements')\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('All required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('All required elements')\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_15.spec.js:30:55",
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('all required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('all required elements')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('all required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('all required elements')\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_15.spec.js:30:55",
                         "location": {
                           "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_15.spec.js",
                           "column": 55,
                           "line": 30
                         },
-                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'All required elements'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the form should have name input field'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
+                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'all required elements'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the form should have name input field'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
                       },
                       "errors": [
                         {
@@ -1376,13 +1376,13 @@
                             "column": 55,
                             "line": 30
                           },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('All required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('All required elements')\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'All required elements'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the form should have name input field'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_15.spec.js:30:55\u001b[22m"
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('all required elements')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('all required elements')\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'all required elements'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the form should have name input field'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_15.spec.js:30:55\u001b[22m"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:39.321Z",
+                      "startTime": "2026-01-23T09:53:55.446Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1429,15 +1429,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1459,
+                      "duration": 1237,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:39.343Z",
+                      "startTime": "2026-01-23T09:53:55.476Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1463,15 +1463,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1287,
+                      "duration": 1481,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:39.513Z",
+                      "startTime": "2026-01-23T09:53:55.603Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1497,15 +1497,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
+                      "workerIndex": 5,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 1639,
+                      "duration": 1436,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:39.697Z",
+                      "startTime": "2026-01-23T09:53:55.852Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1531,15 +1531,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1617,
+                      "duration": 1487,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:40.354Z",
+                      "startTime": "2026-01-23T09:53:56.723Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1582,15 +1582,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 1623,
+                      "duration": 1436,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:40.823Z",
+                      "startTime": "2026-01-23T09:53:56.846Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1616,15 +1616,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1529,
+                      "duration": 1488,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:40.834Z",
+                      "startTime": "2026-01-23T09:53:57.106Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1650,34 +1650,34 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
+                      "workerIndex": 5,
+                      "parallelIndex": 5,
                       "status": "failed",
-                      "duration": 6392,
+                      "duration": 6264,
                       "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('validation errors')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('validation errors')\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('validation errors')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('validation errors')\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_16.spec.js:30:51",
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/validation errors/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/validation errors/i)\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/validation errors/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/validation errors/i)\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_16.spec.js:30:72",
                         "location": {
                           "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_16.spec.js",
-                          "column": 51,
+                          "column": 72,
                           "line": 30
                         },
-                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'validation errors'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the form should not submit'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
+                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/validation errors/i\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                        \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the form should not submit'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_16.spec.js",
-                            "column": 51,
+                            "column": 72,
                             "line": 30
                           },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('validation errors')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('validation errors')\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'validation errors'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the form should not submit'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_16.spec.js:30:51\u001b[22m"
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/validation errors/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/validation errors/i)\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/validation errors/i\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                        \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the form should not submit'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_16.spec.js:30:72\u001b[22m"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:41.350Z",
+                      "startTime": "2026-01-23T09:53:57.303Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1698,7 +1698,7 @@
                       ],
                       "errorLocation": {
                         "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_16.spec.js",
-                        "column": 51,
+                        "column": 72,
                         "line": 30
                       }
                     }
@@ -1724,15 +1724,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1607,
+                      "duration": 1542,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:42.007Z",
+                      "startTime": "2026-01-23T09:53:58.228Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1758,15 +1758,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 1532,
+                      "duration": 1465,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:42.377Z",
+                      "startTime": "2026-01-23T09:53:58.298Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1809,15 +1809,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1398,
+                      "duration": 1304,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:42.465Z",
+                      "startTime": "2026-01-23T09:53:58.611Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1843,15 +1843,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 1324,
+                      "duration": 1524,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:43.680Z",
+                      "startTime": "2026-01-23T09:53:59.786Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1877,15 +1877,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1324,
+                      "duration": 1307,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:43.896Z",
+                      "startTime": "2026-01-23T09:53:59.793Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1911,15 +1911,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1295,
+                      "duration": 1705,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:43.919Z",
+                      "startTime": "2026-01-23T09:53:59.946Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1945,15 +1945,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 6,
-                      "parallelIndex": 3,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1477,
+                      "duration": 1410,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:45.080Z",
+                      "startTime": "2026-01-23T09:54:01.109Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1996,15 +1996,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 1493,
+                      "duration": 1400,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:45.018Z",
+                      "startTime": "2026-01-23T09:54:01.324Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2030,15 +2030,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1340,
+                      "duration": 1383,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:45.227Z",
+                      "startTime": "2026-01-23T09:54:01.667Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2064,15 +2064,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1261,
+                      "duration": 1356,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:45.249Z",
+                      "startTime": "2026-01-23T09:54:02.706Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2098,15 +2098,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 7,
+                      "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1186,
+                      "duration": 1390,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:46.626Z",
+                      "startTime": "2026-01-23T09:54:02.527Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2132,15 +2132,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 1128,
+                      "duration": 1568,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:46.522Z",
+                      "startTime": "2026-01-23T09:54:02.737Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2183,15 +2183,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 668,
+                      "duration": 672,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:46.534Z",
+                      "startTime": "2026-01-23T09:54:03.073Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2217,15 +2217,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 644,
+                      "duration": 626,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:46.576Z",
+                      "startTime": "2026-01-23T09:54:04.268Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2251,34 +2251,34 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 6,
+                      "workerIndex": 3,
                       "parallelIndex": 3,
                       "status": "failed",
-                      "duration": 11172,
+                      "duration": 10919,
                       "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/successfully/i)\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/successfully/i)\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/successfully/i)\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/successfully/i)\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_19.spec.js:30:47",
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('successfully')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('successfully')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('successfully')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('successfully')\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_19.spec.js:30:46",
                         "location": {
                           "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_19.spec.js",
-                          "column": 47,
+                          "column": 46,
                           "line": 30
                         },
-                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/successfully/i\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the HTTP status code should be 200'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
+                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'successfully'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the HTTP status code should be 200'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_19.spec.js",
-                            "column": 47,
+                            "column": 46,
                             "line": 30
                           },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/successfully/i)\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/successfully/i)\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/successfully/i\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the HTTP status code should be 200'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_19.spec.js:30:47\u001b[22m"
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('successfully')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('successfully')\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'successfully'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the HTTP status code should be 200'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_19.spec.js:30:46\u001b[22m"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:46.779Z",
+                      "startTime": "2026-01-23T09:54:03.756Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -2299,7 +2299,7 @@
                       ],
                       "errorLocation": {
                         "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_19.spec.js",
-                        "column": 47,
+                        "column": 46,
                         "line": 30
                       }
                     }
@@ -2325,15 +2325,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 632,
+                      "duration": 618,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:47.209Z",
+                      "startTime": "2026-01-23T09:54:03.925Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2359,15 +2359,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 652,
+                      "duration": 613,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:47.231Z",
+                      "startTime": "2026-01-23T09:54:04.314Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2410,15 +2410,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 647,
+                      "duration": 604,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:47.658Z",
+                      "startTime": "2026-01-23T09:54:04.325Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2444,15 +2444,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 4,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 612,
+                      "duration": 606,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:48.107Z",
+                      "startTime": "2026-01-23T09:54:04.556Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2478,15 +2478,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
+                      "workerIndex": 6,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 620,
+                      "duration": 610,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:47.852Z",
+                      "startTime": "2026-01-23T09:54:04.938Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2512,15 +2512,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 622,
+                      "duration": 603,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:47.889Z",
+                      "startTime": "2026-01-23T09:54:04.937Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2547,14 +2547,14 @@
                   "results": [
                     {
                       "workerIndex": 7,
-                      "parallelIndex": 1,
+                      "parallelIndex": 5,
                       "status": "passed",
                       "duration": 605,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:47.967Z",
+                      "startTime": "2026-01-23T09:54:05.065Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2580,15 +2580,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 600,
+                      "duration": 608,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:48.313Z",
+                      "startTime": "2026-01-23T09:54:05.169Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2631,15 +2631,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 8,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 596,
+                      "duration": 615,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:48.479Z",
+                      "startTime": "2026-01-23T09:54:05.600Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2665,15 +2665,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 595,
+                      "duration": 604,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:48.521Z",
+                      "startTime": "2026-01-23T09:54:05.547Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2699,10 +2699,10 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 7,
-                      "parallelIndex": 1,
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
                       "status": "failed",
-                      "duration": 10802,
+                      "duration": 10807,
                       "error": {
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('A list of available cruise listings')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('A list of available cruise listings')\u001b[22m\n",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('A list of available cruise listings')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('A list of available cruise listings')\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_20.spec.js:30:69",
@@ -2726,7 +2726,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:48.580Z",
+                      "startTime": "2026-01-23T09:54:05.557Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -2773,15 +2773,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 4,
+                      "workerIndex": 7,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 624,
+                      "duration": 592,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:48.828Z",
+                      "startTime": "2026-01-23T09:54:05.679Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2807,15 +2807,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 603,
+                      "duration": 596,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:48.918Z",
+                      "startTime": "2026-01-23T09:54:05.784Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2858,15 +2858,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 593,
+                      "duration": 615,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:49.082Z",
+                      "startTime": "2026-01-23T09:54:06.157Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2892,15 +2892,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 593,
+                      "duration": 591,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:49.121Z",
+                      "startTime": "2026-01-23T09:54:06.278Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2927,9 +2927,9 @@
                   "results": [
                     {
                       "workerIndex": 8,
-                      "parallelIndex": 4,
+                      "parallelIndex": 2,
                       "status": "failed",
-                      "duration": 5839,
+                      "duration": 5728,
                       "error": {
                         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/search and filter functionality/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/search and filter functionality/i)\u001b[22m\n",
                         "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/search and filter functionality/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/search and filter functionality/i)\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_21.spec.js:30:86",
@@ -2953,7 +2953,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:49.459Z",
+                      "startTime": "2026-01-23T09:54:06.329Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -3000,15 +3000,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 614,
+                      "duration": 591,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:49.527Z",
+                      "startTime": "2026-01-23T09:54:06.387Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3034,15 +3034,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 594,
+                      "duration": 617,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:49.680Z",
+                      "startTime": "2026-01-23T09:54:06.778Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3085,15 +3085,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 592,
+                      "duration": 600,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:49.721Z",
+                      "startTime": "2026-01-23T09:54:06.876Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3119,15 +3119,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 625,
+                      "duration": 590,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:50.147Z",
+                      "startTime": "2026-01-23T09:54:06.984Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3153,34 +3153,34 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "failed",
-                      "duration": 5765,
+                      "duration": 10792,
                       "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/cruise details/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/cruise details/i)\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/cruise details/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/cruise details/i)\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_22.spec.js:30:69",
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('Cruise Details', { exact: true })\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('Cruise Details', { exact: true })\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('Cruise Details', { exact: true })\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('Cruise Details', { exact: true })\u001b[22m\n\n    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_22.spec.js:30:65",
                         "location": {
                           "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_22.spec.js",
-                          "column": 69,
+                          "column": 65,
                           "line": 30
                         },
-                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/cruise details/i\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                     \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the card should show cruise name'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
+                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'Cruise Details'\u001b[39m\u001b[33m,\u001b[39m { exact\u001b[33m:\u001b[39m \u001b[36mtrue\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the card should show cruise name'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_22.spec.js",
-                            "column": 69,
+                            "column": 65,
                             "line": 30
                           },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/cruise details/i)\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/cruise details/i)\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[35m/cruise details/i\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                     \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the card should show cruise name'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_22.spec.js:30:69\u001b[22m"
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('Cruise Details', { exact: true })\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('Cruise Details', { exact: true })\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 29 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'Cruise Details'\u001b[39m\u001b[33m,\u001b[39m { exact\u001b[33m:\u001b[39m \u001b[36mtrue\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m   test(\u001b[32m'And the card should show cruise name'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m\n\u001b[2m    at /Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_22.spec.js:30:65\u001b[22m"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:50.280Z",
+                      "startTime": "2026-01-23T09:54:07.403Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -3201,7 +3201,7 @@
                       ],
                       "errorLocation": {
                         "file": "/Users/krishsharma/Desktop/QA_Final/tests/jira-generated/mscship_22.spec.js",
-                        "column": 69,
+                        "column": 65,
                         "line": 30
                       }
                     }
@@ -3227,15 +3227,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 604,
+                      "duration": 614,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:50.318Z",
+                      "startTime": "2026-01-23T09:54:07.482Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3261,15 +3261,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 627,
+                      "duration": 598,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:50.777Z",
+                      "startTime": "2026-01-23T09:54:07.579Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3295,15 +3295,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 602,
+                      "duration": 623,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:50.927Z",
+                      "startTime": "2026-01-23T09:54:08.102Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3329,15 +3329,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 614,
+                      "duration": 590,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:51.410Z",
+                      "startTime": "2026-01-23T09:54:08.182Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3380,15 +3380,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 591,
+                      "duration": 626,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:51.534Z",
+                      "startTime": "2026-01-23T09:54:08.734Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3414,15 +3414,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 616,
+                      "duration": 597,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:52.029Z",
+                      "startTime": "2026-01-23T09:54:08.778Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3448,15 +3448,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 591,
+                      "duration": 622,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:52.130Z",
+                      "startTime": "2026-01-23T09:54:09.366Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3482,15 +3482,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 627,
+                      "duration": 614,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:52.652Z",
+                      "startTime": "2026-01-23T09:54:09.381Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3516,15 +3516,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 592,
+                      "duration": 602,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:52.725Z",
+                      "startTime": "2026-01-23T09:54:09.995Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3567,15 +3567,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1130,
+                      "duration": 1107,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:53.286Z",
+                      "startTime": "2026-01-23T09:54:10.004Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3601,15 +3601,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 1005,
+                      "duration": 1275,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:53.322Z",
+                      "startTime": "2026-01-23T09:54:10.605Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3635,15 +3635,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1131,
+                      "duration": 1027,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:54.333Z",
+                      "startTime": "2026-01-23T09:54:11.117Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3669,15 +3669,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 7,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 1010,
+                      "duration": 1208,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:54.421Z",
+                      "startTime": "2026-01-23T09:54:11.887Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3704,14 +3704,14 @@
                   "results": [
                     {
                       "workerIndex": 9,
-                      "parallelIndex": 4,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 1201,
+                      "duration": 1341,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:55.651Z",
+                      "startTime": "2026-01-23T09:54:12.367Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3754,15 +3754,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1361,
+                      "duration": 1157,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:55.438Z",
+                      "startTime": "2026-01-23T09:54:12.151Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3788,15 +3788,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 7,
                       "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 1078,
+                      "duration": 1072,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:55.470Z",
+                      "startTime": "2026-01-23T09:54:13.104Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3822,15 +3822,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 10,
-                      "parallelIndex": 0,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1189,
+                      "duration": 1061,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:56.604Z",
+                      "startTime": "2026-01-23T09:54:13.314Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3856,15 +3856,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 9,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 1171,
+                      "duration": 1084,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:56.555Z",
+                      "startTime": "2026-01-23T09:54:13.849Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3890,15 +3890,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 7,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 1163,
+                      "duration": 1048,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:56.808Z",
+                      "startTime": "2026-01-23T09:54:14.183Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3924,15 +3924,15 @@
                   "projectName": "jira-generated",
                   "results": [
                     {
-                      "workerIndex": 9,
-                      "parallelIndex": 4,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1180,
+                      "duration": 1082,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-23T09:01:56.972Z",
+                      "startTime": "2026-01-23T09:54:14.383Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -3952,8 +3952,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-01-23T09:01:35.374Z",
-    "duration": 24036.918999999998,
+    "startTime": "2026-01-23T09:53:51.523Z",
+    "duration": 26703.054,
     "expected": 90,
     "skipped": 0,
     "unexpected": 7,
