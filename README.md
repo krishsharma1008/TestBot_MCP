@@ -1,168 +1,167 @@
-# ShipCruiseTour
+# Testbot MCP
 
-![img.png](website/public/asset/img.png)
+**One-command testing with AI-powered analysis for any project.**
 
-## 🎯 NEW: Jira-Based Automated Regression Testing
+Testbot MCP is a Model Context Protocol (MCP) server that enables seamless end-to-end testing with AI-powered failure analysis. Just say "test my app using testbot mcp" in Cursor or Windsurf, and Testbot handles everything automatically.
 
-This project now includes **Jira Integration** that automatically detects changes in your Jira board, generates Playwright tests from user stories and acceptance criteria, and triggers the complete regression cycle - **fully automated!**
+## Features
 
-### Quick Start - Jira Integration
+- **One Command Testing**: Simply ask your AI assistant to test your app
+- **Playwright Integration**: Uses the official Playwright MCP for test generation and execution
+- **AI-Powered Analysis**: Automatically analyzes test failures using Sarvam, Cascade, or Windsurf AI
+- **Beautiful Dashboard**: Auto-opens a dashboard with screenshots, videos, traces, and AI analysis
+- **Zero Config**: Auto-detects project settings (port, base URL, start command)
+- **Optional Jira Integration**: Fetch stories, generate tests from acceptance criteria
 
-```bash
-# Set up Jira credentials
-cp .env.example .env
-# Edit .env with your Jira credentials
+## Quick Start
 
-# Initialize and test connection
-npm run jira:init
-
-# Generate tests for all stories
-npm run jira:sync
-
-# Detect changes and run regression
-npm run jira:detect
-
-# Or use watch mode (continuous monitoring)
-npm run jira:watch
-```
-
-### Jira Integration Features
-- 🎯 **Auto-generate tests** from Jira user stories
-- 🔍 **Change detection** - monitors Jira board for updates
-- 📝 **Gherkin support** - parses Given-When-Then acceptance criteria
-- 🔄 **Smart updates** - only regenerates when criteria changes
-- 🤖 **AI integration** - works with existing AI agent workflow
-- ⏰ **Watch mode** - continuous monitoring and auto-regression
-- 📊 **Full workflow** - test generation → execution → AI fixes → dashboard
-
-### Jira Documentation
-- ⚡ [Quick Start Guide](./JIRA_INTEGRATION_QUICKSTART.md) ⭐ **START HERE**
-- 📖 [Full Documentation](./JIRA_INTEGRATION_README.md)
-- 🏗️ [Architecture Overview](./JIRA_INTEGRATION_ARCHITECTURE.md)
-
----
-
-## 🤖 Fully Automated AI-Powered Test Fixing
-
-This project includes an **AI Agent** that automatically detects test failures, processes all artifacts (screenshots, videos, traces), analyzes them using AI with full visual context, applies fixes, and creates GitHub Pull Requests - **completely automated, zero manual intervention!**
-
-### Quick Start - AI Agent
+### 1. Install
 
 ```bash
-# Install dependencies
-npm install
-
-# Set up your AI provider (choose one)
-echo "AI_PROVIDER=openai" > .env
-echo "AI_API_KEY=your-api-key" >> .env
-
-# Run the AI agent
-npm run ai-agent
+npm install -g @testbot/mcp
 ```
 
-### AI Agent Features
-- ✅ **Fully automated** - Zero manual intervention required
-- ✅ **Automatic artifact processing** - Screenshots, videos, traces
-- ✅ **Visual AI analysis** - AI sees screenshots and understands UI state
-- ✅ **Smart error detection** - Extracts all context automatically
-- ✅ **Automatic code fixing** - With backup and rollback
-- ✅ **GitHub PR creation** - With embedded screenshots in reports
-- ✅ **Multiple AI providers** - OpenAI, Anthropic, Windsurf IDE
+### 2. Configure MCP
 
-### AI Agent Documentation
-- 📚 [Quick Start Guide](./AI_AGENT_QUICKSTART.md)
-- 🤖 [Fully Automated System](./AI_AGENT_AUTOMATED.md)
-- 📖 [Full Documentation](./AI_AGENT_README.md)
-- 🌊 [Windsurf IDE Integration](./WINDSURF_INTEGRATION.md)
+Add to your MCP settings (`~/.cursor/mcp.json` or similar):
 
----
+```json
+{
+  "mcpServers": {
+    "testbot": {
+      "command": "npx",
+      "args": ["@testbot/mcp"],
+      "env": {
+        "SARVAM_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
 
-## Context of the project
-You are required to build a full stack website for the company ShipCruiseTour which will increase their notoriety in the
-market, for this purpose, you must follow the following instructions.
+### 3. Test Your App
 
-![img_1.png](website/public/asset/img_1.png)
+In Cursor or Windsurf:
 
-![img.png](website/public/asset/img_7.png)
+> "Test my app using testbot mcp"
 
-​
+That's it! Testbot will:
+1. Auto-detect your project settings
+2. Generate tests (from PRD or Jira stories if provided)
+3. Run the tests
+4. Analyze failures with AI
+5. Open a dashboard with results
 
-Criteria:
+## Usage
 
-​
+### Basic Usage
 
-Authentication of the application by two roles (Admin, Client).
+```
+User: "test my app using testbot mcp"
+```
 
-A Client / admin is characterized by (Name, first name, email, password, role)
+### With Options
 
-A cruise is characterized by (the ship, price [min], image, number of nights, port of departure, cruise
-itinerary [port1, port 2, port 3], date of departure)
+```
+User: "test my frontend using testbot mcp with sarvam AI analysis"
+```
 
-A port is characterized by its name and country.
+### With PRD File
 
-A ship is characterized by (name, number of rooms, number of seats).
+```
+User: "test my app using testbot mcp with the PRD at ./docs/requirements.md"
+```
 
-A room is characterized by (ship, room number, type of
-room [solo room, room for 2 people, family room more than 2 people and less than 6], price (depending on the type of
-room), capacity according to the type of room )
+### With Jira Integration
 
-A reservation is characterized by (customer, cruise, ++reservation date++, ++reservation price++, room).
+```
+User: "test my app using testbot mcp and fetch stories from Jira project MYAPP"
+```
 
-A reservation concerns a single cruise and a single client.
+## Configuration
 
-A client can book multiple cruises.
+### Environment Variables
 
-A customer can cancel a reservation provided that the date is more than 2 days before the departure date of the cruise.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SARVAM_API_KEY` | Sarvam AI API key for failure analysis | - |
+| `AI_PROVIDER` | AI provider: `sarvam`, `cascade`, `windsurf`, or `none` | `sarvam` |
+| `JIRA_BASE_URL` | Jira instance URL | - |
+| `JIRA_EMAIL` | Jira account email | - |
+| `JIRA_API_TOKEN` | Jira API token | - |
+| `JIRA_PROJECT_KEY` | Jira project key | - |
 
-A customer can view all of these reservations.
+### Tool Parameters
 
-An admin can create or delete a cruise.
+The `testbot_test_my_app` tool accepts:
 
-An admin can create or delete a ship.
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `projectPath` | string | Path to project (default: workspace root) |
+| `testType` | string | `frontend`, `backend`, or `both` |
+| `prdFile` | string | Path to PRD file for test generation |
+| `baseURL` | string | Application base URL |
+| `port` | number | Application port |
+| `startCommand` | string | Command to start the app |
+| `aiProvider` | string | AI provider for analysis |
+| `jira.enabled` | boolean | Enable Jira integration |
 
-An admin can create or delete a port.
+## Dashboard
 
-A complete cruise does not appear in the search.
+The dashboard displays:
 
-The default search displays all available cruises with a valid departure date (greater than the current date).
+- **KPI Cards**: Total tests, passed, failed, skipped, pass rate, duration
+- **AI Analysis Summary**: Carousel of AI-powered failure analyses
+- **Suite Breakdown**: Results by test suite
+- **Charts**: Status distribution and suite results
+- **Test Table**: Filterable, sortable list of all tests
+- **Regression Comparison**: Compare with baseline results
 
-By default the cruise selection is pointed to the minimum price and room type appropriate to the price.
+### Screenshots and Artifacts
 
-The filtering of the search for a cruise is done by: Port , Vessel , Month
+Click any failed test to see:
+- Error details and stack trace
+- AI analysis with root cause and suggested fix
+- Screenshots at time of failure
+- Video recording of the test
+- Playwright trace files
 
-The filtering of after the selection of a cruise is done by: type of room
+## Project Structure
 
-​
+```
+testbot-mcp/
+├── src/
+│   ├── index.js              # MCP server entry
+│   ├── auto-detector.js      # Project settings detection
+│   ├── playwright-integration.js
+│   ├── report-generator.js
+│   ├── dashboard-launcher.js
+│   ├── ai-providers/
+│   │   ├── sarvam.js
+│   │   ├── cascade.js
+│   │   └── windsurf.js
+│   └── jira/
+│       └── client.js
+├── package.json
+└── .env.example
 
-Technological constraints:
+dashboard/
+├── public/
+│   └── index.html
+└── src/
+    ├── data-parser.js
+    ├── reporter.js
+    └── styles/
+        └── dashboard.css
+```
 
-​
+## Documentation
 
-For Backend development, use technologies (PHP, OOP, Mysql) while respecting the MVC design pattern.
+- [Quick Start Guide](docs/QUICKSTART.md)
+- [User Guide](docs/USER_GUIDE.md)
+- [API Reference](docs/API_REFERENCE.md)
 
-For Frontend development (Html, css frameworks, js, sass (optional)), choose the css framework that you know best.
+## License
 
-Validation of fields as well as pagination in the application must be carried out with the Javascript language.
-
-​
-
-Bonuses:
-
-​
-
-Ticket printing.
-
-Display of statistics (total number of cruises, number of cruises per month, total customers, number of countries,
-graphic charter (port/cruise) ...) in the admin area.
-
-​
-
-![img_2.png](website/public/asset/img_2.png)
-
-![img_3.png](website/public/asset/img_3.png)
-
-![img_4.png](website/public/asset/img_4.png)
-
-![img_5.png](website/public/asset/img_5.png)
-
-![img_6.png](website/public/asset/img_6.png)
+MIT
+# TestBot_MCP
