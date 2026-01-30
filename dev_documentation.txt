@@ -1,339 +1,355 @@
 ================================================================================
-DEVELOPMENT DOCUMENTATION
+TESTBOT MCP DEVELOPMENT DOCUMENTATION
 ================================================================================
 
-Date: Tuesday, January 6, 2026, 13:06:17 IST
-
 ================================================================================
-PLAYWRIGHT UI TESTING SETUP
+Update: 2026-01-28 - OpenAI Test Generation Feature
 ================================================================================
 
-TASK: Set up Playwright for UI testing and run all UI tests with HTML report generation
-
-CHANGES MADE:
--------------
-
-1. Project Initialization:
-   - Created package.json with npm init
-   - Installed @playwright/test as dev dependency (version ^1.57.0)
-   - Installed Playwright Chromium browser
-
-2. Playwright Configuration:
-   - Created playwright.config.js with the following settings:
-     * Test directory: ./tests
-     * Base URL: http://localhost:8000 (configurable via BASE_URL env variable)
-     * Reporter: HTML report (playwright-report folder) and list reporter
-     * Browser: Chromium (Desktop Chrome)
-     * Screenshots: Only on failure
-     * Video: Retain on failure
-     * Trace: On first retry
-
-3. Test Files Created:
-   - tests/home.spec.js: Tests for home page functionality
-     * Home page loading
-     * Navigation elements display
-     * Cruise listings display
-     * Login/Register link presence
-   
-   - tests/login.spec.js: Tests for login page functionality
-     * Login page loading
-     * Login form elements display
-     * Invalid credentials error handling
-     * Navigation to register page
-   
-   - tests/register.spec.js: Tests for registration page functionality
-     * Registration page loading
-     * Registration form elements display
-     * Required field validation
-     * Navigation to login page
-   
-   - tests/cruises.spec.js: Tests for cruises listing page functionality
-     * Cruises page loading
-     * Cruise listings display
-     * Search/filter functionality (Port, Navire, Month)
-     * Cruise cards display
-     * View details functionality
-   
-   - tests/contact.spec.js: Tests for contact page functionality
-     * Contact page loading
-     * Contact form elements display
-     * Form field validation
-
-4. Package.json Scripts:
-   - "test": Run all Playwright tests
-   - "test:ui": Run tests with Playwright UI mode
-   - "test:report": Open the HTML test report
-
-5. Test Results:
-   - Total Tests: 21
-   - Passed: 21
-   - Failed: 0
-   - Test Duration: ~5.8 seconds
-   - HTML Report Generated: playwright-report/index.html
-
-TEST COVERAGE:
---------------
-- Home page (5 tests)
-- Login page (4 tests)
-- Register page (4 tests)
-- Cruises page (5 tests)
-- Contact page (3 tests)
-
-REPORT LOCATION:
-----------------
-- HTML Report: playwright-report/index.html
-- Can be viewed by running: npm run test:report
-- Or directly opening: playwright-report/index.html in a browser
-
-NOTES:
-------
-- All tests are designed to be resilient and handle cases where elements may not exist
-- Tests use flexible selectors to accommodate different HTML structures
-- Base URL is set to localhost:8000 by default but can be changed via BASE_URL environment variable
-- Tests run in parallel by default (6 workers)
-- Screenshots and videos are captured only on test failures for debugging
-
-================================================================================
-END OF DOCUMENTATION ENTRY
-================================================================================
-
-Date: Tuesday, January 6, 2026, 13:18:53 IST
-
-================================================================================
-CUSTOM PLAYWRIGHT DASHBOARD REPORTER
-================================================================================
-
-TASK: Create a visually appealing custom dashboard for Playwright test results with clear KPIs, charts, and modern UI design
-
-CHANGES MADE:
--------------
-
-1. Custom Reporter Structure Created:
-   - custom-reporter/ directory with source files
-   - custom-report/ directory for generated dashboard (auto-generated)
-   - scripts/ directory for build automation
-
-2. Dashboard Template (custom-reporter/dashboard-template.html):
-   - Modern, responsive HTML5 structure
-   - Header with project branding and test date
-   - KPI cards section displaying:
-     * Total tests with icon
-     * Passed tests (green indicator)
-     * Failed tests (red indicator)
-     * Skipped tests (yellow indicator)
-     * Overall pass rate with progress bar
-     * Total duration and average duration
-   - Charts section with:
-     * Donut chart for test status distribution
-     * Stacked bar chart for tests per suite
-   - Test results table with:
-     * Sortable columns (Name, Suite, Status, Duration)
-     * Filterable by status (All, Passed, Failed, Skipped)
-     * Searchable by test name or suite
-     * Expandable details for each test
-   - Modal for detailed test information
-   - Footer with links to full Playwright report
-
-3. Dashboard Styling (custom-reporter/dashboard-styles.css):
-   - Modern CSS3 with CSS Grid and Flexbox
-   - CSS Variables for theming and consistency
-   - Color-coded status badges and cards:
-     * Success: Green (#10b981)
-     * Failure: Red (#ef4444)
-     * Warning/Skipped: Amber (#f59e0b)
-     * Primary: Blue (#3b82f6)
-   - Smooth animations and transitions
-   - Hover effects and interactive elements
-   - Responsive design with breakpoints:
-     * Desktop: 4-column metrics grid
-     * Tablet: 2-column metrics grid
-     * Mobile: Single column layout
-   - Dark mode support (respects system preference)
-   - Print-friendly styles
-   - Glassmorphism effects for modern look
-
-4. Data Parser (custom-reporter/data-parser.js):
-   - TestDataParser class for processing Playwright JSON results
-   - Functions for:
-     * Loading and parsing test results from JSON
-     * Calculating statistics (total, passed, failed, skipped, pass rate)
-     * Processing test suites recursively
-     * Formatting durations (ms, seconds, minutes)
-     * Formatting timestamps
-     * Searching and filtering tests
-   - Mock data generation for demonstration when no test results exist
-
-5. Reporter Script (custom-reporter/reporter.js):
-   - Dashboard initialization and rendering
-   - KPI card population with real-time data
-   - Chart rendering using Chart.js:
-     * Donut chart with tooltips showing percentages
-     * Stacked bar chart for suite comparison
-   - Test table rendering with:
-     * Dynamic row creation
-     * Status badges with icons
-     * Duration formatting
-   - Interactive features:
-     * Filter buttons for test status
-     * Search functionality with debouncing
-     * Column sorting (ascending/descending)
-     * Modal for detailed test information
-   - Event listeners for all interactive elements
-   - XSS protection with HTML escaping
-
-6. Build Script (scripts/build-dashboard.js):
-   - Node.js script to automate dashboard generation
-   - Copies template, styles, and JavaScript files to custom-report/
-   - Copies test results JSON file
-   - Creates directory structure if needed
-   - Provides clear console output with status indicators
-   - Error handling and validation
-
-7. Playwright Configuration Updates (playwright.config.js):
-   - Added JSON reporter to generate test-results.json
-   - Reporter configuration:
-     * HTML reporter (playwright-report/)
-     * JSON reporter (test-results.json)
-     * List reporter (console output)
-
-8. Package.json Scripts Updates:
-   - "test:dashboard": Run tests and auto-generate dashboard
-   - "dashboard:build": Build dashboard from existing results
-   - "dashboard": Open the custom dashboard in browser
-
-ARCHITECTURE:
-------------
-
-```
-Playwright Tests → JSON Reporter → test-results.json
-                                         ↓
-                              Build Script (build-dashboard.js)
-                                         ↓
-                     Copies files to custom-report/ directory
-                                         ↓
-                           Dashboard (index.html)
-                                    ↓        ↓        ↓
-                                  KPIs    Charts   Test Table
-```
-
-FILE STRUCTURE:
---------------
-
-QA_Testing_POC/
-├── custom-reporter/                  # Source files
-│   ├── dashboard-template.html       # Main HTML template
-│   ├── dashboard-styles.css          # Modern CSS styles
-│   ├── data-parser.js                # Data processing logic
-│   └── reporter.js                   # Dashboard rendering logic
-├── custom-report/                    # Generated dashboard (auto-created)
-│   ├── index.html                    # Generated dashboard
-│   ├── dashboard-styles.css          # Copied styles
-│   ├── data-parser.js                # Copied parser
-│   ├── reporter.js                   # Copied reporter
-│   └── test-results.json             # Test data
-├── scripts/
-│   └── build-dashboard.js            # Build automation script
-├── test-results.json                 # Playwright JSON output
-├── playwright.config.js              # Updated with JSON reporter
-└── package.json                      # Updated scripts
-
-FEATURES:
+SUMMARY:
 --------
+Implemented AI-powered automatic test generation using OpenAI GPT when TestBot
+detects no existing E2E tests in a project. This enhancement transforms TestBot
+from a test runner into a complete testing solution.
 
-1. Visual KPI Cards:
-   - Animated metric cards with icons
-   - Color-coded by status
-   - Percentage indicators
-   - Progress bars for pass rate
-   - Average duration calculations
+NEW FEATURES:
+-------------
+1. OpenAI Test Generation
+   - Automatically generates Playwright tests when no tests exist
+   - Uses GPT-4o (configurable) for intelligent test creation
+   - Generates smoke, frontend, backend, and workflow tests
+   - Supports Product Requirements Document (PRD) input for better tests
 
-2. Interactive Charts:
-   - Donut chart for status distribution with percentages
-   - Stacked bar chart for suite-wise results
-   - Tooltips with detailed information
-   - Responsive and animated
+2. Browser Configuration UI
+   - Launches a web form when no tests exist
+   - Collects PRD, test preferences, and project settings
+   - Modern UI matching the dashboard aesthetic
+   - Auto-saves form data to prevent loss
 
-3. Test Results Table:
-   - Sortable by any column (name, suite, status, duration)
-   - Filterable by status with badge counts
-   - Searchable by test name or suite name
-   - Status badges with icons and colors
-   - Detailed view modal for each test
+3. Enhanced Context Gathering
+   - Extracts richer codebase details (file contents, component structure)
+   - Parses API schemas (Zod, Yup validation)
+   - Identifies form fields and validation rules
+   - Detects authentication patterns (NextAuth, JWT, OAuth, etc.)
 
-4. Modern UI/UX:
-   - Clean, professional design
-   - Smooth animations and transitions
-   - Hover effects for interactivity
-   - Mobile-responsive layout
-   - Fast loading (no heavy dependencies)
+4. Agent Context Requester
+   - Generates prompts for Cursor/Windsurf agents to analyze codebase
+   - Merges auto-gathered context with agent insights
+   - Provides richer context for OpenAI test generation
 
-5. Automation:
-   - Auto-generates after every test run
-   - No manual intervention required
-   - Works with existing Playwright setup
-   - Compatible with CI/CD pipelines
+FILES CREATED:
+--------------
+1. testbot-mcp/src/ai-providers/openai.js
+   - OpenAI client following existing provider pattern
+   - Supports both test generation and failure analysis
+   - Handles API errors gracefully with clear messages
 
-USAGE:
-------
+2. testbot-mcp/src/config-ui-launcher.js
+   - Launches browser-based configuration form
+   - Creates local HTTP server to handle form submission
+   - Returns collected configuration to MCP
 
-Run tests with dashboard generation:
-```bash
-npm run test:dashboard
-```
+3. testbot-mcp/src/agent-context-requester.js
+   - Generates detailed prompts for AI agent analysis
+   - Waits for agent response with timeout
+   - Merges contexts from multiple sources
 
-Build dashboard from existing test results:
-```bash
-npm run dashboard:build
-```
+4. testbot-mcp/src/test-generator-openai.js
+   - Orchestrates intelligent test generation
+   - Implements prompt engineering for Playwright tests
+   - Handles chunked generation by test type
+   - Writes test files with proper imports
 
-Open the dashboard:
-```bash
-npm run dashboard
-```
+5. dashboard/public/config-form.html
+   - Multi-step configuration wizard
+   - PRD input with markdown preview
+   - Test type and coverage options
 
-Or directly open: custom-report/index.html
+6. dashboard/public/config-form.css
+   - Styles matching dashboard aesthetic
+   - Responsive design
+   - Progress steps indicator
 
-TECHNOLOGY STACK:
-----------------
-- HTML5: Semantic markup
-- CSS3: Modern styling with Grid, Flexbox, CSS Variables
-- Vanilla JavaScript: No framework dependencies
-- Chart.js: Data visualization (CDN)
-- Font Awesome: Icons (CDN)
-- Node.js: Build script automation
+7. dashboard/public/config-form.js
+   - Form handling and validation
+   - LocalStorage auto-save
+   - Template loading for quick PRD setup
 
-TEST RESULTS:
-------------
-- Latest Test Run: Tuesday, January 6, 2026, 13:18:53 IST
-- Total Tests: 21
-- Passed: 21
-- Failed: 0
-- Skipped: 0
-- Pass Rate: 100%
-- Duration: 6.5 seconds
-- Dashboard Generated: ✓ Success
+FILES MODIFIED:
+---------------
+1. testbot-mcp/src/index.js
+   - Added OpenAI test generation flow
+   - Integrated config UI launcher
+   - Added agent context requester
+   - Updated tool schema with openai provider
 
-BENEFITS:
+2. testbot-mcp/src/context-gatherer.js
+   - Enhanced with gatherRichContext() method
+   - Added form detection and validation parsing
+   - Added data model extraction (TypeScript, Prisma)
+   - Added authentication pattern detection
+   - Enhanced workflow inference
+
+3. testbot-mcp/src/ai-providers/index.js
+   - Added OpenAI to provider factory
+   - Added createOpenAI() helper method
+   - Added hasOpenAIKey() check method
+
+4. testbot-mcp/package.json
+   - Updated version to 1.1.0
+   - Added openai as optional dependency
+
+5. .env.example
+   - Added OpenAI configuration section
+   - Added OPENAI_API_KEY, OPENAI_MODEL, OPENAI_MAX_TOKENS
+
+6. .env
+   - Added OPENAI_API_KEY with user's key
+   - Set AI_PROVIDER to openai
+
+CONFIGURATION:
+--------------
+Add to .env:
+  OPENAI_API_KEY=sk-proj-...
+  OPENAI_MODEL=gpt-4o (optional, defaults to gpt-4o)
+  OPENAI_MAX_TOKENS=4000 (optional)
+
+USAGE FLOW:
+-----------
+1. User runs "test my app using testbot mcp" on a project with no tests
+2. TestBot detects no existing tests
+3. Checks for OPENAI_API_KEY (fails clearly if missing)
+4. Gathers rich codebase context automatically
+5. Launches config UI in browser (if no PRD provided)
+6. User fills out PRD and test preferences
+7. TestBot calls OpenAI to generate tests
+8. Tests are written to tests/generated/
+9. Playwright runs the generated tests
+10. Dashboard displays results with AI analysis
+
+ERROR HANDLING:
+---------------
+- Missing API key: Clear error message with setup instructions
+- Generation failures: Logs full error, preserves partial results
+- Config UI timeout: Falls back to template-based generation
+- OpenAI API errors: Retries with exponential backoff
+
+TESTING:
 --------
-- Automatic generation on every test run
-- No additional dependencies to install
-- Fast and lightweight
-- Professional, modern design
-- Easy to customize (colors, layout, metrics)
-- Portable (single HTML file with embedded assets)
-- Works offline (no external API calls)
-- Print-friendly for documentation
-- Suitable for demos, presentations, and reports
-
-NOTES:
-------
-- Dashboard uses mock data if test-results.json is not found
-- All CDN resources (Chart.js, Font Awesome) are cached by browsers
-- Dashboard is completely static - no server required
-- Works alongside existing Playwright HTML report
-- Customizable colors and styling in dashboard-styles.css
-- XSS protection implemented for all dynamic content
+To verify the implementation:
+1. Go to a project without tests
+2. Ensure OPENAI_API_KEY is set in .env
+3. Run testbot_test_my_app via MCP
+4. Observe test generation and execution
 
 ================================================================================
-END OF DOCUMENTATION ENTRY
+
 ================================================================================
+Update: 2026-01-28 (Later) - Dashboard Refresh and Caching Fixes
+================================================================================
+
+SUMMARY:
+--------
+Fixed dashboard refresh issues and clarified config UI behavior.
+
+ISSUES IDENTIFIED:
+------------------
+1. Browser Caching
+   - Browser caches dashboard HTML/CSS/JS files
+   - Old data persists even when report.json is updated
+
+2. Config UI Behavior
+   - Config UI ONLY shows when NO tests exist
+   - User's project had tests in tests/generated/
+   - This is by design, not a bug
+
+3. Playwright MCP Integration
+   - TestBot MCP and Playwright MCP are separate
+   - TestBot uses Playwright directly (npm package)
+
+FIXES APPLIED:
+--------------
+1. Enhanced Dashboard Cache Busting
+   - Added cache-control meta tags to index.html
+   - Versioned CSS/JS references
+   - Added auto-reload notification
+   - Improved dashboard-launcher.js
+
+2. Created Tools
+   - refresh-dashboard.sh for manual refresh
+   - DASHBOARD_REFRESH_GUIDE.md with complete docs
+
+WHEN CONFIG UI SHOWS:
+---------------------
+Conditions (ALL must be true):
+1. Project has NO existing test files
+2. OPENAI_API_KEY is set in .env
+3. generateTests parameter is true
+
+To Force: Delete tests/generated/ directory
+
+HOW TO REFRESH DASHBOARD:
+-------------------------
+1. Press Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
+2. Run ./refresh-dashboard.sh
+3. Close browser completely and rerun TestBot
+
+CURRENT STATUS:
+---------------
+✅ All modules loading correctly
+✅ OpenAI integration implemented
+✅ Dashboard refresh mechanism improved
+✅ Documentation created (DASHBOARD_REFRESH_GUIDE.md)
+⚠️  Config UI only triggers when no tests exist (by design)
+
+================================================================================
+Update: 2026-01-28 16:55 - Dashboard Refresh Debug & Fix Implementation
+================================================================================
+
+SUMMARY:
+--------
+Fixed the root cause of dashboard not updating after test runs. The issue was
+that Playwright's JSON reporter was not configured to output to a file,
+causing TestBot to receive 0 tests.
+
+ROOT CAUSE IDENTIFIED:
+----------------------
+The Playwright configuration had:
+  reporter: 'json'
+
+This outputs JSON to stdout only. TestBot was looking for test-results.json
+file which didn't exist, causing parseTestResults() to return 0 tests.
+
+FIX APPLIED:
+------------
+Changed to:
+  reporter: [['json', { outputFile: 'test-results.json' }]]
+
+This creates the test-results.json file that TestBot can read.
+
+FILES MODIFIED:
+---------------
+1. examples/sample-project/playwright.config.js
+   - Changed reporter config to output to file
+   
+2. testbot-mcp/src/playwright-integration.js
+   - Added comprehensive logging to parseTestResults()
+   - Added warnings when test-results.json is missing
+   - Added diagnostic hints in error messages
+   - Improved extractResultsFromJson() with structure validation
+   
+3. dashboard/src/data-parser.js
+   - Enhanced loadData() with detailed console logging
+   - Added staleness detection for reports
+   - Added empty report (0 tests) warnings
+   - Improved error messages with troubleshooting steps
+
+4. DASHBOARD_REFRESH_GUIDE.md
+   - Added "0 Tests" troubleshooting section
+   - Added Playwright config fix instructions
+   - Added diagnostic tool usage
+   - Updated Summary section with new tools
+
+FILES CREATED:
+--------------
+1. scripts/debug-dashboard.js (executable)
+   - Complete diagnostic tool for dashboard issues
+   - Checks dashboard files exist and are valid
+   - Compares timestamps between project and dashboard
+   - Validates Playwright configuration
+   - Checks for test-results.json
+   - Provides actionable recommendations
+
+2. scripts/fix-dashboard-now.sh (executable)
+   - Quick fix utility for dashboard refresh
+   - Copies latest report to dashboard
+   - Updates metadata
+   - Opens dashboard with aggressive cache-busting
+   - Provides troubleshooting steps if issues persist
+
+VERIFICATION:
+-------------
+1. Ran Playwright tests in sample-project
+2. Verified test-results.json created (39KB, 28 tests)
+3. Debug tool confirms: "JSON reporter configured with outputFile"
+4. Debug tool confirms: "test-results.json exists (38.4 KB), Contains 28 tests"
+
+HOW TO USE NEW TOOLS:
+---------------------
+# Diagnose dashboard issues
+node scripts/debug-dashboard.js [project-path]
+
+# Force fix dashboard
+./scripts/fix-dashboard-now.sh [project-path]
+
+# Standard refresh
+./refresh-dashboard.sh
+
+PLAYWRIGHT CONFIG REQUIREMENT:
+------------------------------
+All projects using TestBot MUST have:
+  reporter: [['json', { outputFile: 'test-results.json' }]]
+
+Without this, the dashboard will show 0 tests even when tests pass.
+
+================================================================================
+Update: 2026-01-28 17:00 - CORS Fix for file:// Protocol
+================================================================================
+
+SUMMARY:
+--------
+Fixed CORS errors that prevented the dashboard from loading report data when
+opened via file:// protocol. Browsers block fetch() requests from file:// URLs.
+
+ROOT CAUSE:
+-----------
+When dashboard is opened via file:// protocol:
+  - Browser blocks fetch('report.json') due to CORS policy
+  - Dashboard falls back to mock data (21 tests, 100% pass rate)
+  - Users see demo data instead of real test results
+
+SOLUTION:
+---------
+Embed report data directly into HTML via a JavaScript file that sets a
+global variable. This bypasses fetch() entirely for file:// protocol.
+
+FILES MODIFIED:
+---------------
+1. testbot-mcp/src/dashboard-launcher.js
+   - Now creates embedded-report.js with report data
+   - Report data stored in window.__TESTBOT_EMBEDDED_REPORT__
+   
+2. dashboard/public/index.html
+   - Added script tag to load embedded-report.js
+   - Falls back gracefully if file doesn't exist
+   
+3. dashboard/src/data-parser.js
+   - Checks for embedded data (window.__TESTBOT_EMBEDDED_REPORT__) first
+   - Falls back to fetch() if no embedded data (for HTTP server mode)
+   - Better CORS-specific error messages
+   
+4. scripts/fix-dashboard-now.sh
+   - Now generates embedded-report.js automatically
+
+FILES CREATED:
+--------------
+1. dashboard/public/embedded-report.js (auto-generated)
+   - Contains the report data as a JavaScript variable
+   - Regenerated each time TestBot runs or fix script is used
+   - Bypasses CORS restrictions for file:// protocol
+
+HOW IT WORKS:
+-------------
+1. TestBot generates report.json (for HTTP servers)
+2. TestBot creates embedded-report.js with same data
+3. Dashboard loads embedded-report.js first (works with file://)
+4. If embedded data exists, uses it directly
+5. If no embedded data, tries fetch() (works with http://)
+6. Falls back to mock data only if both fail
+
+VERIFICATION:
+-------------
+- Dashboard now shows real data (63 tests, 84% pass rate)
+- No more CORS errors in browser console
+- Works with both file:// and http:// protocols
+
