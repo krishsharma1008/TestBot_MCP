@@ -35,9 +35,20 @@
     "quiet": false,
     "reporter": [
       [
+        "list",
+        null
+      ],
+      [
         "json",
         {
           "outputFile": "test-results.json"
+        }
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report",
+          "open": "never"
         }
       ]
     ],
@@ -55,7 +66,8 @@
     "webServer": {
       "command": "npm start",
       "url": "http://localhost:3000",
-      "reuseExistingServer": false
+      "reuseExistingServer": false,
+      "timeout": 120000
     }
   },
   "suites": [
@@ -88,14 +100,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 16,
+                      "duration": 24,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.234Z",
+                      "startTime": "2026-01-30T06:04:17.452Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/api-API-Endpoints-should-list-all-users-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -122,14 +140,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 7,
+                      "duration": 8,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.258Z",
+                      "startTime": "2026-01-30T06:04:17.490Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/api-API-Endpoints-should-get-user-by-ID-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -156,14 +180,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4,
+                      "duration": 7,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.269Z",
+                      "startTime": "2026-01-30T06:04:17.505Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/api-API-Endpoints-should-return-404-for-non-existent-user-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -190,14 +220,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 8,
+                      "duration": 12,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.277Z",
+                      "startTime": "2026-01-30T06:04:17.519Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/api-API-Endpoints-should-create-a-new-user-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -241,14 +277,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3,
+                      "duration": 6,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.294Z",
+                      "startTime": "2026-01-30T06:04:17.538Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_delete_api_u-f7e0c-respond-with-success-status-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -275,14 +317,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3,
+                      "duration": 4,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.301Z",
+                      "startTime": "2026-01-30T06:04:17.549Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_delete_api_u-8ba42-eturn-valid-response-format-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -326,14 +374,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 5,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.308Z",
+                      "startTime": "2026-01-30T06:04:17.560Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_-API-GET-ddea5-respond-with-success-status-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -360,14 +414,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 5,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.315Z",
+                      "startTime": "2026-01-30T06:04:17.570Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_-API-GET-ee17f-eturn-valid-response-format-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -411,14 +471,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3,
+                      "duration": 5,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.321Z",
+                      "startTime": "2026-01-30T06:04:17.581Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_about-AP-f67b7-respond-with-success-status-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -445,14 +511,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 7,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.328Z",
+                      "startTime": "2026-01-30T06:04:17.594Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_about-AP-d4d80-eturn-valid-response-format-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -496,14 +568,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 4,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.334Z",
+                      "startTime": "2026-01-30T06:04:17.607Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_api_user-2d84d-respond-with-success-status-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -530,14 +608,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 4,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.338Z",
+                      "startTime": "2026-01-30T06:04:17.616Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_api_user-54035-eturn-valid-response-format-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -581,14 +665,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 4,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.343Z",
+                      "startTime": "2026-01-30T06:04:17.626Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_api_user-12883-respond-with-success-status-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -615,14 +705,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 3,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.348Z",
+                      "startTime": "2026-01-30T06:04:17.635Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_api_user-2f7de-eturn-valid-response-format-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -666,14 +762,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 4,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.354Z",
+                      "startTime": "2026-01-30T06:04:17.644Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_contact--9a31d-respond-with-success-status-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -700,14 +802,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 3,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.359Z",
+                      "startTime": "2026-01-30T06:04:17.653Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_contact--8ba76-eturn-valid-response-format-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -751,14 +859,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 4,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.364Z",
+                      "startTime": "2026-01-30T06:04:17.662Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_users-AP-21733-respond-with-success-status-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -785,14 +899,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 3,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.368Z",
+                      "startTime": "2026-01-30T06:04:17.671Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_users-AP-e6035-eturn-valid-response-format-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -836,14 +956,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 3,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.373Z",
+                      "startTime": "2026-01-30T06:04:17.680Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_post_api_use-be418-respond-with-success-status-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -870,14 +996,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 4,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.377Z",
+                      "startTime": "2026-01-30T06:04:17.689Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_post_api_use-0d922-eturn-valid-response-format-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -921,14 +1053,30 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 291,
+                      "duration": 304,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:12.382Z",
+                      "startTime": "2026-01-30T06:04:17.698Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-page_home-Home-page-should-load-page-successfully-frontend/test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-page_home-Home-page-should-load-page-successfully-frontend/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-page_home-Home-page-should-load-page-successfully-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -972,14 +1120,30 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 400,
+                      "duration": 449,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:13.016Z",
+                      "startTime": "2026-01-30T06:04:18.277Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-257ae-ard-navigation-successfully-frontend/test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-257ae-ard-navigation-successfully-frontend/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-257ae-ard-navigation-successfully-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -1006,14 +1170,30 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 92,
+                      "duration": 176,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:13.422Z",
+                      "startTime": "2026-01-30T06:04:18.734Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-9fc81-ld-handle-errors-gracefully-frontend/test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-9fc81-ld-handle-errors-gracefully-frontend/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-9fc81-ld-handle-errors-gracefully-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -1057,14 +1237,30 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 89,
+                      "duration": 142,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:13.519Z",
+                      "startTime": "2026-01-30T06:04:18.920Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-load-the-home-page-successfully-frontend/test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-load-the-home-page-successfully-frontend/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-load-the-home-page-successfully-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -1091,14 +1287,30 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 86,
+                      "duration": 142,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:13.611Z",
+                      "startTime": "2026-01-30T06:04:19.070Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-display-navigation-elements-frontend/test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-display-navigation-elements-frontend/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-display-navigation-elements-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -1125,14 +1337,30 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 183,
+                      "duration": 246,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:13.701Z",
+                      "startTime": "2026-01-30T06:04:19.219Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-users-page-frontend/test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-users-page-frontend/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-users-page-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -1159,14 +1387,30 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 153,
+                      "duration": 255,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:13.888Z",
+                      "startTime": "2026-01-30T06:04:19.472Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-about-page-frontend/test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-about-page-frontend/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-about-page-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -1193,14 +1437,30 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 143,
+                      "duration": 224,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-28T11:24:14.045Z",
+                      "startTime": "2026-01-30T06:04:19.735Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-contact-page-frontend/test-finished-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-contact-page-frontend/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-contact-page-frontend/trace.zip"
+                        }
+                      ]
                     }
                   ],
                   "status": "expected"
@@ -1218,8 +1478,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-01-28T11:24:11.138Z",
-    "duration": 3085.422,
+    "startTime": "2026-01-30T06:04:16.366Z",
+    "duration": 3634.605,
     "expected": 28,
     "skipped": 0,
     "unexpected": 0,

@@ -18,6 +18,8 @@ const {
 const AutoDetector = require('./auto-detector');
 const PlaywrightIntegration = require('./playwright-integration');
 const PlaywrightMCPClient = require('./playwright-mcp-client');
+const PlaywrightMCPIntegration = require('./playwright-mcp-integration');
+const ResultsMerger = require('./results-merger');
 const ContextGatherer = require('./context-gatherer');
 const AIAnalyzer = require('./ai-providers/index');
 const JiraClient = require('./jira/client');
@@ -735,9 +737,46 @@ Return the JSON structure above based on what you find in the codebase.
         }
       }
 
-      // 5. Run tests
+      // 5. Run tests (with optional parallel Playwright MCP execution)
       log('Running tests...');
-      const testResults = await playwright.runTests();
+      
+      // Check if parallel MCP execution is enabled
+      const mcpParallelEnabled = process.env.PLAYWRIGHT_MCP_PARALLEL === 'true' || 
+                                  process.env.PLAYWRIGHT_MCP_ENABLED === 'true';
+      
+      let testResults;
+      
+      if (mcpParallelEnabled) {
+        log('Parallel execution enabled - running TestBot + Playwright MCP...');
+        
+        // Create Playwright MCP integration
+        const playwrightMCPIntegration = new PlaywrightMCPIntegration({
+          projectPath: config.projectPath,
+          baseURL: config.baseURL,
+        });
+        
+        // Run tests in parallel
+        const [directResults, mcpResults] = await Promise.all([
+          playwright.runTests(),                    // Fast direct execution
+          playwrightMCPIntegration.runTests()       // Full artifact capture
+        ]);
+        
+        log(`Direct execution: ${directResults.total} tests`);
+        log(`MCP execution: ${mcpResults.available !== false ? mcpResults.total : 'unavailable'} tests`);
+        
+        // Merge results from both sources
+        const merger = new ResultsMerger({ projectPath: config.projectPath });
+        testResults = merger.mergeResults(directResults, mcpResults);
+        
+        // Log merged artifacts
+        if (testResults.artifacts) {
+          const artifacts = testResults.artifacts;
+          log(`Collected artifacts: ${artifacts.screenshots?.length || 0} screenshots, ${artifacts.videos?.length || 0} videos, ${artifacts.traces?.length || 0} traces`);
+        }
+      } else {
+        // Standard single execution
+        testResults = await playwright.runTests();
+      }
 
       log(`Tests completed: ${testResults.total} total, ${testResults.passed} passed, ${testResults.failed} failed`);
 

@@ -388,7 +388,7 @@
             <!-- Footer -->
             <footer class="dashboard-footer">
                 <div class="footer-links">
-                    <a href="/playwright-report/index.html" class="footer-link" target="_blank">
+                    <a href="../../testbot-reports/playwright-report/index.html" class="footer-link" target="_blank" id="playwrightReportLink">
                         <i class="fas fa-file-alt"></i> View Full Playwright Report
                     </a>
                     <a href="#" class="footer-link" onclick="window.print(); return false;">
@@ -469,6 +469,37 @@
             // Page was accessed by navigating into the history
             location.reload(true);
         }
+        
+        // Check if Playwright report exists
+        function checkPlaywrightReport() {
+            const link = document.getElementById('playwrightReportLink');
+            if (!link) return;
+            
+            // Try to fetch the report to see if it exists
+            fetch('../../testbot-reports/playwright-report/index.html', { method: 'HEAD' })
+                .then(response => {
+                    if (!response.ok) {
+                        // Report doesn't exist, disable the link
+                        link.style.opacity = '0.5';
+                        link.style.cursor = 'not-allowed';
+                        link.title = 'Playwright HTML report not yet generated. Run tests to generate it.';
+                        link.onclick = function(e) {
+                            e.preventDefault();
+                            alert('Playwright HTML report not yet generated. Run tests with the HTML reporter enabled to generate it.');
+                            return false;
+                        };
+                    } else {
+                        link.title = 'Open full Playwright HTML report in a new tab';
+                    }
+                })
+                .catch(() => {
+                    // Fetch failed, likely file:// protocol or report doesn't exist
+                    link.title = 'Click to view full Playwright HTML report';
+                });
+        }
+        
+        // Check report availability after page loads
+        setTimeout(checkPlaywrightReport, 500);
     </script>
 </body>
 </html>

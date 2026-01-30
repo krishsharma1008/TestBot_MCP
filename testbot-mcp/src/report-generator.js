@@ -81,6 +81,9 @@ class ReportGenerator {
 
     // Copy artifacts if present
     await this.copyArtifacts(testResults, reportsDir);
+    
+    // Copy Playwright HTML report if it exists
+    await this.copyPlaywrightHTMLReport(projectPath, reportsDir);
 
     return {
       path: reportPath,
@@ -194,70 +197,274 @@ class ReportGenerator {
 
   /**
    * Copy test artifacts to report directory
+   * Handles artifacts from both TestBot direct execution and Playwright MCP
    */
   async copyArtifacts(testResults, reportsDir) {
     const artifactsDir = path.join(reportsDir, 'artifacts');
-
-    const failures = testResults.failures || [];
     let artifactsCopied = 0;
 
+    // Helper function to copy artifacts from a collection
+    const copyArtifactCollection = (artifacts, type) => {
+      if (!artifacts || !Array.isArray(artifacts)) return;
+      
+      const destDir = path.join(artifactsDir, type);
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
+      }
+      
+      for (const artifact of artifacts) {
+        // Handle both formats: { path: '...' } or { fullPath: '...' }
+        const sourcePath = artifact.fullPath || artifact.path;
+        if (!sourcePath) continue;
+        
+        // Try absolute path first, then relative to project
+        let actualPath = sourcePath;
+        if (!fs.existsSync(actualPath) && !path.isAbsolute(actualPath)) {
+          // Try relative to reports directory parent
+          const projectPath = path.dirname(reportsDir);
+          actualPath = path.join(projectPath, sourcePath);
+        }
+        
+        if (fs.existsSync(actualPath)) {
+          const destPath = path.join(destDir, path.basename(actualPath));
+          try {
+            fs.copyFileSync(actualPath, destPath);
+            artifactsCopied++;
+            
+            // Update artifact path to point to new location
+            artifact.path = path.relative(reportsDir, destPath);
+          } catch (error) {
+            console.error(`[Report] Failed to copy ${type}: ${error.message}`);
+          }
+        }
+      }
+    };
+
+    // Copy artifacts from test failures
+    const failures = testResults.failures || [];
     for (const failure of failures) {
       const artifacts = failure.artifacts || {};
+      copyArtifactCollection(artifacts.screenshots, 'screenshots');
+      copyArtifactCollection(artifacts.videos, 'videos');
+      copyArtifactCollection(artifacts.traces, 'traces');
+      copyArtifactCollection(artifacts.other, 'other');
+    }
 
-      // Copy screenshots
-      for (const screenshot of artifacts.screenshots || []) {
-        if (screenshot.path && fs.existsSync(screenshot.path)) {
-          const destDir = path.join(artifactsDir, 'screenshots');
-          if (!fs.existsSync(destDir)) {
-            fs.mkdirSync(destDir, { recursive: true });
-          }
-          const destPath = path.join(destDir, path.basename(screenshot.path));
-          try {
-            fs.copyFileSync(screenshot.path, destPath);
-            artifactsCopied++;
-          } catch (error) {
-            console.error(`[Report] Failed to copy screenshot: ${error.message}`);
-          }
-        }
-      }
+    // Copy global artifacts (from merged results with MCP)
+    if (testResults.artifacts) {
+      const globalArtifacts = testResults.artifacts;
+      copyArtifactCollection(globalArtifacts.screenshots, 'screenshots');
+      copyArtifactCollection(globalArtifacts.videos, 'videos');
+      copyArtifactCollection(globalArtifacts.traces, 'traces');
+      copyArtifactCollection(globalArtifacts.other, 'other');
+    }
 
-      // Copy videos
-      for (const video of artifacts.videos || []) {
-        if (video.path && fs.existsSync(video.path)) {
-          const destDir = path.join(artifactsDir, 'videos');
-          if (!fs.existsSync(destDir)) {
-            fs.mkdirSync(destDir, { recursive: true });
-          }
-          const destPath = path.join(destDir, path.basename(video.path));
-          try {
-            fs.copyFileSync(video.path, destPath);
-            artifactsCopied++;
-          } catch (error) {
-            console.error(`[Report] Failed to copy video: ${error.message}`);
-          }
-        }
-      }
+    // Also copy artifacts from individual tests
+    for (const test of testResults.tests || []) {
+      const artifacts = test.artifacts || {};
+      copyArtifactCollection(artifacts.screenshots, 'screenshots');
+      copyArtifactCollection(artifacts.videos, 'videos');
+      copyArtifactCollection(artifacts.traces, 'traces');
+      copyArtifactCollection(artifacts.other, 'other');
+    }
 
-      // Copy traces
-      for (const trace of artifacts.traces || []) {
-        if (trace.path && fs.existsSync(trace.path)) {
-          const destDir = path.join(artifactsDir, 'traces');
-          if (!fs.existsSync(destDir)) {
-            fs.mkdirSync(destDir, { recursive: true });
-          }
-          const destPath = path.join(destDir, path.basename(trace.path));
-          try {
-            fs.copyFileSync(trace.path, destPath);
-            artifactsCopied++;
-          } catch (error) {
-            console.error(`[Report] Failed to copy trace: ${error.message}`);
-          }
-        }
-      }
+    // Scan playwright-mcp-output directory if it exists
+    const mcpOutputDir = path.join(path.dirname(reportsDir), 'playwright-mcp-output');
+    if (fs.existsSync(mcpOutputDir)) {
+      console.error(`[Report] Scanning MCP output directory: ${mcpOutputDir}`);
+      artifactsCopied += await this.scanAndCopyMCPArtifacts(mcpOutputDir, artifactsDir);
+    }
+
+    // Scan test-results directory for any remaining artifacts
+    const testResultsDir = path.join(path.dirname(reportsDir), 'test-results');
+    if (fs.existsSync(testResultsDir)) {
+      console.error(`[Report] Scanning test-results directory: ${testResultsDir}`);
+      artifactsCopied += await this.scanAndCopyTestResultsArtifacts(testResultsDir, artifactsDir);
     }
 
     if (artifactsCopied > 0) {
-      console.error(`[Report] Copied ${artifactsCopied} artifacts`);
+      console.error(`[Report] Copied ${artifactsCopied} artifacts total`);
+    }
+  }
+
+  /**
+   * Scan and copy artifacts from Playwright MCP output directory
+   */
+  async scanAndCopyMCPArtifacts(mcpDir, artifactsDir) {
+    let copied = 0;
+    
+    const scanDir = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          
+          if (entry.isDirectory()) {
+            scanDir(fullPath);
+          } else if (entry.isFile()) {
+            const ext = path.extname(entry.name).toLowerCase();
+            let destType = null;
+            
+            if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
+              destType = 'screenshots';
+            } else if (['.webm', '.mp4', '.mov'].includes(ext)) {
+              destType = 'videos';
+            } else if (ext === '.zip' || entry.name.includes('trace')) {
+              destType = 'traces';
+            }
+            
+            if (destType) {
+              const destDir = path.join(artifactsDir, destType);
+              if (!fs.existsSync(destDir)) {
+                fs.mkdirSync(destDir, { recursive: true });
+              }
+              
+              const destPath = path.join(destDir, entry.name);
+              if (!fs.existsSync(destPath)) {
+                try {
+                  fs.copyFileSync(fullPath, destPath);
+                  copied++;
+                } catch (error) {
+                  console.error(`[Report] Failed to copy MCP artifact: ${error.message}`);
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`[Report] Error scanning MCP directory: ${error.message}`);
+      }
+    };
+    
+    scanDir(mcpDir);
+    return copied;
+  }
+
+  /**
+   * Scan and copy artifacts from test-results directory
+   */
+  async scanAndCopyTestResultsArtifacts(testResultsDir, artifactsDir) {
+    let copied = 0;
+    
+    const scanDir = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          
+          if (entry.isDirectory()) {
+            scanDir(fullPath);
+          } else if (entry.isFile()) {
+            const ext = path.extname(entry.name).toLowerCase();
+            let destType = null;
+            
+            if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
+              destType = 'screenshots';
+            } else if (['.webm', '.mp4', '.mov'].includes(ext)) {
+              destType = 'videos';
+            } else if (ext === '.zip' || entry.name.includes('trace')) {
+              destType = 'traces';
+            }
+            
+            if (destType) {
+              const destDir = path.join(artifactsDir, destType);
+              if (!fs.existsSync(destDir)) {
+                fs.mkdirSync(destDir, { recursive: true });
+              }
+              
+              const destPath = path.join(destDir, entry.name);
+              if (!fs.existsSync(destPath)) {
+                try {
+                  fs.copyFileSync(fullPath, destPath);
+                  copied++;
+                } catch (error) {
+                  console.error(`[Report] Failed to copy test-results artifact: ${error.message}`);
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`[Report] Error scanning test-results directory: ${error.message}`);
+      }
+    };
+    
+    scanDir(testResultsDir);
+    return copied;
+  }
+
+  /**
+   * Copy Playwright HTML report to testbot-reports directory
+   */
+  async copyPlaywrightHTMLReport(projectPath, reportsDir) {
+    try {
+      // Check for Playwright HTML report in common locations
+      const possibleLocations = [
+        path.join(projectPath, 'playwright-report'),
+        path.join(projectPath, 'examples', 'sample-project', 'playwright-report'),
+        path.join(projectPath, 'sample-project', 'playwright-report'),
+      ];
+      
+      let sourceReportDir = null;
+      for (const location of possibleLocations) {
+        if (fs.existsSync(location) && fs.existsSync(path.join(location, 'index.html'))) {
+          sourceReportDir = location;
+          break;
+        }
+      }
+      
+      if (!sourceReportDir) {
+        console.error('[Report] No Playwright HTML report found to copy');
+        return;
+      }
+      
+      const destReportDir = path.join(reportsDir, 'playwright-report');
+      
+      // Remove old report if it exists
+      if (fs.existsSync(destReportDir)) {
+        fs.rmSync(destReportDir, { recursive: true, force: true });
+      }
+      
+      // Copy the entire report directory
+      this.copyDirectoryRecursive(sourceReportDir, destReportDir);
+      
+      console.error(`[Report] Copied Playwright HTML report from ${sourceReportDir} to ${destReportDir}`);
+    } catch (error) {
+      console.error(`[Report] Failed to copy Playwright HTML report: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Recursively copy a directory
+   */
+  copyDirectoryRecursive(source, dest) {
+    // Create destination directory
+    if (!fs.existsSync(dest)) {
+      fs.mkdirSync(dest, { recursive: true });
+    }
+    
+    // Read all files/folders in source
+    const items = fs.readdirSync(source);
+    
+    for (const item of items) {
+      const sourcePath = path.join(source, item);
+      const destPath = path.join(dest, item);
+      
+      const stat = fs.statSync(sourcePath);
+      
+      if (stat.isDirectory()) {
+        // Recursively copy subdirectory
+        this.copyDirectoryRecursive(sourcePath, destPath);
+      } else {
+        // Copy file
+        fs.copyFileSync(sourcePath, destPath);
+      }
     }
   }
 

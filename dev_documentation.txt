@@ -373,3 +373,252 @@ VERIFICATION:
 - No more CORS errors in browser console
 - Works with both file:// and http:// protocols
 
+================================================================================
+Update: 2026-01-28 - Playwright MCP Integration for Parallel Test Execution
+================================================================================
+
+SUMMARY:
+--------
+Implemented comprehensive integration with the official Microsoft Playwright MCP
+server (@playwright/mcp) to enable parallel test execution with full artifact
+capture including traces, videos, and screenshots.
+
+NEW FEATURES:
+-------------
+1. Playwright MCP Server Configuration
+   - Added Playwright MCP to Cursor's MCP settings (~/.cursor/mcp.json)
+   - Configured with --save-trace, --save-video, --output-dir options
+   - Headless mode enabled for CI/CD compatibility
+
+2. Parallel Test Execution
+   - TestBot now runs tests via two parallel execution paths:
+     a) Direct Playwright execution (fast, minimal artifacts)
+     b) Playwright MCP execution (comprehensive artifact capture)
+   - Results automatically merged from both sources
+   - Fallback to single execution if MCP unavailable
+
+3. Enhanced Artifact Collection
+   - Traces: Full Playwright trace files with step-by-step debugging
+   - Videos: WebM recordings of test execution
+   - Screenshots: Captured at every test step
+   - All artifacts consolidated in testbot-reports/artifacts/
+
+4. Dashboard Trace Viewer Integration
+   - "View Trace" button opens Playwright's online trace viewer
+   - Instructions for local trace viewing via command line
+   - Download buttons for offline analysis
+
+FILES CREATED:
+--------------
+1. testbot-mcp/src/playwright-mcp-integration.js
+   - Main integration module for Playwright MCP server
+   - Handles availability checking, test execution, artifact collection
+   - Supports both direct and MCP-based execution
+
+2. testbot-mcp/src/mcp-client-utils.js
+   - Helper utilities for MCP operations
+   - Retry with exponential backoff
+   - Directory scanning, file copying, artifact collection
+   - Session management and cleanup
+
+3. testbot-mcp/src/results-merger.js
+   - Merges test results from multiple sources
+   - Deduplicates tests by file+title
+   - Combines artifacts with configurable priority
+   - Creates unified test report structure
+
+FILES MODIFIED:
+---------------
+1. ~/.cursor/mcp.json
+   - Added "playwright" MCP server configuration
+
+2. testbot-mcp/src/index.js
+   - Added imports for new modules
+   - Modified handleTestMyApp() for parallel execution
+   - Integrated ResultsMerger for combining results
+
+3. testbot-mcp/src/report-generator.js
+   - Enhanced copyArtifacts() to handle MCP output
+   - Added scanAndCopyMCPArtifacts() method
+   - Added scanAndCopyTestResultsArtifacts() method
+   - Better artifact path handling and deduplication
+
+4. dashboard/src/reporter.js
+   - Added viewTraceInViewer() function
+   - Enhanced trace artifact display with View Trace button
+   - Added getArtifactStats() helper
+
+5. dashboard/src/styles/dashboard.css
+   - Added trace viewer modal styles
+   - Enhanced artifact display styles
+   - Added trace-specific button styles
+
+6. examples/sample-project/playwright.config.js
+   - Set trace: 'on' (always capture)
+   - Set screenshot: 'on' (always capture)
+   - Set video: 'on' (always capture)
+   - Added outputDir configuration
+
+7. .env.example
+   - Added PLAYWRIGHT_MCP_ENABLED environment variable
+   - Added PLAYWRIGHT_MCP_OUTPUT_DIR setting
+   - Added PLAYWRIGHT_MCP_PARALLEL option
+
+ENVIRONMENT VARIABLES:
+----------------------
+# Playwright MCP Configuration
+PLAYWRIGHT_MCP_ENABLED=true         # Enable/disable MCP integration
+PLAYWRIGHT_MCP_OUTPUT_DIR=playwright-mcp-output  # Artifact output directory
+PLAYWRIGHT_MCP_PARALLEL=true        # Run TestBot + MCP in parallel
+
+ARCHITECTURE:
+-------------
+```
+Test Request
+    │
+    ├──► TestBot Direct Execution (fast)
+    │         │
+    │         └──► test-results.json
+    │         └──► test-results/ (minimal artifacts)
+    │
+    └──► Playwright MCP Execution (parallel)
+              │
+              └──► playwright-mcp-output/
+                    ├── traces/
+                    ├── videos/
+                    └── screenshots/
+                              │
+                              ▼
+                    Results Merger
+                              │
+                              ▼
+                    Unified Report
+                              │
+                              ▼
+                    Dashboard with all artifacts
+```
+
+USAGE:
+------
+1. Enable parallel MCP execution:
+   - Set PLAYWRIGHT_MCP_ENABLED=true in .env
+   - Or set PLAYWRIGHT_MCP_PARALLEL=true
+
+2. Run tests via TestBot:
+   - Tests execute in parallel (direct + MCP)
+   - All artifacts automatically collected
+   - Dashboard displays comprehensive results
+
+3. View trace files:
+   - Click "View Trace" in artifact section
+   - Opens trace.playwright.dev or shows instructions
+   - Download trace for offline analysis
+
+TESTING STATUS:
+---------------
+- All new modules created and lint-checked
+- Integration with existing TestBot flow complete
+- Dashboard enhanced for trace/video display
+- Ready for end-to-end testing
+
+TROUBLESHOOTING:
+----------------
+Issue: Playwright MCP server fails to start with "Cannot find module 'playwright/lib/mcp/program'"
+
+Solution:
+1. Install @playwright/mcp locally:
+   npm install --save-dev @playwright/mcp
+
+2. Update ~/.cursor/mcp.json to use local installation:
+   {
+     "playwright": {
+       "command": "node",
+       "args": [
+         "/Users/krishsharma/Desktop/QA_Final/node_modules/@playwright/mcp/cli.js",
+         "--save-trace",
+         "--save-video=1280x720",
+         "--output-dir=playwright-mcp-output",
+         "--output-mode=file",
+         "--headless"
+       ],
+       "env": {},
+       "cwd": "/Users/krishsharma/Desktop/QA_Final"
+     }
+   }
+
+3. Restart Cursor for MCP changes to take effect
+
+The issue occurred because npx creates an isolated environment where
+the playwright peer dependency isn't available. Using the local
+installation resolves this.
+
+PLAYWRIGHT HTML REPORT INTEGRATION:
+------------------------------------
+Date: 2026-01-30 11:25:00
+
+CHANGES:
+1. playwright.config.js - Added HTML reporter
+   - Generates interactive HTML report at playwright-report/
+   - Configured to never auto-open ('open: never')
+   - Provides detailed test visualization with artifacts
+
+2. report-generator.js - Added HTML report copying
+   - New method: copyPlaywrightHTMLReport()
+   - Searches common locations for playwright-report/
+   - Copies entire report directory to testbot-reports/playwright-report/
+   - Makes report accessible from TestBot dashboard
+
+3. dashboard/public/index.html - Updated report link
+   - Link now points to ../../testbot-reports/playwright-report/index.html
+   - Added JavaScript to check report availability
+   - Disables link gracefully if report doesn't exist yet
+   - Shows helpful message when report is not available
+
+WORKFLOW:
+1. Tests run with Playwright (direct or MCP)
+2. Playwright generates HTML report in playwright-report/
+3. ReportGenerator copies report to testbot-reports/playwright-report/
+4. Dashboard "View Full Playwright Report" button opens the report
+5. Users can see detailed test execution with timeline, artifacts, etc.
+
+BENEFITS:
+- Full Playwright HTML report accessible from TestBot dashboard
+- Interactive trace viewer, video playback, screenshot gallery
+- Test timeline showing execution order and parallelization
+- Network logs, console output, and detailed assertions
+- Easy navigation between TestBot summary and Playwright details
+
+VERIFICATION:
+All configuration verified successfully with verify-playwright-report.sh:
+- Playwright config has HTML reporter ✓
+- ReportGenerator has copy methods ✓
+- Dashboard button links to correct path ✓
+- Directory structure is correct ✓
+- JavaScript checker implemented ✓
+
+FULL INTEGRATION TEST COMPLETED (2026-01-30 11:35:00):
+-----------------------------------------------------------
+✓ Tests executed: 28 tests, all passed (100% pass rate)
+✓ Playwright HTML report generated at playwright-report/index.html
+✓ Artifacts captured:
+  - Trace files (.zip): 28 tests
+  - Video files (.webm): Frontend/UI tests
+  - Screenshots (.png): UI tests at key moments
+✓ Reports copied to testbot-reports/playwright-report/
+✓ Test artifacts copied to testbot-reports/artifacts/
+✓ TestBot JSON report generated (latest.json)
+✓ HTTP server started on port 8888 (PID: 35719)
+✓ Dashboard accessible at http://localhost:8888/dashboard/public/index.html
+✓ "View Full Playwright Report" button working correctly
+
+ACCESS URLS:
+- Dashboard: http://localhost:8888/dashboard/public/index.html
+- Playwright Report: http://localhost:8888/testbot-reports/playwright-report/index.html
+
+IMPORTANT NOTE:
+Use HTTP server to avoid CORS issues. The file:// protocol will cause
+"Access to fetch has been blocked by CORS policy" errors. Always use
+the start-dashboard-server.sh script or manually start python3 HTTP server.
+
+See DASHBOARD_ACCESS.md for complete usage instructions.
+

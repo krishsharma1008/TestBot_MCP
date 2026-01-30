@@ -1,10 +1,10 @@
 // Auto-generated embedded report data - DO NOT EDIT
-// Generated at: 2026-01-29T07:47:13.694Z
+// Generated at: 2026-01-30T05:59:43.115Z
 // This file is used to bypass CORS restrictions when opening dashboard via file:// protocol
 window.__TESTBOT_EMBEDDED_REPORT__ = {
   "metadata": {
-    "timestamp": "2026-01-29T07:47:13.691Z",
-    "projectName": "Micro loans",
+    "timestamp": "2026-01-30T05:59:43.108Z",
+    "projectName": "airtime-micro-loans-poc",
     "projectPath": "/Users/krishsharma/Desktop/Micro loans",
     "version": "1.0.0",
     "generator": "testbot-mcp"
@@ -73,6 +73,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -121,6 +145,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -178,6 +226,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -226,6 +298,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -274,6 +370,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -322,6 +442,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -370,6 +514,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -427,6 +595,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -484,6 +676,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -532,6 +748,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -580,6 +820,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -628,6 +892,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -685,6 +973,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -742,6 +1054,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -799,6 +1135,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -856,6 +1216,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -913,6 +1297,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -970,6 +1378,30 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
         "videos": [],
         "traces": [],
         "other": []
+      },
+      "aiAnalysis": {
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "rootCause": "The authentication middleware is either not configured correctly or not applied to the API endpoint, allowing unauthenticated requests to pass through.",
+        "suggestedFix": {
+          "description": "Ensure the authentication middleware is correctly applied to the API endpoint to block unauthenticated requests and return a 404 status code.",
+          "changes": [
+            {
+              "file": "generated/api_get_api_customers_msisdn.spec.js",
+              "action": "replace",
+              "lineStart": 41,
+              "lineEnd": 41,
+              "oldCode": "expect(response.status).toContain(404);",
+              "newCode": "expect(response.status).toBe(404);"
+            }
+          ]
+        },
+        "confidence": 0.95,
+        "affectedFiles": [
+          "generated/api_get_api_customers_msisdn.spec.js"
+        ],
+        "testingRecommendations": "1. Run the test again to ensure it now expects the correct status code. 2. Verify that the authentication middleware is correctly applied to the API endpoint. 3. Test other endpoints to ensure they are not affected by this change.",
+        "aiProvider": "testbot",
+        "model": "sarvam-m"
       }
     },
     {
@@ -1117,12 +1549,79 @@ window.__TESTBOT_EMBEDDED_REPORT__ = {
       }
     }
   ],
-  "aiSummary": null,
+  "aiSummary": {
+    "total": 10,
+    "highConfidence": 10,
+    "mediumConfidence": 0,
+    "lowConfidence": 0,
+    "analyses": [
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_get_api_customers_msisdn.spec.js",
+        "analysis": "The test expects the API to return a 404 status code for an unauthenticated request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "confidence": 0.95
+      },
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_get_api_decisions_decisionId.spec.js",
+        "analysis": "The test expects the API to return a 404 status code for an unauthorized request, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly configured or enforced for the endpoint.",
+        "confidence": 0.95
+      },
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_get_api_offers_offerId_explain.spec.js",
+        "analysis": "The test expects the API response to return a 404 status code when accessing an offer ID that requires authentication, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly blocking unauthenticated requests.",
+        "confidence": 0.95
+      },
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_get_api_offers_token.spec.js",
+        "analysis": "The test expects the API to return a 404 status code when authentication is required but missing. However, the API is returning 200, 201, or 204 status codes instead, indicating that the authentication check is not functioning as expected.",
+        "confidence": 0.95
+      },
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_get_api_users_msisdn.spec.js",
+        "analysis": "The test expects the API to return a 404 status code for unauthorized access, but the actual response status codes being received are 200, 201, and 204. This indicates that the authentication mechanism is not functioning as expected, and the API is not returning the expected 404 status code for unauthorized requests.",
+        "confidence": 0.95
+      },
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_post_api_calls_end.spec.js",
+        "analysis": "The test expects the API call to return a 400 status code when authentication is missing, but the actual response status codes are 200, 201, or 204. This indicates that the API is not properly enforcing authentication for the endpoint.",
+        "confidence": 0.95
+      },
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_post_api_calls_start.spec.js",
+        "analysis": "The test expects the API call to return a 400 status code when authentication is required but not provided. However, the API is returning 200, 201, or 204 status codes, indicating that the authentication check is not functioning as expected.",
+        "confidence": 0.95
+      },
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_post_api_consent.spec.js",
+        "analysis": "The test expects the API to return a 400 status code when authentication is required but not provided. However, the API is returning 200, 201, or 204 status codes instead, indicating that the authentication check is not functioning as expected.",
+        "confidence": 0.95
+      },
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_post_api_personas_name_init.spec.js",
+        "analysis": "The test expects the API response status to contain 404 for unauthorized access, but the actual response status codes are 200, 201, or 204. This indicates that the authentication mechanism is not functioning as expected, and the API is allowing unauthorized access.",
+        "confidence": 0.95
+      },
+      {
+        "testName": "should require authentication",
+        "file": "generated/api_post_api_topup.spec.js",
+        "analysis": "The test expects the API to return a 400 status code when a request is made without authentication, but the API is returning 200, 201, or 204 status codes instead. This indicates that the authentication middleware is not properly enforcing authentication for the API endpoint.",
+        "confidence": 0.95
+      }
+    ]
+  },
   "jiraSummary": null
 };
-window.__TESTBOT_REPORT_TIMESTAMP__ = 1769672833693;
+window.__TESTBOT_REPORT_TIMESTAMP__ = 1769752783114;
 console.log('📊 Embedded report data loaded:', {
   project: window.__TESTBOT_EMBEDDED_REPORT__?.metadata?.projectName || 'Unknown',
   tests: window.__TESTBOT_EMBEDDED_REPORT__?.stats?.total || 0,
-  timestamp: new Date(1769672833693).toISOString()
+  timestamp: new Date(1769752783114).toISOString()
 });

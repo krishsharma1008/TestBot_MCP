@@ -1382,7 +1382,7 @@ function renderTestArtifacts(test) {
         `;
     }
 
-    // Traces section
+    // Traces section - with Playwright trace viewer integration
     if (traces.length > 0) {
         html += `
             <div class="artifact-section">
@@ -1392,10 +1392,18 @@ function renderTestArtifacts(test) {
                 </div>
                 <div class="artifacts-grid">
                     ${traces.map((trace, index) => `
-                        <div class="artifact-item" onclick="window.open('${escapeHtml(trace.path)}', '_blank')">
+                        <div class="artifact-item trace-artifact">
                             <div class="artifact-item-icon"><i class="fas fa-file-archive"></i></div>
                             <div class="artifact-item-name">${escapeHtml(trace.name)}</div>
                             <div class="artifact-item-type">Trace File</div>
+                            <div class="artifact-actions">
+                                <button class="btn-view-trace" onclick="viewTraceInViewer('${escapeHtml(trace.path)}')">
+                                    <i class="fas fa-external-link-alt"></i> View in Trace Viewer
+                                </button>
+                                <a href="${escapeHtml(trace.path)}" download class="btn-download-trace">
+                                    <i class="fas fa-download"></i> Download
+                                </a>
+                            </div>
                         </div>
                     `).join('')}
                 </div>
@@ -1499,4 +1507,82 @@ function viewArtifact(path, type, name) {
  */
 function closeArtifactModal() {
     document.getElementById('artifactModal').classList.remove('active');
+}
+
+/**
+ * View trace in Playwright Trace Viewer
+ * Opens trace in trace.playwright.dev
+ */
+function viewTraceInViewer(tracePath) {
+    // Playwright's online trace viewer can open traces by URL
+    // For local traces, we need to use file:// or serve them
+    const traceViewerUrl = 'https://trace.playwright.dev/';
+    
+    // Try to get absolute URL for the trace
+    let absoluteTraceUrl = tracePath;
+    if (!tracePath.startsWith('http')) {
+        // For file:// protocol, construct the full path
+        const currentUrl = window.location.href;
+        const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+        absoluteTraceUrl = baseUrl + tracePath;
+    }
+    
+    // For local files, inform user about options
+    if (absoluteTraceUrl.startsWith('file://')) {
+        // Open the online trace viewer and show instructions
+        const modal = document.getElementById('artifactModal');
+        const modalTitle = document.getElementById('artifactModalTitle');
+        const modalBody = document.getElementById('artifactModalBody');
+        
+        modalTitle.textContent = 'View Trace';
+        modalBody.innerHTML = `
+            <div class="trace-viewer-info">
+                <h4><i class="fas fa-info-circle"></i> How to View This Trace</h4>
+                
+                <div class="trace-option">
+                    <h5>Option 1: Online Trace Viewer (Recommended)</h5>
+                    <p>1. Click the button below to open Playwright's Trace Viewer</p>
+                    <p>2. Drag and drop the downloaded trace file into the viewer</p>
+                    <a href="https://trace.playwright.dev/" target="_blank" class="btn-open-viewer">
+                        <i class="fas fa-external-link-alt"></i> Open Trace Viewer
+                    </a>
+                </div>
+                
+                <div class="trace-option">
+                    <h5>Option 2: Command Line</h5>
+                    <p>Run this command in your terminal:</p>
+                    <pre><code>npx playwright show-trace "${tracePath}"</code></pre>
+                </div>
+                
+                <div class="trace-download">
+                    <a href="${tracePath}" download class="btn-download">
+                        <i class="fas fa-download"></i> Download Trace File
+                    </a>
+                </div>
+            </div>
+        `;
+        
+        modal.classList.add('active');
+    } else {
+        // For HTTP URLs, try to open directly in trace viewer
+        const viewerUrl = `${traceViewerUrl}?trace=${encodeURIComponent(absoluteTraceUrl)}`;
+        window.open(viewerUrl, '_blank');
+    }
+}
+
+/**
+ * Get artifact stats for a test
+ */
+function getArtifactStats(test) {
+    if (!test.attachments) {
+        return { total: 0, screenshots: 0, videos: 0, traces: 0 };
+    }
+    
+    const { screenshots, videos, traces, other } = test.attachments;
+    return {
+        total: (screenshots?.length || 0) + (videos?.length || 0) + (traces?.length || 0) + (other?.length || 0),
+        screenshots: screenshots?.length || 0,
+        videos: videos?.length || 0,
+        traces: traces?.length || 0
+    };
 }

@@ -2258,3 +2258,174 @@ body {
         min-width: 60px;
     }
 }
+
+/* Trace Viewer Styles */
+.trace-artifact {
+    cursor: default;
+}
+
+.trace-artifact .artifact-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.btn-view-trace,
+.btn-download-trace {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--border-radius);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+    border: none;
+}
+
+.btn-view-trace {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-view-trace:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-download-trace {
+    background: var(--color-bg);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+}
+
+.btn-download-trace:hover {
+    background: var(--color-surface);
+    border-color: var(--color-primary);
+}
+
+/* Trace Viewer Info Modal */
+.trace-viewer-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.trace-viewer-info h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+}
+
+.trace-option {
+    background: var(--color-bg);
+    padding: 1.25rem;
+    border-radius: var(--border-radius);
+    border-left: 4px solid #667eea;
+}
+
+.trace-option h5 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 0.75rem;
+}
+
+.trace-option p {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.trace-option pre {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    overflow-x: auto;
+}
+
+.trace-option code {
+    color: #667eea;
+}
+
+.btn-open-viewer {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: var(--transition);
+    margin-top: 0.75rem;
+}
+
+.btn-open-viewer:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.trace-download {
+    text-align: center;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.trace-download .btn-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.trace-download .btn-download:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+}
+
+/* Video Player Enhancements */
+.artifact-viewer-media video {
+    background: #000;
+}
+
+/* Artifact Grid Improvements */
+.artifacts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+/* Artifact Type Indicators */
+.artifact-item[data-type="video"] .artifact-item-icon {
+    color: var(--color-danger);
+}
+
+.artifact-item[data-type="trace"] .artifact-item-icon {
+    color: #667eea;
+}
+
+.artifact-item[data-type="screenshot"] .artifact-item-icon {
+    color: var(--color-success);
+}

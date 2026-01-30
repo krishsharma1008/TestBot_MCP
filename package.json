@@ -20,5 +20,8 @@
     "automation"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/mcp": "^0.0.61"
+  }
 }
