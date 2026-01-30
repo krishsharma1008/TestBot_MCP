@@ -3,6 +3,26 @@ TESTBOT MCP DEVELOPMENT DOCUMENTATION
 ================================================================================
 
 ================================================================================
+Update: 2026-01-30 (commit and push to TestBot_MCP)
+================================================================================
+
+SUMMARY:
+--------
+Committed all local changes and pushed to origin (https://github.com/krishsharma1008/TestBot_MCP.git).
+
+ACTIONS TAKEN:
+--------------
+1. Staged all changes: git add -A
+2. Committed with message: "Cleanup: remove deprecated docs, ai-agent, jira-integration, custom-report; update .env.example, .gitignore; add DASHBOARD_REFRESH_GUIDE"
+3. Pushed to origin main: a1f44311..df777fc7 main -> main
+
+CHANGES IN COMMIT:
+------------------
+- Removed: deprecated markdown docs (AI_AGENT_*, JIRA_*, DASHBOARD_*, WORKFLOW_*, etc.), ai-agent/, jira-integration/, custom-report/, custom-reporter/, scripts/, tests/, playwright configs, test-results, Conception & DB assets, and related artifacts
+- Modified: .env.example, .gitignore, package.json, package-lock.json, dev_documentation.txt
+- Added: .cursor/worktrees.json, DASHBOARD_REFRESH_GUIDE.md
+
+================================================================================
 Update: 2026-01-28 - OpenAI Test Generation Feature
 ================================================================================
 
