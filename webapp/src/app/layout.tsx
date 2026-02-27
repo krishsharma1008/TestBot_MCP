@@ -1,16 +1,17 @@
 import type { Metadata } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
+import { Space_Grotesk, Space_Mono } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({
-  variable: '--font-inter',
+const spaceGrotesk = Space_Grotesk({
+  variable: '--font-space-grotesk',
   subsets: ['latin'],
   display: 'swap',
 })
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: '--font-jetbrains-mono',
+const spaceMono = Space_Mono({
+  variable: '--font-space-mono',
   subsets: ['latin'],
+  weight: ['400', '700'],
   display: 'swap',
 })
 
@@ -27,10 +28,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased bg-bg-darkest text-text-primary`}
-        style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }}
+        className={`${spaceGrotesk.variable} ${spaceMono.variable} antialiased bg-black text-white`}
+        style={{ fontFamily: "var(--font-space-grotesk), 'Space Grotesk', sans-serif" }}
       >
         {children}
       </body>

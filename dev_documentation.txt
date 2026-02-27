@@ -337,3 +337,208 @@ NOTES:
 ================================================================================
 END OF DOCUMENTATION ENTRY
 ================================================================================
+
+================================================================================
+DATE/TIME: Thursday, February 27, 2026 — 14:55 PST
+TASK: Y2K Neo-Brutalist Theme Overhaul — website/
+AUTHOR: AI Assistant
+================================================================================
+
+OVERVIEW
+--------
+Rethemed the ShipCruiseTour PHP website (website/) with a Y2K black-and-white
+neo-brutalist aesthetic. Strict #000/#fff palette, boxy squared elements, thick
+hard-offset borders, and heavy CSS animations throughout. No PHP business logic
+or routing was modified.
+
+FILES MODIFIED
+--------------
+1. website/public/css/style.css
+   - Replaced all Google Fonts imports with Space Mono + VT323 (from Google Fonts CDN).
+   - Swapped entire color palette to pure black (#000) / white (#fff).
+   - All border-radius values set to 0 (boxy/squared everywhere).
+   - Buttons: border 2-3px solid, hard box-shadow 4px 4px 0 #000, active state
+     translates by (3-4px, 3-4px) and removes shadow (neo-brut press effect).
+   - Added full @keyframes library:
+       glitch / glitch-layer  — hero heading clip-path glitch animation
+       flicker                — CRT brightness pulse (body, 8s loop)
+       scanlines              — fixed pseudo-element scanline overlay (body::before)
+       marquee                — used in CTA section ticker and .y2k-marquee-strip
+       fadeInUp / fadeInLeft  — stagger entrance animations
+       borderPulse            — animated box-shadow for hover states
+       blink                  — cursor blink utility
+       move-forever           — waves animation (unchanged)
+       animateWaves / animate — wave background animations (unchanged)
+   - Counter section: black background, white VT323 numbers, monospace labels.
+   - CTA section: full black background, embedded CSS marquee text strip at top.
+   - Search form: thick black border + 6px 6px hard shadow, squared corners.
+   - Swiper pagination bullets: flat rectangles (width:20px, height:4px).
+   - Added .y2k-marquee-strip / .y2k-marquee-inner classes for JS-injected ticker.
+   - All images: filter: grayscale(1) applied site-wide where applicable.
+   - Generic .card, .btn, .form-control Bootstrap overrides to enforce B&W theme.
+
+2. website/public/css/card.css
+   - Cruise cards (#cruisesBox): squared corners, 2px border, 4px 4px 0 #000 shadow.
+     Hover: shadow expands to 8px, card lifts via translate(-2px, -2px).
+     Active: translate(3px, 3px) neo-brut press.
+   - Cruise detail modal (#cruisesDetail): white background, 3px border + 8px shadow.
+   - Room type radio labels: squared, black border, checked = black fill / white text.
+   - Pagination buttons: squared, 2px border, 2px shadow, active = black fill.
+   - .btn-reservation: B&W neo-brutalist style, press animation.
+
+3. website/public/css/footer.css
+   - Footer background: solid #000 (was blue gradient).
+   - All text: #fff / #aaa (was various blues).
+   - Footer newsletter strip: white background, 3px border, 5px 5px 0 #000 shadow.
+   - Social links: white squares with black icons, hover inverts.
+   - Section headings: VT323 monospace, uppercase, letter-spaced.
+   - Wave decorations: filter: grayscale(1).
+
+4. website/public/css/contact.css
+   - Contact heading: VT323, uppercase, letter-spaced.
+   - .contact-wrap: 3px border + 8px 8px 0 #000 shadow.
+   - Contact info panel: black background, white/gray text.
+   - Form labels: Space Mono, uppercase.
+   - Error/success messages: neo-brutalist box style.
+
+5. website/app/views/component/user/header.php
+   - Added Google Fonts preconnect for Space Mono + VT323.
+   - Removed redundant Comfortaa / Open Sans imports (now in style.css).
+   - Removed navbar-dark class and style="opacity:95%" inline override.
+   - Removed text-white inline class from all .nav-link elements (CSS controls color).
+   - Login link: removed text-white class.
+
+6. website/app/views/component/admin/header.php
+   - Added Space Mono + VT323 Google Fonts link.
+
+7. website/app/views/connection/login.php
+   - Full visual overhaul: login card uses neo-brutalist box style (3px border,
+     8px 8px 0 #000 shadow).
+   - VT323 title "Login_" with blinking cursor feel.
+   - Form inputs: squared, thick border, hard shadow.
+   - Submit button: neo-brutalist press animation.
+   - Login illustration: filter: grayscale(1) + border + shadow.
+   - Removed all inline teal/rounded styles.
+
+DESIGN DECISIONS
+----------------
+- Pure B&W (no grays except #333/#555/#aaa for subtle depth). Zero color anywhere.
+- VT323 used for all headings/display text; Space Mono for body/labels/buttons.
+- All interactive elements have a neo-brutalist "press" animation: active state
+  translates by (3-4px) and removes the hard shadow, mimicking physical button press.
+- CRT scanline overlay uses body::before with a fixed repeating-linear-gradient.
+- Flicker animation on <body> at 8s interval for authentic Y2K CRT monitor feel.
+- Marquee animations used in both the CTA section (CSS pseudo-element) and the
+  .y2k-marquee-strip helper class for any JS-injected ticker strips.
+- All images across the site get filter: grayscale(1) via targeted CSS to stay in
+  pure B&W palette without modifying markup or PHP.
+
+BACKWARD COMPATIBILITY
+----------------------
+- All PHP routes, database queries, session logic, and URL structures are untouched.
+- Bootstrap grid classes are preserved; only visual/color properties overridden.
+- AOS scroll library retained; its animated elements now use B&W transitions.
+- Swiper slider retained; navigation bullets restyled to flat B&W rectangles.
+
+================================================================================
+END OF DOCUMENTATION ENTRY
+================================================================================
+
+================================================================================
+DATE: 2026-02-27 15:18:32
+TASK: Webapp Y2K Black & White + Neo-Brutalism Theme Redesign
+================================================================================
+
+OVERVIEW
+--------
+Complete visual overhaul of the Next.js webapp (running on localhost:8080) from
+a dark blue glassmorphism aesthetic to a Y2K-inspired black & white neo-brutalism
+design with heavy animations, boxy elements, and retro CRT aesthetics.
+
+FILES MODIFIED
+--------------
+webapp/src/app/globals.css
+  - Replaced all blue/dark-blue palette with pure black & white (#000, #fff, grays)
+  - Replaced glassmorphism utility classes with neo-brutalist equivalents using
+    thick solid borders & hard offset box-shadows (no blur)
+  - Added Y2K/CRT animations: crt-flicker, power-on, scanline sweep, stamp-in,
+    text-reveal, border-march, ticker, bounce-in, pixel-in, glitch-1/2
+  - Added .glitch class with ::before/::after pseudo-elements for glitch text
+  - Added .scanlines CRT overlay using repeating-linear-gradient
+  - Added .y2k-badge (boxy monospace label), .pixel-grid, .dot-grid backgrounds
+  - Rewrote .btn-gradient => white bg, black text, thick border, hard offset shadow
+  - All border radii set to 0px; CRT flicker applied to <body>
+
+webapp/src/app/layout.tsx
+  - Replaced Inter + JetBrains Mono with Space Grotesk + Space Mono (Google Fonts)
+  - Background: pure black; removed `dark` html class
+
+webapp/src/app/page.tsx
+  - Wrapper bg: black; CTA section: pixel-grid bg, brutal-card, glitch heading,
+    y2k-badge step numbers, mono font code snippets
+
+webapp/src/components/ui/Button.tsx
+  - Primary: white bg, black text, thick border, hard shadow, uppercase mono font
+  - Secondary: transparent, white border, hard shadow
+  - Neo-brutal press animation on whileTap (translate +1,+1 reduces shadow)
+
+webapp/src/components/ui/Card.tsx
+  - Black bg, 2px white border, 4px hard shadow; border-radius: 0
+  - Added white prop for inverted variant; whileHover lifts card
+
+webapp/src/components/marketing/Navbar.tsx
+  - White square logo with invert-on-hover; TESTBOT_MCP monospace branding
+  - Scrolled state: black bg + 2px white border-bottom
+
+webapp/src/components/marketing/Hero.tsx
+  - Particle canvas: white square pixels with white connection lines
+  - CRT grid overlay + scanline sweep animation
+  - Glitch heading, y2k-badge, $ terminal prompt, white cursor blink
+  - Floating stat badges: brutal-card-white (white bg, black border)
+
+webapp/src/components/marketing/Features.tsx
+  - Brutal cards, icon boxes invert on hover, y2k-badge tags
+
+webapp/src/components/marketing/StatsBanner.tsx
+  - #0a0a0a bg, 2px white borders, white mono numbers
+
+webapp/src/components/marketing/HowItWorks.tsx
+  - Brutal step cards with hover shadow; icon boxes invert on hover; y2k-badge tags
+
+webapp/src/components/marketing/Pricing.tsx
+  - Brutal pricing cards; popular badge with animate-stamp; square check marks
+
+webapp/src/components/marketing/Integrations.tsx
+  - Icon avatars: boxy letter squares with invert-on-hover; y2k-badge status
+
+webapp/src/components/marketing/DashboardPreview.tsx
+  - CRT-style browser window; boxy KPI cards; mono font; hard shadow mockup
+
+webapp/src/components/marketing/Footer.tsx
+  - White 2px border-top; uppercase mono links; logo inverts on hover
+
+webapp/src/components/dashboard/Sidebar.tsx
+  - Active state: white fill (not blue glow); active text: black
+  - Section separators with decorative lines; y2k-badge for plan tier
+
+webapp/src/components/dashboard/TopBar.tsx
+  - bg-black, 2px border-bottom; uppercase mono title; white square avatar
+
+DESIGN SYSTEM SUMMARY
+---------------------
+Colors:   bg #000000 | surface #111111 | border #333333/#ffffff | text #fff/#a0a0a0
+Fonts:    Space Grotesk (body) + Space Mono (labels/buttons/code)
+Borders:  2px solid, 0px radius
+Shadows:  4px 4px 0px hard (no blur) — neo-brutalist offset
+Hover:    translate(-1,-1) + shadow increase = lifted feel
+Active:   translate(+1,+1) + shadow decrease = pressed feel
+Animations: crt-flicker, scanline, glitch, stamp-in, pixel-in, float, border-march
+
+BACKWARD COMPATIBILITY
+----------------------
+All Supabase auth, API routes, DB logic, and navigation paths unchanged.
+Server running on localhost:8080.
+
+================================================================================
+END OF DOCUMENTATION ENTRY
+================================================================================

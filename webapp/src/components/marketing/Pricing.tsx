@@ -20,7 +20,6 @@ const TIERS = [
     ],
     cta: 'Get Started Free',
     ctaHref: '/home',
-    ctaStyle: 'border border-white/20 text-[#F0F6FF] hover:bg-white/5',
     popular: false,
   },
   {
@@ -39,7 +38,6 @@ const TIERS = [
     ],
     cta: 'Start Pro Trial',
     ctaHref: '/home',
-    ctaStyle: 'btn-gradient text-white',
     popular: true,
   },
   {
@@ -58,16 +56,13 @@ const TIERS = [
     ],
     cta: 'Contact Sales',
     ctaHref: 'mailto:hello@testbotmcp.com',
-    ctaStyle: 'border border-white/20 text-[#F0F6FF] hover:bg-white/5',
     popular: false,
   },
 ];
 
 export default function Pricing() {
   return (
-    <section className="py-24 relative" id="pricing">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-950/10 to-transparent" />
-
+    <section className="py-24 bg-black relative" id="pricing">
       <div className="relative max-w-6xl mx-auto px-6">
         {/* Header */}
         <motion.div
@@ -76,55 +71,61 @@ export default function Pricing() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <div className="inline-block px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-[#60A5FA] text-xs font-semibold uppercase tracking-wider mb-4">
-            Pricing
-          </div>
-          <h2 className="text-4xl lg:text-5xl font-black text-[#F0F6FF] leading-tight mb-4">
+          <div className="y2k-badge mb-4">Pricing</div>
+          <h2 className="text-4xl lg:text-5xl font-black text-white leading-tight mb-4 mt-4">
             Simple, transparent pricing.
           </h2>
-          <p className="text-[#8BA4C8] text-lg">Start free. Scale as your team grows.</p>
+          <p className="text-[#a0a0a0] text-base font-mono">Start free. Scale as your team grows.</p>
         </motion.div>
 
         {/* Pricing cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {TIERS.map((tier, i) => (
             <motion.div
               key={tier.name}
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className={`relative glass-card rounded-2xl p-8 flex flex-col transition-all duration-300 hover:shadow-[0_0_40px_rgba(59,130,246,0.2)] ${
+              transition={{ delay: i * 0.08 }}
+              whileHover={{ x: -2, y: -2, boxShadow: '6px 6px 0px #ffffff', borderColor: '#ffffff' }}
+              className={`relative bg-[#111] p-8 flex flex-col transition-all duration-75 ${
                 tier.popular
-                  ? 'border-blue-500/40 shadow-[0_0_40px_rgba(59,130,246,0.15)]'
-                  : 'hover:border-blue-500/30'
+                  ? 'border-2 border-white shadow-[4px_4px_0px_#ffffff]'
+                  : 'border-2 border-[#333] shadow-[4px_4px_0px_#333]'
               }`}
             >
               {/* Popular badge */}
               {tier.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold shadow-[0_0_20px_rgba(59,130,246,0.5)]">
-                  Most Popular
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                  <span className="y2k-badge bg-white text-black border-black animate-stamp">★ Most Popular</span>
                 </div>
               )}
 
-              {/* Gradient top border for popular */}
-              {tier.popular && (
-                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent rounded-t-2xl" />
-              )}
+              {/* Top accent */}
+              {tier.popular && <div className="absolute top-0 left-0 right-0 h-0.5 bg-white" />}
 
               <div className="mb-6">
-                <div className="text-[#8BA4C8] text-sm font-semibold uppercase tracking-wider mb-3">{tier.name}</div>
+                <div className="text-[#a0a0a0] text-xs font-black uppercase tracking-widest font-mono mb-3">{tier.name}</div>
                 <div className="flex items-end gap-1 mb-1">
-                  <span className="text-4xl font-black text-[#F0F6FF]">{tier.price}</span>
-                  {tier.period && <span className="text-[#8BA4C8] text-sm mb-1">{tier.period}</span>}
+                  <span className="text-4xl font-black text-white font-mono">{tier.price}</span>
+                  {tier.period && <span className="text-[#a0a0a0] text-sm mb-1 font-mono">{tier.period}</span>}
                 </div>
-                <p className="text-[#4A6280] text-sm">{tier.tagline}</p>
+                <p className="text-[#505050] text-xs font-mono">{tier.tagline}</p>
               </div>
 
               <ul className="flex flex-col gap-3 mb-8 flex-1">
                 {tier.features.map((feat) => (
-                  <li key={feat.text} className={`flex items-center gap-2.5 text-sm ${feat.included ? 'text-[#8BA4C8]' : 'text-[#4A6280] line-through'}`}>
-                    <span className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-xs ${feat.included ? 'bg-emerald-400/20 text-emerald-400' : 'bg-red-400/10 text-red-400/50'}`}>
+                  <li
+                    key={feat.text}
+                    className={`flex items-center gap-2.5 text-xs font-mono ${feat.included ? 'text-[#a0a0a0]' : 'text-[#333] line-through'}`}
+                  >
+                    <span
+                      className={`flex-shrink-0 w-4 h-4 border flex items-center justify-center text-xs font-black ${
+                        feat.included
+                          ? 'border-white text-white'
+                          : 'border-[#333] text-[#333]'
+                      }`}
+                    >
                       {feat.included ? '✓' : '✗'}
                     </span>
                     {feat.text}
@@ -134,7 +135,11 @@ export default function Pricing() {
 
               <Link
                 href={tier.ctaHref}
-                className={`w-full py-3 rounded-xl text-sm font-semibold text-center transition-all duration-200 ${tier.ctaStyle}`}
+                className={`w-full py-3 text-xs font-black text-center uppercase tracking-widest font-mono transition-all ${
+                  tier.popular
+                    ? 'bg-white text-black border-2 border-black hover:bg-black hover:text-white hover:border-white'
+                    : 'bg-transparent text-white border-2 border-white hover:bg-white hover:text-black'
+                }`}
               >
                 {tier.cta}
               </Link>

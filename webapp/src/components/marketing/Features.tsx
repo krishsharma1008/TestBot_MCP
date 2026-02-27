@@ -6,25 +6,25 @@ const FEATURES = [
   {
     large: true,
     icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="3" /><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14M15.54 8.46a5 5 0 010 7.07M8.46 8.46a5 5 0 000 7.07" />
       </svg>
     ),
     title: 'MCP Native Integration',
     desc: 'Runs as a Model Context Protocol server. Say "test my app" in Cursor or Windsurf and the entire pipeline kicks off — detect, generate, run, analyze, report.',
     extra: (
-      <div className="mt-4 rounded-xl bg-black/40 border border-white/5 p-4 font-mono text-sm">
-        <div className="text-[#4A6280]">// In your IDE chat</div>
-        <div className="text-emerald-400">&quot;Test my app using testbot mcp&quot;</div>
-        <div className="text-[#8BA4C8] mt-1">→ Auto-detects config...</div>
-        <div className="text-[#8BA4C8]">→ Generating 12 tests...</div>
-        <div className="text-emerald-400">→ ✓ 11 passed, 1 analyzed</div>
+      <div className="mt-4 bg-black border-2 border-[#333] p-4 font-mono text-xs">
+        <div className="text-[#505050]">// In your IDE chat</div>
+        <div className="text-white mt-1">&quot;Test my app using testbot mcp&quot;</div>
+        <div className="text-[#a0a0a0] mt-2">&gt; Auto-detects config...</div>
+        <div className="text-[#a0a0a0]">&gt; Generating 12 tests...</div>
+        <div className="text-white font-bold">&gt; + 11 passed, 1 analyzed</div>
       </div>
     ),
   },
   {
     icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
       </svg>
     ),
@@ -33,7 +33,7 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v3" />
         <path d="M15 13v-2a3 3 0 00-6 0v2" />
       </svg>
@@ -43,7 +43,7 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
       </svg>
     ),
@@ -52,8 +52,8 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" />
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="3" width="18" height="18" rx="0" /><path d="M3 9h18M9 21V9" />
       </svg>
     ),
     title: 'Interactive Dashboard',
@@ -61,35 +61,35 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
       </svg>
     ),
     title: 'Jira Integration',
-    desc: 'Connect your Jira project and TestBot automatically fetches user stories, generating tests directly from acceptance criteria — no manual translation needed.',
+    desc: 'Connect your Jira project and TestBot automatically fetches user stories, generating tests directly from acceptance criteria.',
   },
   {
     icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M15 10l-4 4l6 6l4-16l-18 7l4 2l2 6l2-4" />
       </svg>
     ),
     title: 'Multi-Browser Testing',
-    desc: 'Run tests across Chrome, Firefox, and Safari in parallel. Capture screenshots on failure, record videos, and generate Playwright trace files for debugging.',
+    desc: 'Run tests across Chrome, Firefox, and Safari in parallel. Capture screenshots on failure, record videos, and generate Playwright trace files.',
   },
   {
     large: true,
     icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     ),
     title: 'Multiple AI Providers',
-    desc: 'Plug in your preferred AI backend for failure analysis. TestBot supports Sarvam AI (multilingual), OpenAI GPT-4, Cascade, and Windsurf — switchable with a single env variable.',
+    desc: 'Plug in your preferred AI backend. TestBot supports Sarvam AI, OpenAI GPT-4, Cascade, and Windsurf — switchable with a single env variable.',
     extra: (
       <div className="mt-4 flex flex-wrap gap-2">
         {['Sarvam AI', 'OpenAI', 'Cascade', 'Windsurf'].map(p => (
-          <span key={p} className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[#60A5FA] text-xs font-semibold">{p}</span>
+          <span key={p} className="y2k-badge">{p}</span>
         ))}
       </div>
     ),
@@ -98,7 +98,7 @@ const FEATURES = [
 
 export default function Features() {
   return (
-    <section className="py-24 relative" id="features">
+    <section className="py-24 bg-black relative" id="features">
       <div className="max-w-6xl mx-auto px-6">
         {/* Header */}
         <motion.div
@@ -107,14 +107,12 @@ export default function Features() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <div className="inline-block px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-[#60A5FA] text-xs font-semibold uppercase tracking-wider mb-4">
-            Features
-          </div>
-          <h2 className="text-4xl lg:text-5xl font-black text-[#F0F6FF] leading-tight mb-4">
+          <div className="y2k-badge mb-4">Features</div>
+          <h2 className="text-4xl lg:text-5xl font-black text-white leading-tight mb-4 mt-4">
             Everything you need.<br />
-            <span className="gradient-text">Nothing you don&apos;t.</span>
+            <span className="text-[#a0a0a0]">Nothing you don&apos;t.</span>
           </h2>
-          <p className="text-[#8BA4C8] text-lg max-w-xl mx-auto">
+          <p className="text-[#a0a0a0] text-base max-w-xl mx-auto font-mono">
             TestBot MCP is purpose-built for AI-native development teams who want testing to just work.
           </p>
         </motion.div>
@@ -124,23 +122,22 @@ export default function Features() {
           {FEATURES.map((feat, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
-              transition={{ delay: (i % 3) * 0.1, duration: 0.5 }}
-              className={`relative glass-card rounded-2xl p-6 group hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] transition-all duration-300 cursor-default overflow-hidden ${feat.large ? 'md:col-span-2 lg:col-span-1' : ''}`}
+              transition={{ delay: (i % 3) * 0.08, duration: 0.4 }}
+              whileHover={{ x: -2, y: -2, boxShadow: '6px 6px 0px #ffffff', borderColor: '#ffffff' }}
+              className={`relative bg-[#111] border-2 border-[#333] shadow-[4px_4px_0px_#333] p-6 group cursor-default overflow-hidden transition-all duration-75 ${feat.large ? 'md:col-span-2 lg:col-span-1' : ''}`}
             >
-              {/* Hover glow bg */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{ background: 'radial-gradient(circle at 50% 0%, rgba(59,130,246,0.08) 0%, transparent 70%)' }}
-              />
+              {/* Top accent line on hover */}
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-white scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left" />
 
               <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-500/20 flex items-center justify-center text-[#60A5FA] mb-4 group-hover:border-blue-500/40 transition-colors">
+                <div className="w-10 h-10 border-2 border-white bg-black flex items-center justify-center text-white mb-4 group-hover:bg-white group-hover:text-black transition-colors duration-150">
                   {feat.icon}
                 </div>
-                <h3 className="text-[#F0F6FF] font-bold text-lg mb-2">{feat.title}</h3>
-                <p className="text-[#8BA4C8] text-sm leading-relaxed">{feat.desc}</p>
+                <h3 className="text-white font-black text-base mb-2 uppercase tracking-wide">{feat.title}</h3>
+                <p className="text-[#a0a0a0] text-sm leading-relaxed font-mono">{feat.desc}</p>
                 {feat.extra}
               </div>
             </motion.div>

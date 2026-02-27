@@ -13,23 +13,25 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-sm',
+  sm: 'px-3 py-1.5 text-xs',
   md: 'px-5 py-2.5 text-sm',
   lg: 'px-7 py-3.5 text-base',
 }
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    'text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed ' +
-    'bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500 bg-[length:200%_200%] ' +
-    'animate-gradient shadow-lg',
+    'text-black font-bold bg-white border-2 border-black ' +
+    'shadow-[3px_3px_0px_#555] hover:shadow-[5px_5px_0px_#555] ' +
+    'uppercase tracking-widest font-mono ' +
+    'transition-all duration-75 disabled:opacity-50 disabled:cursor-not-allowed',
   secondary:
-    'text-text-primary font-medium rounded-xl border border-white/10 ' +
-    'bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 ' +
-    'transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
+    'text-white font-bold bg-transparent border-2 border-white ' +
+    'shadow-[3px_3px_0px_#555] hover:shadow-[5px_5px_0px_#fff] ' +
+    'uppercase tracking-widest font-mono ' +
+    'transition-all duration-75 disabled:opacity-50 disabled:cursor-not-allowed',
   ghost:
-    'text-text-secondary font-medium rounded-xl hover:text-text-primary ' +
-    'hover:bg-white/5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
+    'text-[#a0a0a0] font-medium border border-transparent hover:text-white hover:border-white/30 ' +
+    'transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -37,9 +39,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <motion.button
         ref={ref}
-        whileTap={{ scale: 0.97 }}
-        whileHover={variant === 'primary' ? { y: -1, boxShadow: '0 0 32px rgba(59,130,246,0.5)' } : {}}
-        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+        whileTap={{ scale: 0.97, x: 2, y: 2 }}
+        whileHover={variant !== 'ghost' ? { x: -1, y: -1 } : {}}
+        transition={{ type: 'spring', stiffness: 600, damping: 20 }}
         disabled={disabled || loading}
         className={`inline-flex items-center justify-center gap-2 cursor-pointer ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
         {...(props as any)}
