@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createClient } from '@/lib/supabase/client';
 import type { TestRun } from '@/lib/types/database';
 
 // ─── Types for the report_json shape ────────────────────────────────────────
@@ -196,17 +195,12 @@ export default function TestRunDetailPage() {
     async function fetchRun() {
       setLoading(true);
       try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from('test_runs')
-          .select('*')
-          .eq('id', id)
-          .single();
-
-        if (error || !data) {
+        const res = await fetch(`/api/test-runs/${id}`);
+        if (!res.ok) {
           setNotFound(true);
         } else {
-          setTestRun(data as TestRun);
+          const json = await res.json();
+          setTestRun(json.data as TestRun);
         }
       } catch {
         setNotFound(true);

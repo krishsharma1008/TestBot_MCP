@@ -4,8 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createClient } from '@/lib/supabase/client';
-
 const PAGE_TITLES: Record<string, string> = {
   '/home': 'Home',
   '/mcp-tests': 'MCP Tests',
@@ -130,8 +128,7 @@ export default function TopBar({ userEmail = 'user@example.com', userInitials = 
                     className="flex items-center gap-3 px-3 py-2 text-[#a0a0a0] hover:text-white hover:bg-[#1a1a1a] text-xs font-mono uppercase tracking-wider w-full text-left transition-colors"
                     onClick={async () => {
                       setDropdownOpen(false);
-                      const supabase = createClient();
-                      await supabase.auth.signOut();
+                      await fetch('/api/auth/logout', { method: 'POST' });
                       window.location.href = '/login';
                     }}
                   >

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { db } from '@/lib/db'
+import { apiKeys, testRuns, profiles } from '@/lib/db/schema'
+import { eq, and } from 'drizzle-orm'
 import { hashApiKey } from '@/lib/utils/api-keys'
 
 export async function POST(request: NextRequest) {
@@ -7,7 +9,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { api_key, creation_name, report } = body
 
-    // Validate required fields
     if (!api_key || !report) {
       return NextResponse.json(
         { error: 'Missing required fields: api_key and report are required' },
@@ -15,26 +16,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createAdminClient()
-
-    // Hash the API key and look it up in the api_keys table
     const keyHash = hashApiKey(api_key)
 
-    const { data: apiKeyRecord, error: apiKeyError } = await supabase
-      .from('api_keys')
-      .select('id, user_id, is_active')
-      .eq('key_hash', keyHash)
-      .eq('is_active', true)
-      .single()
+    // Look up API key
+    const [apiKeyRecord] = await db
+      .select({ id: apiKeys.id, userId: apiKeys.userId, isActive: apiKeys.isActive })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.keyHash, keyHash), eq(apiKeys.isActive, true)))
+      .limit(1)
 
-    if (apiKeyError || !apiKeyRecord) {
-      return NextResponse.json(
-        { error: 'Invalid or inactive API key' },
-        { status: 401 }
-      )
+    if (!apiKeyRecord) {
+      return NextResponse.json({ error: 'Invalid or inactive API key' }, { status: 401 })
     }
 
-    const userId = apiKeyRecord.user_id
+    const userId = apiKeyRecord.userId
 
     // Extract stats from the report
     const stats = report.stats || {}
@@ -43,7 +38,6 @@ export async function POST(request: NextRequest) {
     const failed_tests = stats.failed || 0
     const skipped_tests = stats.skipped || 0
     const duration_ms = stats.duration || 0
-    const pass_rate = total_tests > 0 ? Math.round((passed_tests / total_tests) * 100) : 0
 
     // Determine status
     let status: string
@@ -55,84 +49,65 @@ export async function POST(request: NextRequest) {
       status = 'error'
     }
 
-    // Calculate backend and frontend pass rates from tests array
+    // Calculate backend and frontend pass rates
     const tests: Array<{ suite?: string; status?: string }> = report.tests || []
-
     const backendKeywords = ['api', 'backend', 'server']
     const isBackendTest = (test: { suite?: string }) =>
-      backendKeywords.some(kw =>
-        (test.suite || '').toLowerCase().includes(kw)
-      )
+      backendKeywords.some(kw => (test.suite || '').toLowerCase().includes(kw))
 
     const backendTests = tests.filter(isBackendTest)
     const frontendTests = tests.filter(t => !isBackendTest(t))
-
     const backendPassed = backendTests.filter(t => t.status === 'passed').length
     const frontendPassed = frontendTests.filter(t => t.status === 'passed').length
 
-    const backend_pass_rate =
-      backendTests.length > 0
-        ? Math.round((backendPassed / backendTests.length) * 100)
-        : null
+    const backend_pass_rate = backendTests.length > 0
+      ? Math.round((backendPassed / backendTests.length) * 100).toString()
+      : null
+    const frontend_pass_rate = frontendTests.length > 0
+      ? Math.round((frontendPassed / frontendTests.length) * 100).toString()
+      : null
 
-    const frontend_pass_rate =
-      frontendTests.length > 0
-        ? Math.round((frontendPassed / frontendTests.length) * 100)
-        : null
+    const projectName = creation_name || report.metadata?.projectName || 'Untitled Test Run'
 
-    // Insert into test_runs table
-    const projectName =
-      creation_name ||
-      report.metadata?.projectName ||
-      'Untitled Test Run'
-
-    const { data: testRun, error: insertError } = await supabase
-      .from('test_runs')
-      .insert({
-        user_id: userId,
-        creation_name: projectName,
+    // Insert test run
+    const [testRun] = await db
+      .insert(testRuns)
+      .values({
+        userId,
+        creationName: projectName,
         status,
-        total_tests,
-        passed_tests,
-        failed_tests,
-        skipped_tests,
-        duration_ms,
-        backend_pass_rate,
-        frontend_pass_rate,
-        report_json: report,
-        ai_analysis: report.aiSummary ?? null,
+        totalTests: total_tests,
+        passedTests: passed_tests,
+        failedTests: failed_tests,
+        skippedTests: skipped_tests,
+        durationMs: duration_ms,
+        backendPassRate: backend_pass_rate,
+        frontendPassRate: frontend_pass_rate,
+        reportJson: report,
+        aiAnalysis: report.aiSummary ?? null,
         source: 'mcp',
       })
-      .select('id')
-      .single()
-
-    if (insertError) {
-      console.error('[Ingest] Failed to insert test run:', insertError)
-      return NextResponse.json(
-        { error: 'Failed to save test run', details: insertError.message },
-        { status: 500 }
-      )
-    }
+      .returning({ id: testRuns.id })
 
     // Update last_used_at on the API key
-    await supabase
-      .from('api_keys')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('id', apiKeyRecord.id)
+    await db
+      .update(apiKeys)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(apiKeys.id, apiKeyRecord.id))
 
-    // Deduct 1 credit from the user's credits_remaining in profiles
+    // Deduct 1 credit
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('credits_remaining')
-        .eq('id', userId)
-        .single()
+      const [profile] = await db
+        .select({ creditsRemaining: profiles.creditsRemaining })
+        .from(profiles)
+        .where(eq(profiles.id, userId))
+        .limit(1)
 
-      if (profile && typeof profile.credits_remaining === 'number') {
-        await supabase
-          .from('profiles')
-          .update({ credits_remaining: Math.max(0, profile.credits_remaining - 1) })
-          .eq('id', userId)
+      if (profile && typeof profile.creditsRemaining === 'number') {
+        await db
+          .update(profiles)
+          .set({ creditsRemaining: Math.max(0, profile.creditsRemaining - 1) })
+          .where(eq(profiles.id, userId))
       }
     } catch (creditError) {
       console.warn('[Ingest] Failed to deduct credit:', creditError)
@@ -145,9 +120,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[Ingest] Unexpected error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

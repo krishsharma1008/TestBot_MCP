@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 
@@ -18,18 +17,8 @@ export default function ForgotPasswordPage() {
     setError(null)
     setLoading(true)
 
-    const supabase = createClient()
-    const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/update-password`,
-    })
-
-    if (authError) {
-      setError(authError.message)
-      setLoading(false)
-      return
-    }
-
-    setSuccess(true)
+    // Password reset is not available in local auth mode
+    setError('Password reset is not available in local mode. Please contact your administrator.')
     setLoading(false)
   }
 

@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 
@@ -33,23 +32,27 @@ export default function SignupPage() {
     }
 
     setLoading(true)
-    const supabase = createClient()
-    const { error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-      },
-    })
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, full_name: fullName }),
+      })
 
-    if (authError) {
-      setError(authError.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to create account')
+        setLoading(false)
+        return
+      }
+
+      setSuccess(true)
       setLoading(false)
-      return
+    } catch {
+      setError('An unexpected error occurred')
+      setLoading(false)
     }
-
-    setSuccess(true)
-    setLoading(false)
   }
 
   return (
@@ -93,10 +96,9 @@ export default function SignupPage() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-text-primary">Check your email</h3>
+                <h3 className="text-lg font-semibold text-text-primary">Account created successfully!</h3>
                 <p className="text-text-muted text-sm mt-1">
-                  We sent a confirmation link to <span className="text-blue-400">{email}</span>.
-                  Click it to activate your account.
+                  Your account has been created. You can now sign in.
                 </p>
               </div>
               <Link href="/login" className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors">

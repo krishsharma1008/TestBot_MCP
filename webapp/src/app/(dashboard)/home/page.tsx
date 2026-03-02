@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { createClient } from '@/lib/supabase/client';
 import type { TestRun, TestList, Profile } from '@/lib/types/database';
 
 // Sample data used as fallback / demo when no real data exists
@@ -144,26 +143,23 @@ export default function HomePage() {
     async function fetchData() {
       setLoading(true);
       try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const [runsRes, listsRes, profileRes] = await Promise.all([
+          fetch('/api/test-runs?limit=5&sort_by=created_at&order=desc'),
+          fetch('/api/test-lists'),
+          fetch('/api/profile'),
+        ]);
 
-        if (!user) {
+        const runsJson = await runsRes.json();
+        const listsJson = await listsRes.json();
+        const profileJson = await profileRes.json();
+
+        if (!profileRes.ok) {
           setIsDemo(true);
           setRecentTests(DEMO_TESTS);
           setTestLists(DEMO_LISTS);
           setLoading(false);
           return;
         }
-
-        // Fetch in parallel
-        const [runsRes, listsRes, profileRes] = await Promise.all([
-          fetch('/api/test-runs?limit=5&sort_by=created_at&order=desc'),
-          fetch('/api/test-lists'),
-          supabase.from('profiles').select('*').eq('id', user.id).single(),
-        ]);
-
-        const runsJson = await runsRes.json();
-        const listsJson = await listsRes.json();
 
         const runs: TestRun[] = runsJson.data ?? [];
         const lists: TestList[] = listsJson.data ?? [];
@@ -177,7 +173,7 @@ export default function HomePage() {
         }
 
         setTestLists(lists.length > 0 ? lists.slice(0, 5) : DEMO_LISTS);
-        setProfile(profileRes.data ?? null);
+        setProfile(profileJson.data ?? null);
       } catch (err) {
         console.error('Failed to fetch home data:', err);
         setIsDemo(true);

@@ -1,36 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/auth/session'
+import { db } from '@/lib/db'
+import { apiKeys } from '@/lib/db/schema'
+import { eq, and, desc } from 'drizzle-orm'
 import { generateApiKey } from '@/lib/utils/api-keys'
 
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const data = await db
+      .select({
+        id: apiKeys.id,
+        name: apiKeys.name,
+        key_prefix: apiKeys.keyPrefix,
+        last_used_at: apiKeys.lastUsedAt,
+        expires_at: apiKeys.expiresAt,
+        is_active: apiKeys.isActive,
+        created_at: apiKeys.createdAt,
+      })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.userId, user.id), eq(apiKeys.isActive, true)))
+      .orderBy(desc(apiKeys.createdAt))
+
+    return NextResponse.json({ data })
+  } catch (error) {
+    console.error('[API Keys] GET error:', error)
+    return NextResponse.json({ error: 'Failed to fetch API keys' }, { status: 500 })
   }
-
-  const { data, error } = await supabase
-    .from('api_keys')
-    .select('id, name, key_prefix, last_used_at, expires_at, is_active, created_at')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ data })
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const user = await getCurrentUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
   const { name, expires_at } = body as { name: string; expires_at?: string }
@@ -41,23 +44,27 @@ export async function POST(request: NextRequest) {
 
   const { key, prefix, hash } = generateApiKey()
 
-  const { data, error } = await supabase
-    .from('api_keys')
-    .insert({
-      user_id: user.id,
-      name: name.trim(),
-      key_prefix: prefix,
-      key_hash: hash,
-      is_active: true,
-      expires_at: expires_at ?? null,
-    })
-    .select('id, name, key_prefix, created_at')
-    .single()
+  try {
+    const [data] = await db
+      .insert(apiKeys)
+      .values({
+        userId: user.id,
+        name: name.trim(),
+        keyPrefix: prefix,
+        keyHash: hash,
+        isActive: true,
+        expiresAt: expires_at ? new Date(expires_at) : null,
+      })
+      .returning({
+        id: apiKeys.id,
+        name: apiKeys.name,
+        key_prefix: apiKeys.keyPrefix,
+        created_at: apiKeys.createdAt,
+      })
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ data: { ...data, key } }, { status: 201 })
+  } catch (error) {
+    console.error('[API Keys] POST error:', error)
+    return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 })
   }
-
-  // Return full key only once
-  return NextResponse.json({ data: { ...data, key } }, { status: 201 })
 }

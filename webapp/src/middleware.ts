@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
+import { jwtVerify } from 'jose'
 
 const PROTECTED_ROUTES = [
   '/home',
@@ -15,9 +15,23 @@ const PROTECTED_ROUTES = [
 
 const AUTH_ROUTES = ['/login', '/signup', '/forgot-password']
 
+async function getSessionUser(request: NextRequest): Promise<{ userId: string } | null> {
+  const token = request.cookies.get('testbot-session')?.value
+  if (!token) return null
+
+  try {
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
+    const { payload } = await jwtVerify(token, secret)
+    if (!payload.sub) return null
+    return { userId: payload.sub }
+  } catch {
+    return null
+  }
+}
+
 export async function middleware(request: NextRequest) {
-  const { supabaseResponse, user } = await updateSession(request)
   const { pathname } = request.nextUrl
+  const session = await getSessionUser(request)
 
   const isProtected = PROTECTED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(route + '/')
@@ -26,23 +40,21 @@ export async function middleware(request: NextRequest) {
     (route) => pathname === route || pathname.startsWith(route + '/')
   )
 
-  // Redirect unauthenticated users away from protected routes
-  if (isProtected && !user) {
+  if (isProtected && !session) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'
     loginUrl.searchParams.set('redirectedFrom', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // Redirect authenticated users away from auth routes
-  if (isAuthRoute && user) {
+  if (isAuthRoute && session) {
     const homeUrl = request.nextUrl.clone()
     homeUrl.pathname = '/home'
     homeUrl.search = ''
     return NextResponse.redirect(homeUrl)
   }
 
-  return supabaseResponse
+  return NextResponse.next()
 }
 
 export const config = {

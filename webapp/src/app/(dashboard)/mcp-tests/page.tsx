@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createClient } from '@/lib/supabase/client';
 import McpSetupModal from '@/components/dashboard/McpSetupModal';
 import type { TestRun } from '@/lib/types/database';
 
@@ -43,16 +42,12 @@ export default function McpTestsPage() {
     async function fetchTests() {
       setLoading(true);
       try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from('test_runs')
-          .select('*')
-          .eq('source', 'mcp')
-          .order('created_at', { ascending: false })
-          .limit(100);
-
-        if (!error && data) {
-          setTests(data as TestRun[]);
+        const res = await fetch('/api/test-runs?limit=100&sort_by=created_at&order=desc');
+        if (res.ok) {
+          const json = await res.json();
+          const allRuns: TestRun[] = json.data ?? [];
+          // Filter to MCP source only
+          setTests(allRuns.filter(t => t.source === 'mcp'));
         }
       } catch {
         // silently fail

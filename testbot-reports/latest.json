@@ -1,0 +1,661 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-30T06:05:12.404Z",
+    "projectName": "sample-express-app",
+    "projectPath": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project",
+    "version": "1.0.0",
+    "generator": "testbot-mcp"
+  },
+  "stats": {
+    "total": 28,
+    "passed": 28,
+    "failed": 0,
+    "skipped": 0,
+    "duration": 2057,
+    "passRate": 100
+  },
+  "tests": [
+    {
+      "id": "8747e39b871de0524be5-1393f7a824eb53db5b32",
+      "title": "should list all users",
+      "suite": "api.spec.js › API Endpoints",
+      "file": "api.spec.js",
+      "status": "passed",
+      "duration": 24,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/api-API-Endpoints-should-list-all-users-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8747e39b871de0524be5-cf17c719642126f9cec2",
+      "title": "should get user by ID",
+      "suite": "api.spec.js › API Endpoints",
+      "file": "api.spec.js",
+      "status": "passed",
+      "duration": 8,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/api-API-Endpoints-should-get-user-by-ID-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8747e39b871de0524be5-7394c07ad966a254c9d1",
+      "title": "should return 404 for non-existent user",
+      "suite": "api.spec.js › API Endpoints",
+      "file": "api.spec.js",
+      "status": "passed",
+      "duration": 7,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/api-API-Endpoints-should-return-404-for-non-existent-user-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8747e39b871de0524be5-12f413d59ffb7220e0c5",
+      "title": "should create a new user",
+      "suite": "api.spec.js › API Endpoints",
+      "file": "api.spec.js",
+      "status": "passed",
+      "duration": 12,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/api-API-Endpoints-should-create-a-new-user-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "1159ee066292195065a3-32ebdf42b912d5d7d09e",
+      "title": "should respond with success status",
+      "suite": "generated/api_delete_api_users_id.spec.js › API: DELETE /api/users/:id",
+      "file": "generated/api_delete_api_users_id.spec.js",
+      "status": "passed",
+      "duration": 6,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_delete_api_u-f7e0c-respond-with-success-status-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "1159ee066292195065a3-f7b9b308c7eba6785dd3",
+      "title": "should return valid response format",
+      "suite": "generated/api_delete_api_users_id.spec.js › API: DELETE /api/users/:id",
+      "file": "generated/api_delete_api_users_id.spec.js",
+      "status": "passed",
+      "duration": 4,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_delete_api_u-8ba42-eturn-valid-response-format-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "42c38a714886804e684e-184c109d7b7d2acb307f",
+      "title": "should respond with success status",
+      "suite": "generated/api_get_.spec.js › API: GET /",
+      "file": "generated/api_get_.spec.js",
+      "status": "passed",
+      "duration": 5,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_-API-GET-ddea5-respond-with-success-status-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "42c38a714886804e684e-dedf8ede555cf5273b82",
+      "title": "should return valid response format",
+      "suite": "generated/api_get_.spec.js › API: GET /",
+      "file": "generated/api_get_.spec.js",
+      "status": "passed",
+      "duration": 5,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_-API-GET-ee17f-eturn-valid-response-format-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "e024f4ce2769a37dbb72-069b54f59960b38a8036",
+      "title": "should respond with success status",
+      "suite": "generated/api_get_about.spec.js › API: GET /about",
+      "file": "generated/api_get_about.spec.js",
+      "status": "passed",
+      "duration": 5,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_about-AP-f67b7-respond-with-success-status-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "e024f4ce2769a37dbb72-2e0d4a76d47b62a2c6f0",
+      "title": "should return valid response format",
+      "suite": "generated/api_get_about.spec.js › API: GET /about",
+      "file": "generated/api_get_about.spec.js",
+      "status": "passed",
+      "duration": 7,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_about-AP-d4d80-eturn-valid-response-format-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "639293edb43b06a382e1-3b1e2a270d31dbd62c0f",
+      "title": "should respond with success status",
+      "suite": "generated/api_get_api_users_id.spec.js › API: GET /api/users/:id",
+      "file": "generated/api_get_api_users_id.spec.js",
+      "status": "passed",
+      "duration": 4,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_api_user-2d84d-respond-with-success-status-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "639293edb43b06a382e1-3943f4418998ce4b063c",
+      "title": "should return valid response format",
+      "suite": "generated/api_get_api_users_id.spec.js › API: GET /api/users/:id",
+      "file": "generated/api_get_api_users_id.spec.js",
+      "status": "passed",
+      "duration": 4,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_api_user-54035-eturn-valid-response-format-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "882c4c4e5f7fe42b9f1e-e261ef006551906f8628",
+      "title": "should respond with success status",
+      "suite": "generated/api_get_api_users.spec.js › API: GET /api/users",
+      "file": "generated/api_get_api_users.spec.js",
+      "status": "passed",
+      "duration": 4,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_api_user-12883-respond-with-success-status-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "882c4c4e5f7fe42b9f1e-89db21da689aaf0dd774",
+      "title": "should return valid response format",
+      "suite": "generated/api_get_api_users.spec.js › API: GET /api/users",
+      "file": "generated/api_get_api_users.spec.js",
+      "status": "passed",
+      "duration": 3,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_api_user-2f7de-eturn-valid-response-format-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "3b20e9f59b7313478cc8-8add14b73b14197cd80e",
+      "title": "should respond with success status",
+      "suite": "generated/api_get_contact.spec.js › API: GET /contact",
+      "file": "generated/api_get_contact.spec.js",
+      "status": "passed",
+      "duration": 4,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_contact--9a31d-respond-with-success-status-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "3b20e9f59b7313478cc8-2b21aabc25d29ecab017",
+      "title": "should return valid response format",
+      "suite": "generated/api_get_contact.spec.js › API: GET /contact",
+      "file": "generated/api_get_contact.spec.js",
+      "status": "passed",
+      "duration": 3,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_contact--8ba76-eturn-valid-response-format-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "32157fea96e8f376480d-30d03793336004364408",
+      "title": "should respond with success status",
+      "suite": "generated/api_get_users.spec.js › API: GET /users",
+      "file": "generated/api_get_users.spec.js",
+      "status": "passed",
+      "duration": 4,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_users-AP-21733-respond-with-success-status-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "32157fea96e8f376480d-d669d0cd46b20436672b",
+      "title": "should return valid response format",
+      "suite": "generated/api_get_users.spec.js › API: GET /users",
+      "file": "generated/api_get_users.spec.js",
+      "status": "passed",
+      "duration": 3,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_get_users-AP-e6035-eturn-valid-response-format-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "2c19ef8d502606057e6d-03a0493ab78acdb43182",
+      "title": "should respond with success status",
+      "suite": "generated/api_post_api_users.spec.js › API: POST /api/users",
+      "file": "generated/api_post_api_users.spec.js",
+      "status": "passed",
+      "duration": 3,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_post_api_use-be418-respond-with-success-status-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "2c19ef8d502606057e6d-879f4e845135b0037996",
+      "title": "should return valid response format",
+      "suite": "generated/api_post_api_users.spec.js › API: POST /api/users",
+      "file": "generated/api_post_api_users.spec.js",
+      "status": "passed",
+      "duration": 4,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [],
+        "videos": [],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-api_post_api_use-0d922-eturn-valid-response-format-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "95e8461175320f1bb81b-810cacabf583dce202f4",
+      "title": "should load page successfully",
+      "suite": "generated/page_home.spec.js › Home page",
+      "file": "generated/page_home.spec.js",
+      "status": "passed",
+      "duration": 304,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-page_home-Home-page-should-load-page-successfully-frontend/test-finished-1.png",
+            "name": "screenshot"
+          }
+        ],
+        "videos": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-page_home-Home-page-should-load-page-successfully-frontend/video.webm",
+            "name": "video"
+          }
+        ],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-page_home-Home-page-should-load-page-successfully-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5265c0232f2c537d3ba1-cbec42feecc2daec51b1",
+      "title": "should complete dashboard navigation successfully",
+      "suite": "generated/workflow_dashboard_navigation.spec.js › Workflow: Dashboard Navigation",
+      "file": "generated/workflow_dashboard_navigation.spec.js",
+      "status": "passed",
+      "duration": 449,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-257ae-ard-navigation-successfully-frontend/test-finished-1.png",
+            "name": "screenshot"
+          }
+        ],
+        "videos": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-257ae-ard-navigation-successfully-frontend/video.webm",
+            "name": "video"
+          }
+        ],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-257ae-ard-navigation-successfully-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5265c0232f2c537d3ba1-296af6237be5ed2b3115",
+      "title": "should handle errors gracefully",
+      "suite": "generated/workflow_dashboard_navigation.spec.js › Workflow: Dashboard Navigation",
+      "file": "generated/workflow_dashboard_navigation.spec.js",
+      "status": "passed",
+      "duration": 176,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-9fc81-ld-handle-errors-gracefully-frontend/test-finished-1.png",
+            "name": "screenshot"
+          }
+        ],
+        "videos": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-9fc81-ld-handle-errors-gracefully-frontend/video.webm",
+            "name": "video"
+          }
+        ],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/generated-workflow_dashboa-9fc81-ld-handle-errors-gracefully-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "379953442ddfc3019abd-0a5fda551db69e98527f",
+      "title": "should load the home page successfully",
+      "suite": "home.spec.js › Home Page",
+      "file": "home.spec.js",
+      "status": "passed",
+      "duration": 142,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-load-the-home-page-successfully-frontend/test-finished-1.png",
+            "name": "screenshot"
+          }
+        ],
+        "videos": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-load-the-home-page-successfully-frontend/video.webm",
+            "name": "video"
+          }
+        ],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-load-the-home-page-successfully-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "379953442ddfc3019abd-336583e2ffaa9395502a",
+      "title": "should display navigation elements",
+      "suite": "home.spec.js › Home Page",
+      "file": "home.spec.js",
+      "status": "passed",
+      "duration": 142,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-display-navigation-elements-frontend/test-finished-1.png",
+            "name": "screenshot"
+          }
+        ],
+        "videos": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-display-navigation-elements-frontend/video.webm",
+            "name": "video"
+          }
+        ],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-display-navigation-elements-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "379953442ddfc3019abd-372c3d01f423996686c1",
+      "title": "should navigate to users page",
+      "suite": "home.spec.js › Home Page",
+      "file": "home.spec.js",
+      "status": "passed",
+      "duration": 246,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-users-page-frontend/test-finished-1.png",
+            "name": "screenshot"
+          }
+        ],
+        "videos": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-users-page-frontend/video.webm",
+            "name": "video"
+          }
+        ],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-users-page-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "379953442ddfc3019abd-f6da1de984eb2f575389",
+      "title": "should navigate to about page",
+      "suite": "home.spec.js › Home Page",
+      "file": "home.spec.js",
+      "status": "passed",
+      "duration": 255,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-about-page-frontend/test-finished-1.png",
+            "name": "screenshot"
+          }
+        ],
+        "videos": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-about-page-frontend/video.webm",
+            "name": "video"
+          }
+        ],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-about-page-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    },
+    {
+      "id": "379953442ddfc3019abd-a63bdb2fa30f7acdd479",
+      "title": "should navigate to contact page",
+      "suite": "home.spec.js › Home Page",
+      "file": "home.spec.js",
+      "status": "passed",
+      "duration": 224,
+      "error": null,
+      "retries": 0,
+      "attachments": {
+        "screenshots": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-contact-page-frontend/test-finished-1.png",
+            "name": "screenshot"
+          }
+        ],
+        "videos": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-contact-page-frontend/video.webm",
+            "name": "video"
+          }
+        ],
+        "traces": [
+          {
+            "path": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project/test-results/home-Home-Page-should-navigate-to-contact-page-frontend/trace.zip",
+            "name": "trace"
+          }
+        ]
+      }
+    }
+  ],
+  "aiSummary": null,
+  "jiraSummary": null
+}

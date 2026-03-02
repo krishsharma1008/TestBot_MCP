@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/types/database'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -18,20 +17,17 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (data) {
-        setProfile(data)
-        setFullName(data.full_name ?? '')
-        setCompany(data.company ?? '')
+      try {
+        const res = await fetch('/api/profile')
+        if (!res.ok) return
+        const { data } = await res.json()
+        if (data) {
+          setProfile(data)
+          setFullName(data.full_name ?? '')
+          setCompany(data.company ?? '')
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err)
       }
       setLoading(false)
     }
@@ -43,22 +39,26 @@ export default function ProfilePage() {
     setSaving(true)
     setMessage(null)
 
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName.trim() || null,
-        company: company.trim() || null,
-        updated_at: new Date().toISOString(),
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: fullName.trim() || null,
+          company: company.trim() || null,
+        }),
       })
-      .eq('id', profile!.id)
 
-    setSaving(false)
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
-    } else {
-      setMessage({ type: 'success', text: 'Profile updated successfully.' })
+      if (!res.ok) {
+        const data = await res.json()
+        setMessage({ type: 'error', text: data.error || 'Failed to update profile' })
+      } else {
+        setMessage({ type: 'success', text: 'Profile updated successfully.' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'An unexpected error occurred' })
     }
+    setSaving(false)
   }
 
   const initials = (fullName || profile?.email || 'U')

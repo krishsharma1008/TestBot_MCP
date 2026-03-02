@@ -1,8 +1,11 @@
 {
   "mcpServers": {
-    "supabase": {
-      "type": "http",
-      "url": "https://mcp.supabase.com/mcp?project_ref=zpcfkueufqozybqqissk"
+    "testbot": {
+      "command": "node",
+      "args": ["testbot-mcp/src/index.js"],
+      "env": {
+        "TESTBOT_DASHBOARD_URL": "http://localhost:3000"
+      }
     }
   }
 }

@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-28T06:53:53.042Z",
+    "projectName": "sample-express-app",
+    "projectPath": "/Users/krishsharma/Desktop/QA_Final/examples/sample-project",
+    "version": "1.0.0",
+    "generator": "testbot-mcp"
+  },
+  "stats": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "duration": 0,
+    "passRate": 0
+  },
+  "tests": [],
+  "aiSummary": null,
+  "jiraSummary": null
+}

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/types/database'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -88,17 +87,14 @@ export default function PlanBillingPage() {
 
   useEffect(() => {
     const load = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (data) setProfile(data)
+      try {
+        const res = await fetch('/api/profile')
+        if (!res.ok) return
+        const { data } = await res.json()
+        if (data) setProfile(data)
+      } catch (err) {
+        console.error('Failed to load profile:', err)
+      }
       setLoading(false)
     }
     load()

@@ -1,3 +1,10 @@
+export interface User {
+  id: string
+  email: string
+  password_hash: string
+  created_at: string
+}
+
 export interface Profile {
   id: string
   email: string
@@ -55,29 +62,3 @@ export interface TestList {
   updated_at: string
 }
 
-export type Database = {
-  public: {
-    Tables: {
-      profiles: {
-        Row: Profile
-        Insert: Partial<Profile> & { id: string; email: string }
-        Update: Partial<Profile>
-      }
-      api_keys: {
-        Row: ApiKey
-        Insert: Omit<ApiKey, 'id' | 'created_at'>
-        Update: Partial<ApiKey>
-      }
-      test_runs: {
-        Row: TestRun
-        Insert: Omit<TestRun, 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<TestRun>
-      }
-      test_lists: {
-        Row: TestList
-        Insert: Omit<TestList, 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<TestList>
-      }
-    }
-  }
-}

@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 
@@ -20,17 +19,27 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-    if (authError) {
-      setError(authError.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to sign in')
+        setLoading(false)
+        return
+      }
+
+      router.push('/home')
+      router.refresh()
+    } catch {
+      setError('An unexpected error occurred')
       setLoading(false)
-      return
     }
-
-    router.push('/home')
-    router.refresh()
   }
 
   return (
