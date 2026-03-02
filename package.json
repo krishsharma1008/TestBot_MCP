@@ -1,7 +1,7 @@
 {
   "name": "qa_testing_poc",
   "version": "1.0.0",
-  "description": "![img.png](website/public/asset/img.png)",
+  "description": "QA testing POC with Testbot MCP and dashboard webapp",
   "main": "index.js",
   "scripts": {
     "test": "playwright test",

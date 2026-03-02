@@ -466,8 +466,6 @@ class ReportGenerator {
       // Check for Playwright HTML report in common locations
       const possibleLocations = [
         path.join(projectPath, 'playwright-report'),
-        path.join(projectPath, 'examples', 'sample-project', 'playwright-report'),
-        path.join(projectPath, 'sample-project', 'playwright-report'),
       ];
       
       let sourceReportDir = null;

@@ -1,0 +1,33 @@
+================================================================================
+dev_documentation.txt - Development log
+================================================================================
+
+2025-03-02 (Codebase Understanding and Cleanup Plan implementation)
+--------------------------------------------------------------------------------
+- .gitignore: Removed merge conflict markers. Uncommented and added ignores for
+  test-results/, playwright-report/, testbot-reports/. Added .claude/ to IDE
+  section. Kept node_modules, .env*, .idea, .vscode, OS/log patterns.
+
+- Removed generated artifacts from repo: Stopped tracking and deleted from
+  working tree: testbot-reports/ (root), examples/ (entire directory including
+  sample-project playwright-report, test-results, testbot-reports). These paths
+  are now in .gitignore so they are not re-committed.
+
+- testbot-mcp/src/report-generator.js: In copyPlaywrightHTMLReport(), removed
+  the candidate paths for examples/sample-project and sample-project; only
+  projectPath/playwright-report is used now (examples/ was removed).
+
+- README.md: Rewrote to describe MCP + webapp layout. Removed references to
+  deleted docs (AI_AGENT_QUICKSTART.md, AI_AGENT_README.md, etc.) and broken
+  image paths (website/public/asset/). Added Quick start for dashboard, MCP,
+  and Playwright. Kept project context/criteria section without images.
+
+- package.json: Set description to "QA testing POC with Testbot MCP and
+  dashboard webapp" (replaced invalid markdown image syntax and missing path).
+
+Target structure: root config (.env.example, .gitignore, .mcp.json,
+docker-compose.yml, package.json, playwright.config.js, README.md), testbot-mcp/,
+tests/, webapp/. No testbot-reports, playwright-report, test-results, or
+examples/ in the repo.
+
+================================================================================

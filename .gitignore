@@ -1,10 +1,11 @@
 # Node modules
 node_modules/
 
-# Test results
-# test-results/
-# test-results.json
-# playwright-report/
+# Test results and reports
+test-results/
+test-results.json
+playwright-report/
+testbot-reports/
 playwright/.cache/
 
 # Custom dashboard generated files
@@ -17,6 +18,7 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -31,10 +33,7 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
-<<<<<<< Updated upstream
-=======
 
 # AI Agent
 # ai-agent-reports/
 *.backup.*
->>>>>>> Stashed changes
