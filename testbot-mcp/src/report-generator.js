@@ -8,6 +8,43 @@ const path = require('path');
 const crypto = require('crypto');
 const Logger = require('./logger');
 
+/**
+ * Canonical synonyms for [CAT:xxx] tag values. Keys are the lowercase token
+ * that may appear inside [CAT:...], values are the canonical category we
+ * roll up against in severityForQaCategory.
+ *
+ * NOTE: `api_contract` is intentionally NOT in this table — it routes
+ * through a special case in categoryFromCatTag that disambiguates between
+ * `filter_logic` and `http_contract` based on surrounding text.
+ */
+const CAT_TAG_SYNONYMS = {
+  a11y: 'a11y',
+  accessibility: 'a11y',
+  aria: 'a11y',
+  wcag: 'a11y',
+  authz: 'authz',
+  rbac: 'authz',
+  api_auth: 'authz',
+  authorization: 'authz',
+  permission: 'authz',
+  permissions: 'authz',
+  validation: 'validation',
+  form_validation: 'validation',
+  api_negative: 'validation',
+  boundary_validation: 'validation',
+  boundary: 'validation',
+  input_validation: 'validation',
+  filter_logic: 'filter_logic',
+  filter: 'filter_logic',
+  search: 'filter_logic',
+  query: 'filter_logic',
+  'qac-filter': 'filter_logic',
+  http_contract: 'http_contract',
+  contract: 'http_contract',
+  status_code: 'http_contract',
+  functional: 'functional',
+};
+
 class ReportGenerator {
   stripAnsiAndNormalize(value) {
     if (value === null || value === undefined) {
@@ -428,27 +465,41 @@ class ReportGenerator {
     const match = String(value || '').match(/\[CAT:([^\]]+)\]/i);
     if (!match) return null;
     const cat = match[1].trim().toLowerCase();
-    if (cat === 'a11y' || cat === 'accessibility') return 'a11y';
-    if (cat === 'form_validation' || cat === 'api_negative' || cat === 'boundary_validation') return 'validation';
-    if (cat === 'api_auth' || cat === 'rbac' || cat === 'authz') return 'authz';
-    if (cat === 'filter_logic') return 'filter_logic';
     if (cat === 'api_contract') {
       if (/qac-filter|filter|query|search/i.test(value)) return 'filter_logic';
       return 'http_contract';
+    }
+    if (Object.prototype.hasOwnProperty.call(CAT_TAG_SYNONYMS, cat)) {
+      return CAT_TAG_SYNONYMS[cat];
     }
     return cat.replace(/[^a-z0-9_]+/g, '_') || null;
   }
 
   inferQaCategory(test = {}) {
-    const rawText = `${test.title || ''} ${test.file || ''} ${test.suite || ''}`;
-    const taggedCategory = this.categoryFromCatTag(rawText);
-    if (taggedCategory) return taggedCategory;
-    const text = rawText.toLowerCase();
-    if (/form_validation|form-validation|boundary|validation|required|string|whitespace|api_negative/.test(text)) return 'validation';
-    if (/a11y|accessib|aria|interactive/.test(text)) return 'a11y';
-    if (/rbac|authz|api_auth|forbidden|unauthorized/.test(text)) return 'authz';
-    if (/filter|query|search/.test(text)) return 'filter_logic';
-    if (/status|201|202|204|api_contract|contract/.test(text)) return 'http_contract';
+    const fieldOrder = ['title', 'suite', 'body', 'source', 'snippet', 'error', 'errorMessage', 'file'];
+    for (const field of fieldOrder) {
+      const raw = test[field];
+      const fieldText = typeof raw === 'string'
+        ? raw
+        : (raw && typeof raw === 'object' ? (raw.message || raw.value || raw.stack || '') : '');
+      if (!fieldText) continue;
+      const tagged = this.categoryFromCatTag(fieldText);
+      if (tagged) return tagged;
+    }
+    const text = fieldOrder
+      .map((field) => {
+        const raw = test[field];
+        if (typeof raw === 'string') return raw;
+        if (raw && typeof raw === 'object') return raw.message || raw.value || raw.stack || '';
+        return '';
+      })
+      .join(' ')
+      .toLowerCase();
+    if (/\ba11y\b|\baccessib\w+|\baria-|\brole=|wcag|screen.?reader|alt.?text|keyboard.?nav/.test(text)) return 'a11y';
+    if (/\brbac\b|\bauthz\b|api_auth|forbidden|unauthorized|403\b|permission.?denied/.test(text)) return 'authz';
+    if (/form_validation|form-validation|boundary_validation|api_negative|input_validation|required.?field|whitespace.?trim/.test(text)) return 'validation';
+    if (/\bfilter\b|search.?results|query.?param|sort.?order/.test(text)) return 'filter_logic';
+    if (/http.?status|status.?code|2\d\d.?response|api_contract|http_contract|response.?shape|content.?type.?header/.test(text)) return 'http_contract';
     return 'functional';
   }
 
