@@ -16,6 +16,8 @@ import {
   persistPreparedQaCorpus,
   prepareQaCorpusPayload,
 } from '@/lib/qa-corpus'
+import { dispatch } from '@/lib/dispatch'
+import type { Finding } from '@/lib/dispatch/types'
 
 const ENDPOINT = '/api/test-runs/ingest'
 
@@ -270,6 +272,7 @@ export async function POST(request: NextRequest) {
       contract_snapshot,
       qaContracts,
       qa_contracts,
+      dispatch: dispatchConfig,
     } = body as {
       api_key?: string
       creation_name?: string
@@ -296,6 +299,7 @@ export async function POST(request: NextRequest) {
       contract_snapshot?: unknown
       qaContracts?: unknown
       qa_contracts?: unknown
+      dispatch?: unknown
     }
     const finalApiKey: string = rawKey ?? api_key ?? ''
 
@@ -495,6 +499,27 @@ export async function POST(request: NextRequest) {
       })
     } catch (err) {
       console.error('[Ingest] Failed to persist QA corpus rows (non-fatal)', err)
+    }
+
+    // Outbound dispatch (Slack / GitHub / Jira). Pulls customer routing
+    // config from the request body so the MCP can ship .healix/dispatch.json
+    // alongside the report. Absent that, we no-op silently — existing
+    // ingests see no change. Each adapter call is isolated so a single
+    // failure cannot break ingest.
+    try {
+      const findings = Array.isArray(qa_findings) ? (qa_findings as unknown[]) : []
+      if (findings.length > 0 && dispatchConfig) {
+        for (const raw of findings) {
+          if (!raw || typeof raw !== 'object') continue
+          try {
+            await dispatch(raw as Finding, dispatchConfig, userId)
+          } catch (err) {
+            console.error('[Ingest] dispatch threw (non-fatal)', err)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Ingest] dispatch loop failed (non-fatal)', err)
     }
 
     // Persist test_failures rows — one per evidence bundle. Classifier
