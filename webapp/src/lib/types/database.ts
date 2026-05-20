@@ -180,6 +180,16 @@ export interface GeneratedGroovyFile {
   created_at: string
 }
 
+export interface DispatchedFinding {
+  id: number
+  user_id: string
+  finding_key: string
+  adapter: string
+  external_ref: string | null
+  payload: Record<string, unknown> | null
+  dispatched_at: string
+}
+
 export interface MCPTelemetryEvent {
   id: string
   user_id: string
