@@ -31,8 +31,10 @@ function getClient(): Octokit {
 /** Test seam — used by unit tests to inject a stub Octokit. */
 export function __setOctokitForTests(client: Octokit | null): void {
   cachedClient = client
-  cachedToken = client ? 'test' : null
-  if (client) process.env.GITHUB_TOKEN = process.env.GITHUB_TOKEN || 'test'
+  // Pin the cache key to whatever the current env token is so getClient()
+  // returns the stub instead of constructing a fresh real Octokit.
+  cachedToken = client ? (process.env.GITHUB_TOKEN || 'test') : null
+  if (client && !process.env.GITHUB_TOKEN) process.env.GITHUB_TOKEN = 'test'
 }
 
 function truncate(value: string, max: number): string {
