@@ -20,7 +20,7 @@
 -- IMPORTANT: apply manually via `psql` / Supabase SQL editor if the Drizzle
 -- journal is out of sync (it is, historically — see MIGRATION.md).
 
-CREATE TABLE generation_jobs (
+CREATE TABLE IF NOT EXISTS generation_jobs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   api_key_id uuid REFERENCES api_keys(id) ON DELETE SET NULL,
@@ -37,9 +37,9 @@ CREATE TABLE generation_jobs (
   completed_at timestamptz
 );
 
-CREATE INDEX generation_jobs_user_idx ON generation_jobs(user_id, created_at DESC);
-CREATE INDEX generation_jobs_status_idx ON generation_jobs(status) WHERE status IN ('queued','running');
-CREATE UNIQUE INDEX generation_jobs_idem_idx ON generation_jobs(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS generation_jobs_user_idx ON generation_jobs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS generation_jobs_status_idx ON generation_jobs(status) WHERE status IN ('queued','running');
+CREATE UNIQUE INDEX IF NOT EXISTS generation_jobs_idem_idx ON generation_jobs(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 
 -- To revert:
 -- DROP INDEX IF EXISTS generation_jobs_idem_idx;

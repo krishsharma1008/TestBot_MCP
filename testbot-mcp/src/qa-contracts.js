@@ -1001,7 +1001,7 @@ function fillDynamicPath(pathname: string, value: string | number): string {
 
 function collectionPathForDynamic(pathname: string): string {
   const normalized = String(pathname);
-  if (/^\/api\/comments\/issue\/[:{]/.test(normalized)) return '/api/issues';
+  if (/^\\/api\\/comments\\/issue\\/[:{]/.test(normalized)) return '/api/issues';
   return pathname
     .replace(/(?:\\/\\{[^}]+\\}|\\/:[A-Za-z_][\\w-]*)(?:\\/.*)?$/, '') || '/';
 }

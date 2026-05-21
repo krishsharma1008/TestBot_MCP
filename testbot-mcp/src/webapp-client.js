@@ -888,6 +888,128 @@ class WebappClient {
   }
 
   /**
+   * Create an in-progress test_runs row at pipeline start. Returns
+   * { test_run_id } so subsequent PATCH calls can target it by DB UUID.
+   * Non-fatal: if the webapp is unreachable, returns null and the pipeline
+   * continues without live partial ingest.
+   */
+  async initTestRun({ creationName, framework, projectPath } = {}) {
+    if (!this.apiKey) return null;
+    try {
+      const result = await this._post(
+        '/api/test-runs/init',
+        {
+          api_key: this.apiKey,
+          creation_name: creationName || 'Untitled Test Run',
+          framework: framework || null,
+          project_path: projectPath || null,
+        },
+        { timeoutMs: 10_000 }
+      );
+      return result?.test_run_id || null;
+    } catch (err) {
+      Logger.warn?.('WebappClient', 'initTestRun failed (non-blocking)', {
+        code: err?.code,
+        message: err?.message,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Send a heartbeat to keep the in-progress run alive.
+   * Fire-and-forget — never throws.
+   */
+  async sendHeartbeat(testRunId) {
+    if (!this.apiKey || !testRunId) return;
+    try {
+      await this._post(
+        `/api/test-runs/${encodeURIComponent(testRunId)}/heartbeat`,
+        { api_key: this.apiKey },
+        { timeoutMs: 5_000 }
+      );
+    } catch {
+      // non-fatal
+    }
+  }
+
+  /**
+   * Stream partial tier findings to the dashboard as each tier completes.
+   * Merges into the existing row — does not overwrite all tier_results.
+   * Fire-and-forget — never throws.
+   */
+  async patchFindings(testRunId, { tierResults, findingSummary, currentPhase, totalTests, passedTests, failedTests, skippedTests } = {}) {
+    if (!this.apiKey || !testRunId) return;
+    try {
+      await this._post(
+        `/api/test-runs/${encodeURIComponent(testRunId)}/findings`,
+        {
+          api_key: this.apiKey,
+          tier_results: tierResults || null,
+          finding_summary: findingSummary || null,
+          current_phase: currentPhase || null,
+          total_tests: totalTests ?? null,
+          passed_tests: passedTests ?? null,
+          failed_tests: failedTests ?? null,
+          skipped_tests: skippedTests ?? null,
+        },
+        { timeoutMs: 10_000 }
+      );
+    } catch (err) {
+      Logger.warn?.('WebappClient', 'patchFindings failed (non-blocking)', {
+        code: err?.code,
+        message: err?.message,
+      });
+    }
+  }
+
+  /**
+   * Update current_phase on the DB run row (by UUID, not MCP run_id).
+   * Also acts as a heartbeat. Fire-and-forget.
+   */
+  async patchPhase(testRunId, phase) {
+    if (!this.apiKey || !testRunId || !phase) return;
+    try {
+      await this._post(
+        `/api/test-runs/${encodeURIComponent(testRunId)}/phase`,
+        { api_key: this.apiKey, phase },
+        { timeoutMs: 5_000 }
+      );
+    } catch {
+      // non-fatal
+    }
+  }
+
+  /**
+   * Mark the run as complete (or completed_partial if killed mid-way).
+   * Called at the end of the pipeline before ingest, or in error handlers.
+   */
+  async completeTestRun(testRunId, { status = 'completed_partial', currentPhase, totalTests, passedTests, failedTests, skippedTests, durationMs } = {}) {
+    if (!this.apiKey || !testRunId) return;
+    try {
+      await this._post(
+        `/api/test-runs/${encodeURIComponent(testRunId)}/complete`,
+        {
+          api_key: this.apiKey,
+          status,
+          current_phase: currentPhase || null,
+          total_tests: totalTests ?? null,
+          passed_tests: passedTests ?? null,
+          failed_tests: failedTests ?? null,
+          skipped_tests: skippedTests ?? null,
+          duration_ms: durationMs ?? null,
+        },
+        { timeoutMs: 10_000 }
+      );
+    } catch (err) {
+      Logger.warn?.('WebappClient', 'completeTestRun failed (non-blocking)', {
+        code: err?.code,
+        message: err?.message,
+      });
+    }
+  }
+
+  /**
    * Fire-and-forget durable phase write. If the webapp is unreachable, the call
    * fails silently — the pipeline must never block on this best-effort state.
    * Used to populate `test_runs.current_phase + current_phase_at` so a crashed

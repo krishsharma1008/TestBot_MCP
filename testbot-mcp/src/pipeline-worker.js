@@ -8651,6 +8651,45 @@ async function runPipeline(config, runId) {
     setStageBudgetReporter(null);
   }
 
+  // ── Live partial ingest: create in-progress row early ──────────────────────
+  // liveRunId is the DB UUID of the test_runs row created at pipeline start.
+  // All subsequent PATCH calls (heartbeat, findings, phase, complete) use it.
+  // null when the webapp is unreachable — pipeline continues without live ingest.
+  let liveRunId = null;
+  if (durableClient) {
+    liveRunId = await durableClient.initTestRun({
+      creationName: config.projectName || 'Untitled Test Run',
+      framework: config.framework || null,
+      projectPath: config.projectPath || null,
+    });
+    if (liveRunId) {
+      Logger.info('PipelineWorker', 'Live run row created', { liveRunId });
+      const liveDashboardUrl = `${durableClient.dashboardUrl}/all-tests/test-run/${liveRunId}`;
+      updateStatus(statusDir, 'live_run_created', {
+        runId,
+        message: `Live dashboard: ${liveDashboardUrl}`,
+        liveRunId,
+        liveDashboardUrl,
+      }, telemetryReporter);
+    }
+  }
+
+  // Send a heartbeat every 30 s so the dashboard can detect stalls.
+  let heartbeatInterval = null;
+  if (durableClient && liveRunId) {
+    heartbeatInterval = setInterval(() => {
+      durableClient.sendHeartbeat(liveRunId).catch(() => undefined);
+    }, 30_000);
+  }
+
+  // Helper — call at the end of the pipeline (success or failure).
+  const stopHeartbeat = () => {
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
+  };
+
   // Kill any leftover Healix-started dev server from a previous run.
   // We only kill what Healix wrote into this PID file — nothing else.
   const healixReportsDir = path.join(config.projectPath, 'healix-reports');
@@ -9809,6 +9848,16 @@ async function runPipeline(config, runId) {
       timeout: executionTimeout,
       serverPidFile,
       onTestProgress: telemetryReporter && telemetryReporter.isEnabled() ? onTestProgress : undefined,
+      onPhaseComplete: (durableClient && liveRunId) ? ({ tier, results }) => {
+        durableClient.patchFindings(liveRunId, {
+          tierResults: { [tier]: { passed: results.passed, failed: results.failed, total: results.total, skipped: results.skipped || 0 } },
+          currentPhase: `${tier}_complete`,
+          totalTests: results.total,
+          passedTests: results.passed,
+          failedTests: results.failed,
+          skippedTests: results.skipped || 0,
+        }).catch(() => undefined);
+      } : undefined,
       // Emit a `dev_server_ready` telemetry event once the primary dev server
       // responds (HTTP 2xx/3xx/4xx or TCP fallback). Downstream consumers use
       // this to distinguish cold-start latency from genuine Playwright flakes.
@@ -10015,6 +10064,19 @@ async function runPipeline(config, runId) {
       Logger.warn('PipelineWorker', 'Failed to compute tier results', { reason: tierErr.message });
     }
 
+    // Stream partial findings to the dashboard immediately after execution.
+    // This satisfies the "Tier-0 findings appear at the 90-second mark" criteria.
+    if (durableClient && liveRunId && (tierResults || testResults.total > 0)) {
+      durableClient.patchFindings(liveRunId, {
+        tierResults,
+        currentPhase: 'tests_complete',
+        totalTests: testResults.total || 0,
+        passedTests: testResults.passed || 0,
+        failedTests: testResults.failed || 0,
+        skippedTests: testResults.skipped || 0,
+      }).catch(() => undefined);
+    }
+
     if (testResults.total > 0 && testResults.skipped === testResults.total) {
       const allSkippedError = new Error(`Playwright reported ${testResults.total} tests, but all were skipped. Healix requires runnable tests for public/reachable surfaces.`);
       allSkippedError.code = 'ZERO_RUNNABLE_TESTS';
@@ -10143,6 +10205,7 @@ async function runPipeline(config, runId) {
         projectPath: config.projectPath,
         projectName: config.projectName,
         runId,
+        liveRunId,
         testResults,
         aiAnalysis,
         jiraData: jiraStories,
@@ -10338,6 +10401,20 @@ async function runPipeline(config, runId) {
     try { stopSecondaryServices(config.projectPath); } catch { /* ignore */ }
     killPreStartedProc(preStartedProc);
 
+    // Stop heartbeat + mark run complete before draining telemetry.
+    stopHeartbeat();
+    if (durableClient && liveRunId) {
+      await durableClient.completeTestRun(liveRunId, {
+        status: testResults.failed > 0 ? 'failed' : 'passed',
+        currentPhase: 'completed',
+        totalTests: testResults.total || 0,
+        passedTests: testResults.passed || 0,
+        failedTests: testResults.failed || 0,
+        skippedTests: testResults.skipped || 0,
+        durationMs: testResults.duration || 0,
+      }).catch(() => undefined);
+    }
+
     // Give fire-and-forget reportPhase('completed') time to reach the webapp
     // before process.exit(0) kills in-flight HTTP requests. Without this the
     // SSE stream never receives the terminal event and the live page stays
@@ -10355,6 +10432,14 @@ async function runPipeline(config, runId) {
     }
     try { stopSecondaryServices(config.projectPath); } catch { /* ignore */ }
     killPreStartedProc(preStartedProc);
+    stopHeartbeat();
+    // Mark run as completed_partial so partial findings are preserved.
+    if (durableClient && liveRunId) {
+      durableClient.completeTestRun(liveRunId, {
+        status: 'completed_partial',
+        currentPhase: 'error',
+      }).catch(() => undefined);
+    }
 
     const errorCode = classifyErrorCode(error);
     const userFacingError = buildUserFacingPipelineError(errorCode, error);

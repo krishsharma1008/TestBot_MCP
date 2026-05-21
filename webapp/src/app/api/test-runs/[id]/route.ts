@@ -172,6 +172,7 @@ export async function GET(
           current_phase: null,
           error_code: null,
           is_live: false,
+          last_heartbeat_at: ingestedRow.lastHeartbeatAt?.toISOString() ?? null,
           generationJob,
         }
         return NextResponse.json({ data })
@@ -186,7 +187,38 @@ export async function GET(
         return NextResponse.json({ error: 'Test run not found' }, { status: 404 })
       }
 
-      return NextResponse.json({ data: { ...liveRun, generationJob: null } })
+      // Merge tier_results + heartbeat from the most recent in_progress DB row
+      // so the live dashboard shows partial findings as each tier completes.
+      let liveTierResults = null
+      let liveHeartbeatAt = null
+      let liveCurrentPhase = null
+      try {
+        const [inProgressRow] = await db
+          .select({
+            tierResults: testRuns.tierResults,
+            lastHeartbeatAt: testRuns.lastHeartbeatAt,
+            currentPhase: testRuns.currentPhase,
+          })
+          .from(testRuns)
+          .where(and(eq(testRuns.userId, user.id), eq(testRuns.status, 'in_progress')))
+          .orderBy(desc(testRuns.createdAt))
+          .limit(1)
+        if (inProgressRow) {
+          liveTierResults = inProgressRow.tierResults ?? null
+          liveHeartbeatAt = inProgressRow.lastHeartbeatAt?.toISOString() ?? null
+          liveCurrentPhase = inProgressRow.currentPhase ?? null
+        }
+      } catch { /* non-fatal */ }
+
+      return NextResponse.json({
+        data: {
+          ...liveRun,
+          generationJob: null,
+          tier_results: liveTierResults,
+          last_heartbeat_at: liveHeartbeatAt,
+          current_phase: liveCurrentPhase ?? liveRun.current_phase,
+        }
+      })
     }
 
     const [row] = await db
@@ -229,9 +261,10 @@ export async function GET(
       created_at: row.createdAt?.toISOString() ?? null,
       updated_at: row.updatedAt?.toISOString() ?? null,
       run_id: extractRunIdFromReport(row.reportJson),
-      current_phase: null,
+      current_phase: row.currentPhase ?? null,
       error_code: null,
       is_live: false,
+      last_heartbeat_at: row.lastHeartbeatAt?.toISOString() ?? null,
       generationJob,
     }
 

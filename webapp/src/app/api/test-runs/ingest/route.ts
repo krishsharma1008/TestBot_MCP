@@ -248,6 +248,7 @@ export async function POST(request: NextRequest) {
       api_key,
       creation_name,
       run_id,
+      test_run_id,
       report,
       project_path,
       projectFingerprint,
@@ -274,6 +275,7 @@ export async function POST(request: NextRequest) {
       api_key?: string
       creation_name?: string
       run_id?: string
+      test_run_id?: string  // DB UUID from a prior /api/test-runs/init call; if set, UPDATE instead of INSERT
       report?: ReportPayload
       project_path?: string
       projectFingerprint?: unknown
@@ -462,30 +464,92 @@ export async function POST(request: NextRequest) {
         ? 'completed_with_findings'
         : status
 
-    // Insert test run
-    const [testRun] = await db
-      .insert(testRuns)
-      .values({
-        userId,
-        creationName: projectName,
-        status: runStatus,
-        totalTests: total_tests,
-        passedTests: passed_tests,
-        failedTests: failed_tests,
-        skippedTests: skipped_tests,
-        durationMs: duration_ms,
-        backendPassRate: backend_pass_rate,
-        frontendPassRate: frontend_pass_rate,
-        reportJson: reportWithRunId,
-        aiAnalysis: aiAnalysisPayload,
-        coverageMetrics: coverageMetricsPayload,
-        tierResults: tierResultsPayload,
-        pipelineError: pipelineErrorPayload,
-        findingSummary: qaCorpusPayload.findingSummary,
-        source: 'mcp',
-        projectPath: project_path || null,
-      })
-      .returning({ id: testRuns.id })
+    // If the MCP provided a test_run_id (from a prior /api/test-runs/init call),
+    // UPDATE the existing in-progress row. Otherwise INSERT a new one.
+    const existingRunId = typeof test_run_id === 'string' && test_run_id.trim().length > 0
+      ? test_run_id.trim()
+      : null
+
+    let testRun: { id: string }
+    if (existingRunId) {
+      const [updated] = await db
+        .update(testRuns)
+        .set({
+          creationName: projectName,
+          status: runStatus,
+          totalTests: total_tests,
+          passedTests: passed_tests,
+          failedTests: failed_tests,
+          skippedTests: skipped_tests,
+          durationMs: duration_ms,
+          backendPassRate: backend_pass_rate,
+          frontendPassRate: frontend_pass_rate,
+          reportJson: reportWithRunId,
+          aiAnalysis: aiAnalysisPayload,
+          coverageMetrics: coverageMetricsPayload,
+          tierResults: tierResultsPayload,
+          pipelineError: pipelineErrorPayload,
+          findingSummary: qaCorpusPayload.findingSummary,
+          projectPath: project_path || null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(testRuns.id, existingRunId), eq(testRuns.userId, userId)))
+        .returning({ id: testRuns.id })
+      if (!updated) {
+        // Row not found or wrong owner — fall back to insert
+        const [inserted] = await db
+          .insert(testRuns)
+          .values({
+            userId,
+            creationName: projectName,
+            status: runStatus,
+            totalTests: total_tests,
+            passedTests: passed_tests,
+            failedTests: failed_tests,
+            skippedTests: skipped_tests,
+            durationMs: duration_ms,
+            backendPassRate: backend_pass_rate,
+            frontendPassRate: frontend_pass_rate,
+            reportJson: reportWithRunId,
+            aiAnalysis: aiAnalysisPayload,
+            coverageMetrics: coverageMetricsPayload,
+            tierResults: tierResultsPayload,
+            pipelineError: pipelineErrorPayload,
+            findingSummary: qaCorpusPayload.findingSummary,
+            source: 'mcp',
+            projectPath: project_path || null,
+          })
+          .returning({ id: testRuns.id })
+        testRun = inserted
+      } else {
+        testRun = updated
+      }
+    } else {
+      const [inserted] = await db
+        .insert(testRuns)
+        .values({
+          userId,
+          creationName: projectName,
+          status: runStatus,
+          totalTests: total_tests,
+          passedTests: passed_tests,
+          failedTests: failed_tests,
+          skippedTests: skipped_tests,
+          durationMs: duration_ms,
+          backendPassRate: backend_pass_rate,
+          frontendPassRate: frontend_pass_rate,
+          reportJson: reportWithRunId,
+          aiAnalysis: aiAnalysisPayload,
+          coverageMetrics: coverageMetricsPayload,
+          tierResults: tierResultsPayload,
+          pipelineError: pipelineErrorPayload,
+          findingSummary: qaCorpusPayload.findingSummary,
+          source: 'mcp',
+          projectPath: project_path || null,
+        })
+        .returning({ id: testRuns.id })
+      testRun = inserted
+    }
 
     try {
       await persistPreparedQaCorpus({

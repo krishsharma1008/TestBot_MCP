@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { TestRun, TestFailure, FailureVerdict, QaFinding, FindingSummary } from '@/lib/types/database';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -466,15 +467,85 @@ function StatusBadge({ status }: { status: string }) {
 
 function runStatusLabel(status: string | null | undefined): string {
   if (status === 'completed_with_findings') return 'completed with findings';
+  if (status === 'in_progress') return 'in progress';
+  if (status === 'completed_partial') return 'partial results';
+  if (status === 'stalled') return 'stalled';
   return status || 'unknown';
 }
 
 function runStatusClass(status: string | null | undefined): string {
   if (status === 'passed') return 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400';
   if (status === 'failed') return 'bg-red-500/10 border border-red-500/20 text-red-400';
-  if (status === 'running') return 'bg-blue-500/10 border border-blue-500/20 text-blue-400';
+  if (status === 'running' || status === 'in_progress') return 'bg-blue-500/10 border border-blue-500/20 text-blue-400';
   if (status === 'completed_with_findings') return 'bg-amber-500/10 border border-amber-500/25 text-amber-300';
+  if (status === 'completed_partial') return 'bg-purple-500/10 border border-purple-500/20 text-purple-300';
+  if (status === 'stalled') return 'bg-orange-500/10 border border-orange-500/20 text-orange-400';
   return 'bg-amber-500/10 border border-amber-500/20 text-amber-400';
+}
+
+// ─── Tier-pill banner ────────────────────────────────────────────────────────
+
+type TierCount = { passed?: number; failed?: number; blocked?: number; skipped?: number; total?: number }
+
+function TierPillBanner({ tierResults }: { tierResults: Record<string, TierCount> | null | undefined }) {
+  if (!tierResults || Object.keys(tierResults).length === 0) return null;
+  const tiers = Object.entries(tierResults).sort(([a], [b]) => a.localeCompare(b));
+  return (
+    <div className="flex flex-wrap gap-2 items-center">
+      {tiers.map(([tier, counts]) => {
+        const total = counts.total ?? ((counts.passed ?? 0) + (counts.failed ?? 0) + (counts.skipped ?? 0));
+        const passed = counts.passed ?? 0;
+        const failed = counts.failed ?? 0;
+        const rate = total > 0 ? Math.round((passed / total) * 100) : null;
+        const rateColor = failed > 0 ? 'text-red-400' : rate === 100 ? 'text-emerald-400' : 'text-amber-400';
+        const bg = failed > 0 ? 'bg-red-500/10 border-red-500/20' : rate === 100 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-amber-500/10 border-amber-500/20';
+        return (
+          <span key={tier} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${bg}`}>
+            <span className="text-[#8BA4C8] uppercase tracking-wide">{tier.replace(/_/g, ' ')}</span>
+            {rate !== null && <span className={rateColor}>{rate}%</span>}
+            <span className="text-[#4A6280]">{total} tests</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Stalled banner ──────────────────────────────────────────────────────────
+
+const STALL_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+function StalledBanner({ lastHeartbeatAt, status }: { lastHeartbeatAt: string | null | undefined; status: string | null | undefined }) {
+  const [stalled, setStalled] = useState(false);
+
+  useEffect(() => {
+    if (!lastHeartbeatAt || (status !== 'in_progress' && status !== 'running')) {
+      setStalled(false);
+      return;
+    }
+    const check = () => {
+      const age = Date.now() - new Date(lastHeartbeatAt).getTime();
+      setStalled(age > STALL_THRESHOLD_MS);
+    };
+    check();
+    const timer = setInterval(check, 30_000);
+    return () => clearInterval(timer);
+  }, [lastHeartbeatAt, status]);
+
+  if (!stalled) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-3 flex items-center gap-3"
+    >
+      <span className="text-orange-400 text-sm font-semibold">Worker stalled</span>
+      <span className="text-[#8BA4C8] text-xs">
+        No heartbeat received in {Math.round((Date.now() - new Date(lastHeartbeatAt!).getTime()) / 60000)} min.
+        The worker may have crashed. Partial findings below are preserved.
+      </span>
+    </motion.div>
+  );
 }
 
 function severityClass(severity: string | null | undefined): string {
@@ -3376,7 +3447,7 @@ export default function TestRunDetailPage() {
     const status = String(run.status || '').toLowerCase();
     const phase = String(run.current_phase || '').toLowerCase();
     if (run.is_live) return true;
-    if (status === 'running') return true;
+    if (status === 'running' || status === 'in_progress') return true;
     return [
       'queued',
       'awaiting_configuration',
@@ -3524,6 +3595,55 @@ export default function TestRunDetailPage() {
       evtSourceRef.current = null;
     };
   }, [id, isLiveDetailId]);
+
+  // ── Supabase Realtime subscription ─────────────────────────────────────────
+  // Subscribe to UPDATE events on the test_runs row for this run so partial
+  // findings, heartbeats, and phase changes appear without polling.
+  useEffect(() => {
+    if (!id || id.startsWith('live-')) return;
+    let supabase: ReturnType<typeof createSupabaseBrowserClient> | null = null;
+    try {
+      supabase = createSupabaseBrowserClient();
+    } catch {
+      return; // Supabase env vars not set — skip realtime
+    }
+    const channel = supabase
+      .channel(`test-run-${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'test_runs', filter: `id=eq.${id}` },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (!row) return;
+          setTestRun((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              status: (row.status as TestRun['status']) ?? prev.status,
+              current_phase: (row.current_phase as string | null) ?? prev.current_phase,
+              tier_results: (row.tier_results as TestRun['tier_results']) ?? prev.tier_results,
+              finding_summary: (row.finding_summary as TestRun['finding_summary']) ?? prev.finding_summary,
+              last_heartbeat_at: (row.last_heartbeat_at as string | null) ?? prev.last_heartbeat_at,
+              total_tests: typeof row.total_tests === 'number' ? row.total_tests : prev.total_tests,
+              passed_tests: typeof row.passed_tests === 'number' ? row.passed_tests : prev.passed_tests,
+              failed_tests: typeof row.failed_tests === 'number' ? row.failed_tests : prev.failed_tests,
+              skipped_tests: typeof row.skipped_tests === 'number' ? row.skipped_tests : prev.skipped_tests,
+              updated_at: (row.updated_at as string) ?? prev.updated_at,
+            };
+          });
+          // Stop polling once run is terminal
+          const status = row.status as string;
+          if (status && !['running', 'in_progress'].includes(status)) {
+            setActivePolling(false);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -3927,6 +4047,35 @@ export default function TestRunDetailPage() {
 
       {pipelineError && (
         <PipelineErrorBanner error={pipelineError as PipelineErrorShape} runId={testRun.id} />
+      )}
+
+      {/* Stalled banner — shown when heartbeat goes silent for > 5 min */}
+      <StalledBanner lastHeartbeatAt={testRun.last_heartbeat_at} status={testRun.status} />
+
+      {/* Completed-partial notice */}
+      {testRun.status === 'completed_partial' && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-3 flex items-center gap-3"
+        >
+          <span className="text-purple-300 text-sm font-semibold">Partial results</span>
+          <span className="text-[#8BA4C8] text-xs">
+            The pipeline was interrupted before completing all tiers. Findings captured so far are preserved below.
+          </span>
+        </motion.div>
+      )}
+
+      {/* Tier-pill banner — visible while in_progress or after completing */}
+      {testRun.tier_results && Object.keys(testRun.tier_results).length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card rounded-xl px-4 py-3 flex flex-col gap-2"
+        >
+          <span className="text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Tier results</span>
+          <TierPillBanner tierResults={testRun.tier_results} />
+        </motion.div>
       )}
 
       {visibleAgentFailures.length > 0 && (

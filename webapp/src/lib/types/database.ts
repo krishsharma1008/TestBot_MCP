@@ -109,7 +109,7 @@ export interface TestRun {
   id: string
   user_id: string
   creation_name: string
-  status: 'running' | 'passed' | 'failed' | 'error' | 'completed_with_findings'
+  status: 'running' | 'passed' | 'failed' | 'error' | 'completed_with_findings' | 'in_progress' | 'completed_partial' | 'stalled'
   total_tests: number
   passed_tests: number
   failed_tests: number
@@ -136,6 +136,7 @@ export interface TestRun {
   current_phase?: string | null
   error_code?: string | null
   is_live?: boolean
+  last_heartbeat_at?: string | null
 }
 
 export interface ImportSession {

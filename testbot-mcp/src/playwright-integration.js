@@ -1671,6 +1671,16 @@ test.describe('${this.sanitizeString(scenario.name)}', () => {
         });
       }
 
+      // Fire tier-A complete callback for live dashboard streaming
+      if (typeof this.config.onPhaseComplete === 'function') {
+        try {
+          this.config.onPhaseComplete({
+            tier: 'tier_a',
+            results: { total: Number(primary.total || 0), passed: Number(primary.passed || 0), failed: Number(primary.failed || 0), skipped: Number(primary.skipped || 0) },
+          });
+        } catch { /* non-fatal */ }
+      }
+
       if (shouldRunSupplementalAuthPass) {
         Logger.info('PlaywrightIntegration', 'Running supplemental auth pass', { config: authConfigPath });
         try {
@@ -1684,6 +1694,15 @@ test.describe('${this.sanitizeString(scenario.name)}', () => {
               `Supplemental auth pass matched zero tests even though ${authScan.authTaggedTestCount} @auth/@tierB test(s) exist.`,
               authScan
             );
+          }
+          // Fire tier-B complete callback for live dashboard streaming
+          if (typeof this.config.onPhaseComplete === 'function') {
+            try {
+              this.config.onPhaseComplete({
+                tier: 'tier_b',
+                results: { total: Number(authResults.total || 0), passed: Number(authResults.passed || 0), failed: Number(authResults.failed || 0), skipped: Number(authResults.skipped || 0) },
+              });
+            } catch { /* non-fatal */ }
           }
           this._mergeTestRuns(primary, authResults);
           primary.tierBAuthPass = {
