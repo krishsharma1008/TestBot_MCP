@@ -512,6 +512,51 @@ module.exports = defineConfig({
     }
   }
 
+  /**
+   * Fast pre-flight check: can we run Playwright at all?
+   * Called BEFORE AI test generation so we don't waste the token budget.
+   * Returns { ok: true } when Playwright is resolvable (local, bundled, or
+   * installable), or { ok: false, reason } when it clearly cannot work.
+   */
+  checkPlaywrightAvailable() {
+    const projectPath = this.config.projectPath;
+
+    // 1. Already installed in project node_modules
+    const localPath = path.join(projectPath, 'node_modules', '@playwright', 'test');
+    if (fs.existsSync(localPath)) return { ok: true, source: 'local' };
+
+    // 2. Bundled inside the MCP's own node_modules (bridge will symlink it)
+    if (this.getBundledPlaywrightPackageDir()) return { ok: true, source: 'bundled' };
+
+    // 3. No package.json — npm install will fail later, fail now
+    const packageJsonPath = path.join(projectPath, 'package.json');
+    if (!fs.existsSync(packageJsonPath)) {
+      return {
+        ok: false,
+        reason:
+          '@playwright/test is not installed in the project and no package.json was found.\n' +
+          'Fix: add a package.json, then run `npm install -D @playwright/test` and `npx playwright install chromium`.',
+      };
+    }
+
+    // 4. Try resolving via npx without actually downloading
+    try {
+      execSync('npx --no-install playwright --version', {
+        cwd: projectPath,
+        stdio: 'pipe',
+        timeout: 5000,
+      });
+      return { ok: true, source: 'npx' };
+    } catch { /* not in npx cache — will need npm install */ }
+
+    // 5. package.json exists — ensurePlaywrightInstalled() will run npm install
+    //    during execution.  Allow the pipeline to continue; log a warning.
+    Logger.warn('PlaywrightIntegration',
+      '@playwright/test not found locally — will attempt `npm install -D @playwright/test` before test execution.',
+      { projectPath });
+    return { ok: true, source: 'will_install' };
+  }
+
   getBundledPlaywrightPackageDir() {
     try {
       return path.dirname(require.resolve('@playwright/test/package.json'));

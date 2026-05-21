@@ -252,11 +252,13 @@ function analyzeProjectSource(projectPath) {
     // Annotate inputs with their label text
     for (const inp of inputs) {
       if (inp.id && labels[inp.id]) inp.labelText = labels[inp.id];
-      inp.sourceFile = path.relative(projectPath, file);
+      // Normalise to POSIX separators so callers receive consistent paths
+      // on Windows (path.relative returns backslashes on Windows).
+      inp.sourceFile = path.relative(projectPath, file).replace(/\\/g, '/');
       allInputs.push(inp);
     }
     for (const sel of selects) {
-      sel.sourceFile = path.relative(projectPath, file);
+      sel.sourceFile = path.relative(projectPath, file).replace(/\\/g, '/');
       allSelects.push(sel);
     }
     ariaHazards.push(...ariaLabelElements);

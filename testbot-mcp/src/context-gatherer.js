@@ -10,6 +10,17 @@ const path = require('path');
 const Logger = require('./logger');
 const { extractQaContracts } = require('./qa-contracts');
 
+/**
+ * path.relative() returns backslash-separated paths on Windows.
+ * All public-facing file paths (sourceFile, file, source fields that reach
+ * the webapp prompt or test assertions) must use POSIX separators so that:
+ *   - AI grounding checks work cross-platform
+ *   - Test assertions like assert.equal(f.sourceFile, 'src/foo/bar.ts') pass
+ */
+function posixRelative(from, to) {
+  return path.relative(from, to).replace(/\\/g, '/');
+}
+
 class ContextGatherer {
   constructor(config = {}) {
     this.config = {
@@ -485,7 +496,7 @@ class ContextGatherer {
         .slice(0, 20);
 
       forms.push({
-        file: path.relative(this.config.projectPath, filePath),
+        file: posixRelative(this.config.projectPath, filePath),
         fields: fields.slice(0, 20), // Limit fields
         validationPatterns,
         hasFormElement: formMatches.length > 0,
@@ -846,7 +857,7 @@ class ContextGatherer {
     
     return {
       name,
-      file: path.relative(this.config.projectPath, filePath),
+      file: posixRelative(this.config.projectPath, filePath),
       props: props.slice(0, 10),
       stateHooks: stateHooks.slice(0, 5),
       eventHandlers: eventHandlers.slice(0, 10),
@@ -1110,7 +1121,7 @@ class ContextGatherer {
           
           pages.push({
             path: routePath,
-            sourceFile: path.relative(this.config.projectPath, fullPath),
+            sourceFile: posixRelative(this.config.projectPath, fullPath),
             description: this.formatPageName(routePath),
             components: uiHints.components,
             interactions: uiHints.interactions,
@@ -1163,7 +1174,7 @@ class ContextGatherer {
             const uiHints = this.extractPageUIHints(pageFile);
             pages.push({
               path: newBasePath || '/',
-              sourceFile: path.relative(this.config.projectPath, pageFile),
+              sourceFile: posixRelative(this.config.projectPath, pageFile),
               description: this.formatPageName(newBasePath || '/'),
               components: uiHints.components,
               interactions: uiHints.interactions,
@@ -1217,7 +1228,7 @@ class ContextGatherer {
               const uiHints = this.extractPageUIHints(file);
               pages.push({
                 path: routePath,
-                sourceFile: path.relative(this.config.projectPath, file),
+                sourceFile: posixRelative(this.config.projectPath, file),
                 routeComponent: this.extractRouteComponentName(content, match.index),
                 description: this.formatPageName(routePath),
                 components: uiHints.components,
@@ -1263,7 +1274,7 @@ class ContextGatherer {
           const uiHints = this.extractPageUIHints(routerFile);
           pages.push({
             path: routePath,
-            sourceFile: path.relative(this.config.projectPath, routerFile),
+            sourceFile: posixRelative(this.config.projectPath, routerFile),
             description: this.formatPageName(routePath),
             components: uiHints.components,
             interactions: uiHints.interactions,
@@ -1383,7 +1394,7 @@ class ContextGatherer {
               path: routePath,
               description: `${method} ${routePath}`,
               requiresAuth: this.detectAuthRequired(fullPath),
-              source: path.relative(this.config.projectPath, fullPath),
+              source: posixRelative(this.config.projectPath, fullPath),
             });
           }
         }
@@ -1427,7 +1438,7 @@ class ContextGatherer {
                 path: routePath,
                 description: `${method} ${routePath}`,
                 requiresAuth: content.includes('auth') || content.includes('token'),
-                source: path.relative(this.config.projectPath, file),
+                source: posixRelative(this.config.projectPath, file),
               });
             }
           }
@@ -1504,7 +1515,7 @@ class ContextGatherer {
                 description: this.formatPageName(routePath),
                 components: [],
                 interactions: ['navigation'],
-                source: path.relative(projectPath, file),
+                source: posixRelative(projectPath, file),
               });
             }
           }
@@ -1596,7 +1607,7 @@ class ContextGatherer {
                   path: fullPath,
                   description: `${method} ${fullPath}`,
                   requiresAuth: hasAuth,
-                  source: path.relative(projectPath, file),
+                  source: posixRelative(projectPath, file),
                   sourceRoutePath: localPath,
                   sourceRouteBase: classBasePath,
                 });
@@ -1627,7 +1638,7 @@ class ContextGatherer {
                       path: match[patternDef.pathIdx],
                       description: `${m.toUpperCase()} ${match[patternDef.pathIdx]}`,
                       requiresAuth: hasAuth,
-                      source: path.relative(projectPath, file),
+                      source: posixRelative(projectPath, file),
                     });
                   }
                 }
@@ -1641,7 +1652,7 @@ class ContextGatherer {
                   path: fullPath,
                   description: `${method} ${fullPath}`,
                   requiresAuth: hasAuth,
-                  source: path.relative(projectPath, file),
+                  source: posixRelative(projectPath, file),
                 });
               }
             }
@@ -2171,7 +2182,7 @@ class ContextGatherer {
       const content = this.readFileCached(filePath, { allowLarge: true, maxBytes: 500000 });
       if (!content) continue;
 
-      const relativePath = path.relative(projectPath, filePath);
+      const relativePath = posixRelative(projectPath, filePath);
       const fileRoutePaths = new Set();
       const fileTestIds = new Set();
       if (/withHashLocation\s*\(|HashLocationStrategy|useHash\s*:\s*true/i.test(content)) {

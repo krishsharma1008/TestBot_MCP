@@ -32,7 +32,7 @@ function readSource(projectPath, sourceRel, readFile) {
   if (sourceFileLooksNonAuthoritative(sourceRel)) return '';
   const sourcePath = path.resolve(projectPath, sourceRel);
   const projectRoot = path.resolve(projectPath);
-  const relative = path.relative(projectRoot, sourcePath);
+  const relative = path.relative(projectRoot, sourcePath).replace(/\\/g, '/');
   if (relative.startsWith('..') || path.isAbsolute(relative)) return '';
   if (typeof readFile === 'function') {
     return readFile(sourcePath, { allowLarge: true }) || '';
@@ -251,7 +251,7 @@ function findProjectSourceFiles(rootDir, limit = 250) {
 function findProjectFilterEvidence({ projectPath, param, readFile }) {
   const projectRoot = path.resolve(projectPath || process.cwd());
   for (const file of findProjectSourceFiles(projectRoot)) {
-    const sourceRel = path.relative(projectRoot, file);
+    const sourceRel = path.relative(projectRoot, file).replace(/\\/g, '/');
     const content = typeof readFile === 'function'
       ? readFile(file, { allowLarge: true })
       : (() => {
