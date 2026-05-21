@@ -1001,7 +1001,7 @@ function fillDynamicPath(pathname: string, value: string | number): string {
 
 function collectionPathForDynamic(pathname: string): string {
   const normalized = String(pathname);
-  if (/^\/api\/comments\/issue\/[:{]/.test(normalized)) return '/api/issues';
+  if (/^\\/api\\/comments\\/issue\\/[:{]/.test(normalized)) return '/api/issues';
   return pathname
     .replace(/(?:\\/\\{[^}]+\\}|\\/:[A-Za-z_][\\w-]*)(?:\\/.*)?$/, '') || '/';
 }
@@ -1358,7 +1358,11 @@ function ensureQaContractSpec({ projectPath, context = {}, roles = [], testType 
   if (!spec) {
     return result;
   }
-  const generatedDir = path.join(projectPath, 'tests', 'generated');
+  // Tier-0 deterministic contracts live in a dedicated subdirectory so that
+  // resetGeneratedTestsDir() (which nukes AI-tier ephemera between runs) cannot
+  // delete the source-derived corpus. Playwright's default recursive testMatch
+  // still discovers these specs from tests/generated/.
+  const generatedDir = path.join(projectPath, 'tests', 'generated', 'tier0');
   fs.mkdirSync(generatedDir, { recursive: true });
   const targetPath = path.join(generatedDir, spec.filename);
   fs.writeFileSync(targetPath, spec.content, 'utf-8');

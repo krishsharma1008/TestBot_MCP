@@ -504,6 +504,57 @@ class HealixMCPServer {
     return /^\//.test(trimmed) || /^[A-Za-z]:[\\/]/.test(trimmed);
   }
 
+  // Normalize and validate a projectPath argument coming from an MCP tool call.
+  // Returns an absolute path that exists on disk; throws with code
+  // INVALID_PROJECT_PATH otherwise. Catches the class of bug where a Windows
+  // client (e.g. `c:\Users\...\thea`) sends its native path to a POSIX server:
+  // without this guard the pipeline silently creates a directory whose name
+  // contains backslashes and a colon and writes outputs into it.
+  validateProjectPath(input) {
+    const fallback = process.cwd();
+    const raw = (input == null || input === '') ? fallback : input;
+    if (typeof raw !== 'string') {
+      const err = new Error(`projectPath must be a string, got ${typeof raw}`);
+      err.code = 'INVALID_PROJECT_PATH';
+      throw err;
+    }
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      const err = new Error('projectPath cannot be empty');
+      err.code = 'INVALID_PROJECT_PATH';
+      throw err;
+    }
+    // Reject paths whose separator scheme does not match the current platform.
+    // On POSIX we treat a Windows drive-letter prefix or any backslash as
+    // foreign; on Windows the reverse check is not needed because forward
+    // slashes are accepted natively by Node's path APIs.
+    if (process.platform !== 'win32') {
+      if (/^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.includes('\\')) {
+        const err = new Error(
+          `projectPath looks like a Windows path but this MCP server is running on ${process.platform}: ${JSON.stringify(trimmed)}. ` +
+            `Pass a POSIX absolute path (e.g. /home/you/project) instead.`,
+        );
+        err.code = 'INVALID_PROJECT_PATH';
+        throw err;
+      }
+    }
+    const resolved = path.resolve(trimmed);
+    let stat;
+    try {
+      stat = fs.statSync(resolved);
+    } catch {
+      const err = new Error(`projectPath does not exist: ${resolved}`);
+      err.code = 'INVALID_PROJECT_PATH';
+      throw err;
+    }
+    if (!stat.isDirectory()) {
+      const err = new Error(`projectPath is not a directory: ${resolved}`);
+      err.code = 'INVALID_PROJECT_PATH';
+      throw err;
+    }
+    return resolved;
+  }
+
   resolveHeadlessPreference(params = {}) {
     const envHeadless = resolveBoolean(process.env.HEALIX_HEADLESS, true);
     return resolveBoolean(params.headless, envHeadless);
@@ -1348,7 +1399,7 @@ class HealixMCPServer {
     Logger.mcp('Index', 'handleConfigure called', { projectPath: params?.projectPath });
 
     try {
-      const projectPath = params.projectPath || process.cwd();
+      const projectPath = this.validateProjectPath(params.projectPath);
 
       Logger.info('Index', 'Analyzing project for configuration...');
 
@@ -1690,10 +1741,24 @@ Return the JSON structure above based on what you find in the codebase.
 
     Logger.mcp('Index', 'handleTestMyApp called', { projectPath: params?.projectPath });
 
+    let validatedProjectPath;
+    try {
+      validatedProjectPath = this.validateProjectPath(params.projectPath);
+    } catch (err) {
+      if (err && err.code === 'INVALID_PROJECT_PATH') {
+        Logger.warn('Index', `Rejecting healix_test_my_app: ${err.message}`);
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `INVALID_PROJECT_PATH: ${err.message}` }],
+        };
+      }
+      throw err;
+    }
+
     // 1. Fast auto-detection (~100ms)
     Logger.info('Index', 'Detecting project settings...');
     const detector = this.createAutoDetector();
-    const context = await detector.detect(params.projectPath || process.cwd());
+    const context = await detector.detect(validatedProjectPath);
 
     Logger.info('Index', `Project: ${context.projectName} (${context.language})`, { path: context.projectPath });
 
@@ -1960,7 +2025,18 @@ Return the JSON structure above based on what you find in the codebase.
         isError: true,
       };
     }
-    const projectPath = params.projectPath || process.cwd();
+    let projectPath;
+    try {
+      projectPath = this.validateProjectPath(params.projectPath);
+    } catch (err) {
+      if (err && err.code === 'INVALID_PROJECT_PATH') {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'INVALID_PROJECT_PATH', message: err.message }, null, 2) }],
+          isError: true,
+        };
+      }
+      throw err;
+    }
     const statusFile = path.join(projectPath, 'healix-reports', '.runs', runId, 'status.json');
 
     if (!fs.existsSync(statusFile)) {
@@ -2113,7 +2189,18 @@ Return the JSON structure above based on what you find in the codebase.
   async handleAnalyzeFailures(params) {
     Logger.mcp('Index', 'handleAnalyzeFailures called', { projectPath: params?.projectPath });
 
-    const projectPath = params.projectPath || process.cwd();
+    let projectPath;
+    try {
+      projectPath = this.validateProjectPath(params.projectPath);
+    } catch (err) {
+      if (err && err.code === 'INVALID_PROJECT_PATH') {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `INVALID_PROJECT_PATH: ${err.message}` }],
+        };
+      }
+      throw err;
+    }
     const testResultsPath = params.testResultsPath || `${projectPath}/test-results.json`;
     Logger.info('Index', `Analyzing failures in ${testResultsPath}...`);
 
@@ -2208,7 +2295,18 @@ Return the JSON structure above based on what you find in the codebase.
   async handleGenerateReport(params) {
     Logger.mcp('Index', 'handleGenerateReport called', { params });
 
-    const projectPath = params.projectPath || process.cwd();
+    let projectPath;
+    try {
+      projectPath = this.validateProjectPath(params.projectPath);
+    } catch (err) {
+      if (err && err.code === 'INVALID_PROJECT_PATH') {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `INVALID_PROJECT_PATH: ${err.message}` }],
+        };
+      }
+      throw err;
+    }
     const testResultsPath = params.testResultsPath || `${projectPath}/test-results.json`;
 
     Logger.info('Index', `Generating report from ${testResultsPath}...`);
