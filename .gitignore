@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.envrc
 
 # Test outputs
 test-results/
@@ -43,3 +44,9 @@ notebooks/
 
 # Local target apps cloned for Healix evaluation
 targets/
+
+# Python
+__pycache__/
+*.pyc
+
+.gradle/

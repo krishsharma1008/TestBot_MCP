@@ -3447,18 +3447,26 @@ function getCursorFixtureContent(serializedInitScript, moduleType = 'commonjs', 
   // it always picks up the freshest tokens (including those written by the
   // pre-execution refresh pass).
   const verifiedRoles = (roles || []).filter((r) => r && r.loginVerified && r.storageStatePath);
-  let authPreamble = '';
+  let authPreambleTs = '';
+  let authPreambleEsm = '';
   let authPreambleCjs = '';
   let authBlock = '';
   if (verifiedRoles.length > 0) {
     const stateMapEntries = verifiedRoles
       .map((r) => `  ${JSON.stringify(normalizeRoleLabel(r.role || r.name || 'user'))}: ${JSON.stringify(r.storageStatePath)}`)
       .join(',\n');
-    // ESM/TS: top-level import + named reference in helper
-    authPreamble =
+    // TS: ESM import + TS type annotations
+    authPreambleTs =
       `import { readFileSync as _healixReadFileSync } from 'fs';\n\n` +
       `const _HEALIX_ROLE_STATES: Record<string, string> = {\n${stateMapEntries},\n};\n\n` +
       `function _healixLoadState(p: string): any {\n` +
+      `  try { return JSON.parse(_healixReadFileSync(p, 'utf-8')); } catch { return null; }\n` +
+      `}\n\n`;
+    // ESM JS: same imports as TS, but no type annotations (Node parses .js as plain JS)
+    authPreambleEsm =
+      `import { readFileSync as _healixReadFileSync } from 'fs';\n\n` +
+      `const _HEALIX_ROLE_STATES = {\n${stateMapEntries},\n};\n\n` +
+      `function _healixLoadState(p) {\n` +
       `  try { return JSON.parse(_healixReadFileSync(p, 'utf-8')); } catch { return null; }\n` +
       `}\n\n`;
     // CJS: inline require in helper, no top-level import needed
@@ -3502,7 +3510,7 @@ function getCursorFixtureContent(serializedInitScript, moduleType = 'commonjs', 
 
   const ts = `import { test as base, expect, request } from '@playwright/test';
 
-${authPreamble}const test = base.extend({
+${authPreambleTs}const test = base.extend({
   page: ${pageFixtureBody},
 });
 
@@ -3514,7 +3522,7 @@ export { test, expect, request };
   // CJS projects: `module.exports = { ... }`, our historical default.
   const jsEsm = `import { test as base, expect, request } from '@playwright/test';
 
-${authPreamble}const test = base.extend({
+${authPreambleEsm}const test = base.extend({
   page: ${pageFixtureBody},
 });
 
@@ -3647,8 +3655,21 @@ function resolveFailureAnalysisProvider() {
 
 function resetGeneratedTestsDir(projectPath) {
   const testsDir = path.join(projectPath, 'tests', 'generated');
-  fs.rmSync(testsDir, { recursive: true, force: true });
   ensureDir(testsDir);
+  // Preserve the Tier-0 deterministic corpus so AI-tier failures cannot wipe
+  // out source-derived QA-contract coverage. Everything else in this directory
+  // is treated as AI-tier ephemera and safe to delete on each run.
+  let entries = [];
+  try {
+    entries = fs.readdirSync(testsDir, { withFileTypes: true });
+  } catch {
+    return testsDir;
+  }
+  for (const entry of entries) {
+    if (entry.name === 'tier0') continue;
+    const target = path.join(testsDir, entry.name);
+    fs.rmSync(target, { recursive: true, force: true });
+  }
   return testsDir;
 }
 
@@ -5218,7 +5239,33 @@ function auditGeneratedTestQuality({ projectPath, testType, context, exploration
     return { valid: false, ...summary };
   }
 
-  const files = fs.readdirSync(generatedDir).filter((name) => GENERATED_SPEC_FILE_PATTERN.test(name));
+  // Walk generatedDir recursively so we discover Tier-0 deterministic specs
+  // (preserved in tests/generated/tier0/) alongside top-level AI ephemera.
+  // Names are returned as paths relative to generatedDir (e.g. "foo.spec.ts"
+  // or "tier0/healix-qa-contracts.spec.ts") so path.join + content reads still
+  // work and downstream logs make the source obvious.
+  const collectGeneratedSpecs = (root) => {
+    const out = [];
+    const walk = (dir) => {
+      let entries;
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (entry.isFile() && GENERATED_SPEC_FILE_PATTERN.test(entry.name)) {
+          out.push(path.relative(root, full));
+        }
+      }
+    };
+    walk(root);
+    return out;
+  };
+  const files = collectGeneratedSpecs(generatedDir);
   summary.totalFiles = files.length;
   Logger.info('PipelineWorker', `[QUALITY AUDIT] Found ${files.length} spec file(s): ${files.join(', ') || '(none)'}`);
 
@@ -5387,7 +5434,7 @@ function auditGeneratedTestQuality({ projectPath, testType, context, exploration
       summary.riskyFiles.push(name);
     }
 
-    const isDeterministicQaContractFile = name === 'healix-qa-contracts.spec.ts' || /\[QAC:[^\]]+\]/.test(content);
+    const isDeterministicQaContractFile = path.basename(name) === 'healix-qa-contracts.spec.ts' || /\[QAC:[^\]]+\]/.test(content);
     const generatedBlocks = findGeneratedTestBlocks(content);
     const contextualSelectorIssueBlocks = generatedBlocks
       .map((block) => ({
@@ -5802,12 +5849,30 @@ function installMissingDependencies(projectPath, testsDir) {
     ...(packageJson.devDependencies || {})
   };
 
-  // Scan generated test files for imports
-  const testFiles = fs.readdirSync(testsDir).filter(f => GENERATED_SPEC_FILE_PATTERN.test(f));
+  // Scan generated test files for imports — walk subdirectories so Tier-0
+  // specs in tests/generated/tier0/ are scanned alongside top-level AI files.
+  const testFiles = [];
+  const walkSpecs = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walkSpecs(full);
+      } else if (entry.isFile() && GENERATED_SPEC_FILE_PATTERN.test(entry.name)) {
+        testFiles.push(full);
+      }
+    }
+  };
+  walkSpecs(testsDir);
   const missingDeps = new Set();
 
-  testFiles.forEach(file => {
-    const content = fs.readFileSync(path.join(testsDir, file), 'utf-8');
+  testFiles.forEach(filePath => {
+    const content = fs.readFileSync(filePath, 'utf-8');
     // Match: import ... from 'package' or import('package') or require('package')
     const importMatches = content.matchAll(/(?:import\s+.*?\s+from\s+['"]([^'"./][^'"]*?)['"]|import\(['"]([^'"./][^'"]*?)['"]\)|require\(['"]([^'"./][^'"]*?)['"]\))/g);
     

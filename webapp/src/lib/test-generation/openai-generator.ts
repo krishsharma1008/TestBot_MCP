@@ -850,7 +850,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown code blocks or explanations.`
 - Test both happy paths and error scenarios
 - Use accessible selectors (getByRole, getByLabel, getByText, getByTestId)
 - Add meaningful comments explaining test logic
-- Group related tests in describe blocks
+- Group related tests in \`test.describe\` blocks (Playwright does NOT expose a global \`describe\` — bare \`describe(...)\` will throw \`ReferenceError: describe is not defined\` during list/run)
 - Include proper test isolation
 - Splash / intro screens: always wait for the main content area to become interactive before asserting. If the app uses \`aria-hidden\` on \`<main>\` during a splash, use \`await page.waitForSelector('main:not([aria-hidden="true"])', { timeout: 8000 }).catch(() => {})\` after navigation. The __healix-fixture already injects sessionStorage keys to bypass known splash screens, but add the wait as a safety net.
 
@@ -2132,8 +2132,10 @@ Return JSON array only.`
     normalized = normalized.replace(/^```(?:typescript|ts|javascript|js)?\s*/i, '')
     normalized = normalized.replace(/\s*```$/i, '')
     normalized = normalized.replace(/\r\n/g, '\n')
-    // Playwright does not expose bare afterEach/beforeEach/afterAll/beforeAll globals.
-    // Replace any the AI emits with the correct test.* prefixed versions.
+    // Playwright does not expose bare describe/afterEach/beforeEach/afterAll/beforeAll
+    // globals. Replace any the AI emits with the correct test.* prefixed versions so
+    // the file does not throw `ReferenceError: describe is not defined` at list time.
+    normalized = normalized.replace(/(?<![.\w])describe\s*\(/g, 'test.describe(')
     normalized = normalized.replace(/(?<![.\w])afterEach\s*\(/g, 'test.afterEach(')
     normalized = normalized.replace(/(?<![.\w])beforeEach\s*\(/g, 'test.beforeEach(')
     normalized = normalized.replace(/(?<![.\w])afterAll\s*\(/g, 'test.afterAll(')
