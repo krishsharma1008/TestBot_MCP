@@ -7243,7 +7243,7 @@ async function runAsyncGenerationPath({
   };
 }
 
-async function generateWithFallbackChain({ config, context, prdContent, runBudget, projectInfo, parsedPRD, explorationArtifact, roles, statusDir = null, runId = null, telemetryReporter = null }) {
+async function generateWithFallbackChain({ config, context, prdContent, runBudget, projectInfo, parsedPRD, explorationArtifact, roles, statusDir = null, runId = null, telemetryReporter = null, durableClient = null }) {
   const generationMeta = {
     provider: null,
     selectedGenerator: null,
@@ -8401,6 +8401,23 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
         });
       }
     }
+
+    // Stream Tier-0 findings to the dashboard immediately — these are available
+    // ~90s into the run, long before AI generation or test execution completes.
+    if (durableClient && deterministicTier0Pack && deterministicTier0Pack.written) {
+      const tier0Findings = deterministicTier0Pack.qaContractQuestions
+        ? Object.entries(deterministicTier0Pack.qaContractQuestions).map(([endpoint, questions]) => ({
+            source: 'tier0_deterministic',
+            endpoint,
+            tests: Array.isArray(questions) ? questions.length : 0,
+          }))
+        : [];
+      durableClient.patchFindings(runId, {
+        findings: tier0Findings,
+        phase: 'tier0_complete',
+      }).catch(() => undefined);
+    }
+
     const saasResult = await maybeGenerateViaSaaS({
       config,
       context,
@@ -8649,6 +8666,17 @@ async function runPipeline(config, runId) {
   } else {
     setDurablePhaseReporter(null);
     setStageBudgetReporter(null);
+  }
+
+  // Create a test_runs row immediately so the dashboard can show "In Progress"
+  // before the 25-minute pipeline finishes. Non-blocking — pipeline continues
+  // whether or not this succeeds.
+  if (durableClient) {
+    durableClient.createRun({
+      runId,
+      creationName: config.projectName || 'Unnamed run',
+      projectPath: config.projectPath || null,
+    }).catch(() => undefined);
   }
 
   // Kill any leftover Healix-started dev server from a previous run.
@@ -9336,6 +9364,7 @@ async function runPipeline(config, runId) {
             statusDir,
             runId,
             telemetryReporter,
+            durableClient,
           });
 
           generationMeta = generationResult.generationMeta;
@@ -9947,6 +9976,16 @@ async function runPipeline(config, runId) {
 
     let testResults;
 
+    // Heartbeat loop: ping the dashboard every 30s so it knows the worker is
+    // alive. Cleared in the finally block regardless of outcome.
+    let _heartbeatTimer = null;
+    if (durableClient) {
+      _heartbeatTimer = setInterval(() => {
+        durableClient.patchHeartbeat(runId, 'executing').catch(() => undefined);
+      }, 30_000);
+    }
+
+    try {
     testResults = await withStageBudget(runBudget, 'execution', async () => {
       if (!mcpParallelEnabled) {
         return playwright.runTests();
@@ -9990,6 +10029,10 @@ async function runPipeline(config, runId) {
       });
       return mcpOutcome.value;
     });
+    } finally {
+      // Stop the heartbeat once tests complete (success or failure).
+      if (_heartbeatTimer) { clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
+    }
     if (progressFlushTimer) {
       clearTimeout(progressFlushTimer);
       progressFlushTimer = null;
@@ -10013,6 +10056,15 @@ async function runPipeline(config, runId) {
       testResults.tierResults = tierResults;
     } catch (tierErr) {
       Logger.warn('PipelineWorker', 'Failed to compute tier results', { reason: tierErr.message });
+    }
+
+    // Stream tier-level results to the dashboard immediately after execution —
+    // finding counts and pass/fail counts become visible before AI triage.
+    if (durableClient && tierResults) {
+      durableClient.patchFindings(runId, {
+        tierResults,
+        phase: 'execution_complete',
+      }).catch(() => undefined);
     }
 
     if (testResults.total > 0 && testResults.skipped === testResults.total) {
@@ -10121,6 +10173,16 @@ async function runPipeline(config, runId) {
     // -------------------------------------------------------
     // 7. Generate report
     // -------------------------------------------------------
+    // Mark the run completed_partial before the final ingest so any partial
+    // findings already on the dashboard stay visible if ingest is slow/fails.
+    if (durableClient) {
+      const finalStats = testResults
+        ? { total: testResults.total, passed: testResults.passed, failed: testResults.failed, skipped: testResults.skipped, duration: testResults.duration }
+        : null;
+      const prelimStatus = testResults && testResults.failed === 0 && testResults.total > 0 ? 'passed' : 'completed_partial';
+      durableClient.patchComplete(runId, prelimStatus, finalStats ? { report: { stats: finalStats }, tier_results: tierResults } : null).catch(() => undefined);
+    }
+
     updateStatus(statusDir, 'reporting', {
       runId,
       message: 'Generating report...',

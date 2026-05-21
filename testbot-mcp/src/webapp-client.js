@@ -887,6 +887,107 @@ class WebappClient {
     });
   }
 
+  // PATCH helper — mirrors _post but uses the PATCH method. Lightweight:
+  // no retry loop, short ceiling, fire-and-forget friendly.
+  async _patch(path, body, { timeoutMs } = {}) {
+    const url = `${this.dashboardUrl}${path}`;
+    const fetchFn = getFetch();
+    const limit = Number.isFinite(timeoutMs) ? timeoutMs : 8_000;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), limit);
+    let response;
+    try {
+      response = await fetchFn(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': this.apiKey || '' },
+        body: JSON.stringify(body || {}),
+        signal: controller.signal,
+      });
+    } catch (networkErr) {
+      clearTimeout(timer);
+      if (networkErr.name === 'AbortError') {
+        const err = new Error(`Healix webapp PATCH timed out after ${limit}ms: ${path}`);
+        err.code = 'WEBAPP_TIMEOUT';
+        throw err;
+      }
+      const err = new Error(`Cannot reach Healix webapp at ${url}: ${networkErr.message}`);
+      err.code = 'WEBAPP_UNREACHABLE';
+      throw err;
+    }
+    clearTimeout(timer);
+    const rawText = await response.text().catch(() => '');
+    let payload = null;
+    try { payload = rawText ? JSON.parse(rawText) : null; } catch { payload = null; }
+    if (!response.ok) {
+      const detail = payload?.error || rawText.slice(0, 200) || `HTTP ${response.status}`;
+      const err = new Error(`Healix webapp PATCH ${path} failed (${response.status}): ${detail}`);
+      err.code = response.status >= 500 ? 'WEBAPP_SERVER_ERROR' : 'WEBAPP_ERROR';
+      err.status = response.status;
+      throw err;
+    }
+    return payload;
+  }
+
+  // Create a test_runs row at the very start of the pipeline (status=running).
+  // Idempotent: if the row already exists for this run_id the server returns 200.
+  async createRun({ runId, creationName, projectPath } = {}) {
+    if (!this.apiKey || !runId) return null;
+    try {
+      return await this._post('/api/test-runs/create', {
+        api_key: this.apiKey,
+        run_id: runId,
+        creation_name: creationName || 'Unnamed run',
+        project_path: projectPath || null,
+      }, { timeoutMs: 8_000 });
+    } catch (err) {
+      Logger.warn('WebappClient', 'createRun failed (non-blocking)', {
+        runId, code: err?.code, message: err?.message,
+      });
+      return null;
+    }
+  }
+
+  // Append partial findings + optional tierResults to the run row.
+  async patchFindings(runId, { findings, tierResults, phase } = {}) {
+    if (!this.apiKey || !runId) return null;
+    return this._patch(`/api/test-runs/${encodeURIComponent(runId)}/findings`, {
+      api_key: this.apiKey,
+      findings: Array.isArray(findings) ? findings : [],
+      tier_results: tierResults || null,
+      phase: phase || null,
+    }).catch((err) => {
+      Logger.warn('WebappClient', 'patchFindings failed (non-blocking)', {
+        runId, code: err?.code, message: err?.message,
+      });
+      return null;
+    });
+  }
+
+  // Update last_heartbeat_at so the dashboard can detect a stalled worker.
+  async patchHeartbeat(runId, phase) {
+    if (!this.apiKey || !runId) return null;
+    return this._patch(`/api/test-runs/${encodeURIComponent(runId)}/heartbeat`, {
+      api_key: this.apiKey,
+      phase: phase || null,
+    }).catch(() => null); // completely silent — heartbeat must never interrupt the pipeline
+  }
+
+  // Mark the run as completed / completed_partial / error. Optionally attach
+  // final stats so the dashboard row shows accurate counts even before ingest.
+  async patchComplete(runId, status, finalData) {
+    if (!this.apiKey || !runId) return null;
+    return this._patch(`/api/test-runs/${encodeURIComponent(runId)}/complete`, {
+      api_key: this.apiKey,
+      status: status || 'completed_partial',
+      final_data: finalData || null,
+    }).catch((err) => {
+      Logger.warn('WebappClient', 'patchComplete failed (non-blocking)', {
+        runId, status, code: err?.code, message: err?.message,
+      });
+      return null;
+    });
+  }
+
   /**
    * Fire-and-forget durable phase write. If the webapp is unreachable, the call
    * fails silently — the pipeline must never block on this best-effort state.

@@ -107,6 +107,15 @@ async function loadFailuresForRun(runId: string, userId: string) {
   }))
 }
 
+const STALE_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
+
+function resolveEffectiveStatus(status: string | null, lastHeartbeatAt: Date | null): string {
+  if (status !== 'running') return status ?? 'unknown'
+  if (!lastHeartbeatAt) return status
+  const age = Date.now() - new Date(lastHeartbeatAt).getTime()
+  return age > STALE_THRESHOLD_MS ? 'stalled' : status
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -148,7 +157,7 @@ export async function GET(
           id: ingestedRow.id,
           user_id: ingestedRow.userId,
           creation_name: ingestedRow.creationName,
-          status: ingestedRow.status,
+          status: resolveEffectiveStatus(ingestedRow.status, ingestedRow.lastHeartbeatAt ?? null),
           total_tests: ingestedRow.totalTests,
           passed_tests: ingestedRow.passedTests,
           failed_tests: ingestedRow.failedTests,
@@ -162,6 +171,8 @@ export async function GET(
           tier_results: ingestedRow.tierResults ?? null,
           pipeline_error: ingestedRow.pipelineError ?? null,
           finding_summary: ingestedRow.findingSummary ?? null,
+          partial_findings: ingestedRow.partialFindings ?? null,
+          last_heartbeat_at: ingestedRow.lastHeartbeatAt?.toISOString() ?? null,
           qa_findings,
           test_failures,
           framework: ingestedRow.framework,
@@ -208,7 +219,7 @@ export async function GET(
       id: row.id,
       user_id: row.userId,
       creation_name: row.creationName,
-      status: row.status,
+      status: resolveEffectiveStatus(row.status, row.lastHeartbeatAt ?? null),
       total_tests: row.totalTests,
       passed_tests: row.passedTests,
       failed_tests: row.failedTests,
@@ -222,6 +233,8 @@ export async function GET(
       tier_results: row.tierResults ?? null,
       pipeline_error: row.pipelineError ?? null,
       finding_summary: row.findingSummary ?? null,
+      partial_findings: row.partialFindings ?? null,
+      last_heartbeat_at: row.lastHeartbeatAt?.toISOString() ?? null,
       qa_findings,
       test_failures,
       framework: row.framework,

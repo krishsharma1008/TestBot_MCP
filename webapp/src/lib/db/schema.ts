@@ -91,6 +91,11 @@ export const testRuns = pgTable(
     tierResults: jsonb('tier_results'),
     pipelineError: jsonb('pipeline_error'),
     findingSummary: jsonb('finding_summary').$type<FindingSummary>(),
+    // Prompt-2 live-ingest columns: lastHeartbeatAt tracks worker liveness
+    // (stalled if > 5 min old and status='running'); partialFindings accumulates
+    // findings streamed before the final ingest completes.
+    lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true }),
+    partialFindings: jsonb('partial_findings'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
