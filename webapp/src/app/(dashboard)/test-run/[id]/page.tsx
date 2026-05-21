@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { TestRun, TestFailure, FailureVerdict, QaFinding, FindingSummary } from '@/lib/types/database';
+import { subscribeToRun, type RunRealtimeUpdate } from '@/lib/supabase/realtime';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -466,6 +467,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function runStatusLabel(status: string | null | undefined): string {
   if (status === 'completed_with_findings') return 'completed with findings';
+  if (status === 'completed_partial') return 'partial results';
+  if (status === 'stalled') return 'stalled';
   return status || 'unknown';
 }
 
@@ -474,6 +477,8 @@ function runStatusClass(status: string | null | undefined): string {
   if (status === 'failed') return 'bg-red-500/10 border border-red-500/20 text-red-400';
   if (status === 'running') return 'bg-blue-500/10 border border-blue-500/20 text-blue-400';
   if (status === 'completed_with_findings') return 'bg-amber-500/10 border border-amber-500/25 text-amber-300';
+  if (status === 'completed_partial') return 'bg-orange-500/10 border border-orange-500/20 text-orange-300';
+  if (status === 'stalled') return 'bg-orange-500/15 border border-orange-500/30 text-orange-400';
   return 'bg-amber-500/10 border border-amber-500/20 text-amber-400';
 }
 
@@ -3365,6 +3370,10 @@ export default function TestRunDetailPage() {
   const [pipelineEnded, setPipelineEnded] = useState(false);
   const [testResultsOpen, setTestResultsOpen] = useState(true);
   const [overviewOpen, setOverviewOpen] = useState(false);
+  // Prompt-2: last heartbeat timestamp for stalled detection
+  const [lastHeartbeat, setLastHeartbeat] = useState<string | null>(null);
+  // Prompt-2: partial findings streamed before final ingest
+  const [partialFindings, setPartialFindings] = useState<unknown[]>([]);
 
   const testResultsHeaderRef = useRef<HTMLDivElement>(null);
   const evtSourceRef = useRef<EventSource | null>(null);
@@ -3664,6 +3673,51 @@ export default function TestRunDetailPage() {
     return () => clearInterval(timer);
   }, [id, activePolling, isLiveDetailId, isLiveOrRunning]);
 
+  // ── Prompt-2: Supabase realtime subscription ──────────────────────────────
+  // Listens for DB-level updates pushed by the MCP partial-ingest endpoints.
+  // Supplements the SSE stream — any DB row change reaches the UI in real time
+  // without the client needing to poll.
+  useEffect(() => {
+    if (!id || id.startsWith('live-')) return;
+    const unsubscribe = subscribeToRun(id, (update: RunRealtimeUpdate) => {
+      setTestRun((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ...(update.status ? { status: update.status as TestRun['status'] } : {}),
+          ...(update.tier_results != null ? { tier_results: update.tier_results as TestRun['tier_results'] } : {}),
+          ...(update.current_phase ? { current_phase: update.current_phase } : {}),
+          ...(update.total_tests != null ? { total_tests: update.total_tests } : {}),
+          ...(update.passed_tests != null ? { passed_tests: update.passed_tests } : {}),
+          ...(update.failed_tests != null ? { failed_tests: update.failed_tests } : {}),
+          ...(update.skipped_tests != null ? { skipped_tests: update.skipped_tests } : {}),
+          ...(update.updated_at ? { updated_at: update.updated_at } : {}),
+        };
+      });
+      if (update.last_heartbeat_at) setLastHeartbeat(update.last_heartbeat_at);
+      if (Array.isArray(update.partial_findings)) setPartialFindings(update.partial_findings);
+    });
+    return unsubscribe;
+  }, [id]);
+
+  // ── Prompt-2: Client-side stalled detection ───────────────────────────────
+  // If the run is 'running' and the heartbeat is > 5 min old, flip to 'stalled'
+  // locally so the user sees the state change without a full reload.
+  useEffect(() => {
+    if (!testRun || testRun.status !== 'running') return;
+    const STALE_MS = 5 * 60 * 1000;
+    const timer = setInterval(() => {
+      const hb = lastHeartbeat ?? (testRun as TestRun & { last_heartbeat_at?: string }).last_heartbeat_at;
+      if (hb) {
+        const age = Date.now() - new Date(hb).getTime();
+        if (age > STALE_MS) {
+          setTestRun((prev) => prev ? { ...prev, status: 'stalled' } : prev);
+        }
+      }
+    }, 15_000);
+    return () => clearInterval(timer);
+  }, [testRun, lastHeartbeat]);
+
   // ── Loading ──
   if (loading) {
     return (
@@ -3928,6 +3982,74 @@ export default function TestRunDetailPage() {
       {pipelineError && (
         <PipelineErrorBanner error={pipelineError as PipelineErrorShape} runId={testRun.id} />
       )}
+
+      {/* Prompt-2: stalled banner */}
+      {testRun.status === 'stalled' && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card rounded-2xl p-4 border border-orange-500/30 bg-orange-500/5 flex items-start gap-3"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-400 mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div>
+            <div className="text-orange-300 font-semibold text-sm">Worker stalled</div>
+            <div className="text-[#8BA4C8] text-xs mt-0.5">
+              No heartbeat received for over 5 minutes. The pipeline worker may have crashed.
+              {lastHeartbeat && (
+                <> Last seen: {new Date(lastHeartbeat).toLocaleTimeString()}.</>
+              )}
+              {!lastHeartbeat && (testRun as TestRun & { last_heartbeat_at?: string }).last_heartbeat_at && (
+                <> Last seen: {new Date((testRun as TestRun & { last_heartbeat_at?: string }).last_heartbeat_at!).toLocaleTimeString()}.</>
+              )}
+              {' '}Partial findings below may still be useful.
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Prompt-2: completed_partial banner */}
+      {testRun.status === 'completed_partial' && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card rounded-2xl p-4 border border-amber-500/30 bg-amber-500/5 flex items-start gap-3"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-400 mt-0.5 shrink-0"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div>
+            <div className="text-amber-300 font-semibold text-sm">Partial results</div>
+            <div className="text-[#8BA4C8] text-xs mt-0.5">
+              The pipeline completed with partial results. Some tests or tiers may not have finished.
+              {partialFindings.length > 0 && <> {partialFindings.length} partial finding(s) preserved.</>}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Prompt-2: tier-pill banner — shown during running or after execution */}
+      {(testRun.status === 'running' || testRun.status === 'stalled' || testRun.tier_results) && (() => {
+        const tr = testRun.tier_results as Record<string, { passed?: number; failed?: number; total?: number }> | null;
+        if (!tr || Object.keys(tr).length === 0) return null;
+        return (
+          <div className="flex gap-2 flex-wrap">
+            {Object.entries(tr).map(([key, counts]) => {
+              const passed = counts?.passed ?? 0;
+              const failed = counts?.failed ?? 0;
+              const total = counts?.total ?? 0;
+              const pillColor = failed > 0
+                ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                : total === 0
+                  ? 'bg-white/5 border-white/10 text-[#8BA4C8]'
+                  : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+              const label = key.replace('B-auth-', 'Tier B · ').replace('A-public', 'Tier A · Public').replace('C-backend', 'Tier C · API');
+              return (
+                <span key={key} className={`px-3 py-1 rounded-full text-xs font-semibold border ${pillColor}`}>
+                  {label} · {passed}/{total}
+                </span>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {visibleAgentFailures.length > 0 && (
         <FailedAgentRetryPanel

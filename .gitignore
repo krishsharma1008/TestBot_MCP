@@ -18,6 +18,12 @@ playwright-report/
 .ai-agent-temp/
 ai-agent-requests/
 
+# Python bytecode cache (auto-generated, never commit)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 # Build
 dist/
 build/

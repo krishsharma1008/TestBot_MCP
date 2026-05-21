@@ -28,10 +28,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${spaceGrotesk.variable} ${spaceMono.variable} antialiased bg-black text-white`}
         style={{ fontFamily: "var(--font-space-grotesk), 'Space Grotesk', sans-serif" }}
+        suppressHydrationWarning
       >
         {children}
       </body>
