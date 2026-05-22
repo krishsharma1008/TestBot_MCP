@@ -11,6 +11,7 @@ import {
   index,
   uniqueIndex,
   check,
+  serial,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { GenerationPlan } from '@/lib/test-generation/plan-schema'
@@ -605,5 +606,28 @@ export const payments = pgTable(
       'payments_status_check',
       sql`status IN ('pending','succeeded','failed','refunded')`
     ),
+  ]
+)
+
+export const dispatchedFindings = pgTable(
+  'dispatched_findings',
+  {
+    id: serial('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    findingKey: text('finding_key').notNull(),
+    adapter: text('adapter').notNull(),
+    externalRef: text('external_ref'),
+    payload: jsonb('payload'),
+    dispatchedAt: timestamp('dispatched_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('dispatched_findings_user_key_adapter_idx').on(
+      table.userId,
+      table.findingKey,
+      table.adapter
+    ),
+    index('idx_dispatched_findings_user').on(table.userId),
   ]
 )
