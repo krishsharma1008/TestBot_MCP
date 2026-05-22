@@ -143,6 +143,8 @@ class ConfigUILauncher {
       minGeneratedTests: String(projectInfo.minGeneratedTests || 50),
       coverageProfile: projectInfo.coverageProfile || 'qa-max',
       phaseMode: projectInfo.phaseMode || 'two-phase',
+      artifactMode: projectInfo.artifactMode || 'full',
+      showMouseCursorInVideo: String(projectInfo.showMouseCursorInVideo !== false),
       serverPort: String(this.config.port),
     });
 

@@ -1443,9 +1443,9 @@ module.exports = defineConfig({
   
   use: {
     baseURL: process.env.BASE_URL || '${this.config.baseURL}',
-    trace: 'retain-on-failure',
-    screenshot: 'on',
-    video: 'retain-on-failure',
+    trace: process.env.HEALIX_ARTIFACT_MODE === 'full' ? 'on' : 'retain-on-failure',
+    screenshot: process.env.HEALIX_ARTIFACT_MODE === 'full' ? 'on' : 'on',
+    video: process.env.HEALIX_ARTIFACT_MODE === 'full' ? 'on' : 'retain-on-failure',
   },
 
   projects: [

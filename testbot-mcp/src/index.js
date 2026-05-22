@@ -426,11 +426,11 @@ class HealixMCPServer {
     if (!credentials) return undefined;
     
     if (Array.isArray(credentials)) {
-      const validCreds = credentials.filter(c => c.username || c.password);
+      const validCreds = credentials.filter(c => c.username && c.password);
       return validCreds.length > 0 ? validCreds : undefined;
     }
     
-    if (credentials.username || credentials.password) {
+    if (credentials.username && credentials.password) {
       return [credentials];
     }
     
@@ -529,21 +529,7 @@ class HealixMCPServer {
     // finalConfig.configAutoFixes alongside the port/startCommand corrections.
     const configAutoUpgrades = [];
 
-    // strictAIGeneration normalization. The canonical default is TRUE. If we're
-    // auto-upgrading (local project with pages), we also force this true even
-    // if the caller passed false, because template-only generation on local
-    // codebases reliably produces low-quality suites (the l9ptet incident).
     let strictAIGeneration = params.strictAIGeneration !== false;
-    if (shouldAutoUpgrade && params.strictAIGeneration === false) {
-      strictAIGeneration = true;
-      configAutoUpgrades.push({
-        kind: 'config_auto_upgraded',
-        detail: 'Promoted strictAIGeneration=false → true for local project with detected pages/workflows',
-        field: 'strictAIGeneration',
-        from: false,
-        to: true,
-      });
-    }
 
     // Initial generationMode resolution (before auto-upgrade).
     let resolvedGenerationMode = strictAIGeneration
@@ -565,32 +551,21 @@ class HealixMCPServer {
     let minGeneratedTests = Number.isFinite(parsedMinGeneratedTests) && parsedMinGeneratedTests > 0
       ? Math.floor(parsedMinGeneratedTests)
       : 50;
-    if (shouldAutoUpgrade && minGeneratedTests < 50) {
+    if (shouldAutoUpgrade && minGeneratedTests < 5) {
       const previous = minGeneratedTests;
-      minGeneratedTests = 50;
+      minGeneratedTests = 5;
       configAutoUpgrades.push({
         kind: 'config_auto_upgraded',
-        detail: `Promoted minGeneratedTests=${previous} → 50 for local project with detected pages/workflows`,
+        detail: `Promoted minGeneratedTests=${previous} → 5 for local project with detected pages/workflows`,
         field: 'minGeneratedTests',
         from: previous,
-        to: 50,
+        to: 5,
       });
     }
 
     // coverageProfile upgrade — 'balanced' on a local project with pages
     // produced the zapminds l9ptet 42% pass rate; 'qa-max' is the new floor.
     let coverageProfile = params.coverageProfile || 'qa-max';
-    if (shouldAutoUpgrade && params.coverageProfile === 'balanced') {
-      coverageProfile = 'qa-max';
-      configAutoUpgrades.push({
-        kind: 'config_auto_upgraded',
-        detail: 'Promoted coverageProfile=balanced → qa-max for local project with detected pages/workflows',
-        field: 'coverageProfile',
-        from: 'balanced',
-        to: 'qa-max',
-      });
-    }
-
     if (configAutoUpgrades.length > 0) {
       Logger.info('Index', `Auto-upgraded ${configAutoUpgrades.length} generation config field(s) for local project`, {
         projectPath: context.projectPath,
@@ -643,11 +618,11 @@ class HealixMCPServer {
       jira: params.jira,
       openDashboard: params.openDashboard !== false,
       generationMode: resolvedGenerationMode,
-      artifactMode: params.artifactMode || 'hybrid',
+      artifactMode: params.artifactMode || 'full',
+      showMouseCursorInVideo: params.showMouseCursorInVideo !== false,
       browserMode: params.browserMode || 'chromium',
       validateGeneratedTests: params.validateGeneratedTests !== false,
       aiFailureAnalysis: params.aiFailureAnalysis !== false,
-      showMouseCursorInVideo: params.showMouseCursorInVideo !== false,
       strictAIGeneration,
       aiOnlyEnforced: strictAIGeneration,
       minGeneratedTests,
@@ -1731,7 +1706,7 @@ Return the JSON structure above based on what you find in the codebase.
           ],
         };
       }
-      if (['queued','started','detecting','context','context_enrichment','jira','port_conflict','warning','parsing_prd','prd_parsed','plan_generated','exploring','explored','auth_injecting','auth_injected','generating','generation_partial','generation_async_enqueued','generation_async_progress','running','running_tests','secondary_services_started','tests_complete','reporting','uploading_artifacts','artifacts_uploaded'].includes(recent.data.phase) && ageMs < 30 * 60 * 1000) {
+      if (['queued','started','detecting','context','context_enrichment','jira','port_conflict','dev_server_reused','server_start_blocked','warning','parsing_prd','prd_parsed','plan_generated','exploring','explored','auth_injecting','auth_injected','auth_refreshing','auth_refresh_reused_preauth','generating','generation_partial','generation_async_enqueued','generation_async_progress','running','running_tests','secondary_services_started','tests_complete','reporting','uploading_artifacts','artifacts_uploaded'].includes(recent.data.phase) && ageMs < 30 * 60 * 1000) {
         return {
           content: [
             {

@@ -116,7 +116,18 @@ class Logger {
       const header = `[${timestamp}] [${level}] [${moduleName}] ${safeMessage}`;
       consoleOutput = header.slice(0, MAX_STDERR_WRITE - 32) + ' [+truncated]\n';
     }
-    process.stderr.write(consoleOutput);
+    const skipStderr = true;
+    try {
+      if (!skipStderr && !process.stderr.destroyed && process.stderr.writable !== false) {
+        process.stderr.write(consoleOutput);
+      }
+    } catch (e) {
+      if (e?.code !== 'EPIPE') {
+        try {
+          fs.appendFileSync(this.errorLogPath || path.join(__dirname, '..', 'logs', 'error.log'), `[${timestamp}] [ERROR] [Logger] stderr write failed: ${e.message}\n`);
+        } catch (_) {}
+      }
+    }
 
     // File logging
     if (this.logsDir) {
