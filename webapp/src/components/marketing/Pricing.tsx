@@ -5,58 +5,62 @@ import Link from 'next/link';
 
 const TIERS = [
   {
-    name: 'Starter',
-    price: '$0',
-    period: '/month',
-    tagline: 'Perfect for individual developers',
-    features: [
-      { text: 'Unlimited test runs', included: true },
-      { text: 'Auto-detection', included: true },
-      { text: 'OpenAI test generation', included: true },
-      { text: 'Interactive dashboard', included: true },
-      { text: '1 AI provider', included: true },
-      { text: 'Jira integration', included: false },
-      { text: 'Team analytics', included: false },
-    ],
+    id: 'free',
+    name: 'Trial',
+    price: 'Free',
+    priceNote: 'forever',
+    description: 'Start free. No credit card required.',
+    tokenLabel: '500 credits / month',
+    features: ['1 user · 1 project', 'Basic AI models', 'Basic test types', 'Community support'],
     cta: 'Get Started Free',
     ctaHref: '/home',
-    popular: false,
+    highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '$29',
-    period: '/month',
-    tagline: 'For teams who ship fast',
-    features: [
-      { text: 'Everything in Starter', included: true },
-      { text: 'Jira integration', included: true },
-      { text: 'All AI providers', included: true },
-      { text: 'Team analytics', included: true },
-      { text: 'Priority support', included: true },
-      { text: 'CI/CD integration', included: true },
-      { text: 'Custom AI prompts', included: true },
-    ],
-    cta: 'Start Pro Trial',
+    id: 'starter',
+    name: 'Starter',
+    price: '$15',
+    priceNote: '/month',
+    description: 'Advanced AI for growing teams.',
+    tokenLabel: '2,500 credits / month',
+    features: ['Advanced AI models', 'All test types · self healing', 'Jira / ADO integration', 'Priority support'],
+    cta: 'Get Started',
     ctaHref: '/home',
-    popular: true,
+    highlighted: false,
   },
   {
+    id: 'team',
+    name: 'Team',
+    price: '$30',
+    priceNote: '/month',
+    description: 'Scalable testing for engineering teams.',
+    tokenLabel: '10,000 credits / month',
+    features: [
+      'Advanced models + priority queue',
+      'Custom integrations (10 hrs onboarding)',
+      'CI/CD pipeline integration',
+      'Priority support (< 4hr SLA)',
+    ],
+    cta: 'Start Team Trial',
+    ctaHref: '/home',
+    highlighted: true,
+  },
+  {
+    id: 'enterprise',
     name: 'Enterprise',
     price: 'Custom',
-    period: '',
-    tagline: 'For large engineering teams',
+    priceNote: '',
+    description: 'Custom AI, dedicated infrastructure, and SLA.',
+    tokenLabel: 'Unlimited credits',
     features: [
-      { text: 'Everything in Pro', included: true },
-      { text: 'SSO / SAML', included: true },
-      { text: 'Self-hosted option', included: true },
-      { text: 'Custom AI model', included: true },
-      { text: 'SLA guarantee', included: true },
-      { text: 'Dedicated support', included: true },
-      { text: 'Audit logs', included: true },
+      'Custom AI model selection',
+      'API access + custom agents',
+      'Dedicated CSM + 99.9% SLA',
+      'SSO/SAML + compliance',
     ],
     cta: 'Contact Sales',
     ctaHref: 'mailto:Swathi.Dharshna@zapcg.com',
-    popular: false,
+    highlighted: false,
   },
 ];
 
@@ -79,56 +83,41 @@ export default function Pricing() {
         </motion.div>
 
         {/* Pricing cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {TIERS.map((tier, i) => (
             <motion.div
-              key={tier.name}
+              key={tier.id}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.08 }}
-              whileHover={{ x: -2, y: -2, boxShadow: '6px 6px 0px #ffffff', borderColor: '#ffffff' }}
-              className={`relative bg-[#111] p-8 flex flex-col transition-all duration-75 ${
-                tier.popular
-                  ? 'border-2 border-white shadow-[4px_4px_0px_#ffffff]'
-                  : 'border-2 border-[#333] shadow-[4px_4px_0px_#333]'
+              className={`relative bg-[#111] p-6 flex flex-col border-2 transition-all duration-75 ${
+                tier.highlighted
+                  ? 'border-blue-500/50 shadow-[0_0_40px_rgba(59,130,246,0.15)]'
+                  : 'border-[#333] shadow-[4px_4px_0px_#333]'
               }`}
             >
-              {/* Popular badge */}
-              {tier.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                  <span className="y2k-badge bg-white text-black border-black animate-stamp">★ Most Popular</span>
+              <div className="mb-5">
+                <h3 className="text-white font-semibold text-base mb-1">{tier.name}</h3>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-3xl font-bold text-white">{tier.price}</span>
+                  {tier.priceNote && (
+                    <span className="text-[#a0a0a0] text-sm">{tier.priceNote}</span>
+                  )}
                 </div>
-              )}
-
-              {/* Top accent */}
-              {tier.popular && <div className="absolute top-0 left-0 right-0 h-0.5 bg-white" />}
-
-              <div className="mb-6">
-                <div className="text-[#a0a0a0] text-xs font-black uppercase tracking-widest font-mono mb-3">{tier.name}</div>
-                <div className="flex items-end gap-1 mb-1">
-                  <span className="text-4xl font-black text-white font-mono">{tier.price}</span>
-                  {tier.period && <span className="text-[#a0a0a0] text-sm mb-1 font-mono">{tier.period}</span>}
-                </div>
-                <p className="text-[#505050] text-xs font-mono">{tier.tagline}</p>
+                <p className="text-[#606060] text-xs mb-1.5">{tier.description}</p>
+                <span className="inline-block text-xs font-medium text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded-full">
+                  {tier.tokenLabel}
+                </span>
               </div>
 
-              <ul className="flex flex-col gap-3 mb-8 flex-1">
+              <ul className="flex flex-col gap-2.5 flex-1 mb-6">
                 {tier.features.map((feat) => (
-                  <li
-                    key={feat.text}
-                    className={`flex items-center gap-2.5 text-xs font-mono ${feat.included ? 'text-[#a0a0a0]' : 'text-[#333] line-through'}`}
-                  >
-                    <span
-                      className={`flex-shrink-0 w-4 h-4 border flex items-center justify-center text-xs font-black ${
-                        feat.included
-                          ? 'border-white text-white'
-                          : 'border-[#333] text-[#333]'
-                      }`}
-                    >
-                      {feat.included ? '✓' : '✗'}
-                    </span>
-                    {feat.text}
+                  <li key={feat} className="flex items-start gap-2 text-sm text-[#a0a0a0]">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="mt-0.5 shrink-0 text-blue-400">
+                      <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {feat}
                   </li>
                 ))}
               </ul>
@@ -136,8 +125,8 @@ export default function Pricing() {
               <Link
                 href={tier.ctaHref}
                 className={`w-full py-3 text-xs font-black text-center uppercase tracking-widest font-mono transition-all ${
-                  tier.popular
-                    ? 'bg-white text-black border-2 border-black hover:bg-black hover:text-white hover:border-white'
+                  tier.highlighted
+                    ? 'bg-blue-500 text-white border-2 border-blue-600 hover:bg-blue-400'
                     : 'bg-transparent text-white border-2 border-white hover:bg-white hover:text-black'
                 }`}
               >

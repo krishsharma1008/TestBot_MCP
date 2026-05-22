@@ -3673,6 +3673,7 @@ const HEALIX_GITIGNORE_ENTRIES = [
   '.healix/',
   '.healix-server.pid',
   '.healix-worker.pid',
+  'tests/',
   'tests/generated/',
   'tests/.healix-quarantine/',
   'tests/.healix-validation/',
