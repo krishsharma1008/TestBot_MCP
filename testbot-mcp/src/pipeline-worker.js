@@ -43,6 +43,8 @@ const {
   summarizeQaContracts,
   buildQaContractQuestions,
 } = require('./qa-contracts');
+const { detectGitContext, commitTier0Branch, createTier0PR } = require('./git-corpus');
+const { runSoapTier0 } = require('./soap/soap-tier0');
 const Logger = require('./logger');
 const MCPTelemetryReporter = require('./mcp-telemetry');
 
@@ -92,6 +94,9 @@ const STRICT_AI_REQUIRED_CATEGORIES = [
 ];
 
 const GENERATED_SPEC_FILE_PATTERN = /\.(?:spec|test)\.(?:ts|js|mts|mjs|cts|cjs)$/i;
+// Matches per-finding tier-0 spec files: healix-qac-<id>.spec.ts
+const TIER0_SPEC_PATTERN = /^healix-qac-.+\.spec\.ts$/;
+function isTier0Spec(name) { return TIER0_SPEC_PATTERN.test(name); }
 const GENERATED_SPEC_FILENAME_PATTERN = /[A-Za-z0-9_.-]+\.(?:spec|test)\.(?:ts|js|mts|mjs|cts|cjs)\b/g;
 
 const CURSOR_FIXTURE_BASENAME = '__healix-fixture';
@@ -3066,6 +3071,20 @@ function setDurablePhaseReporter(fn) {
   __durablePhaseReporter = typeof fn === 'function' ? fn : null;
 }
 
+// Optional heartbeat reporter — called on every updateStatus tick to keep
+// `test_runs.last_heartbeat_at` fresh for stalled-run detection.
+let __heartbeatReporter = null;
+function setHeartbeatReporter(fn) {
+  __heartbeatReporter = typeof fn === 'function' ? fn : null;
+}
+
+// Optional partial-findings reporter — called after Tier-0 contracts are written
+// so the dashboard can show stub findings before test execution completes.
+let __partialFindingsReporter = null;
+function setPartialFindingsReporter(fn) {
+  __partialFindingsReporter = typeof fn === 'function' ? fn : null;
+}
+
 /**
  * Circular-reference-safe JSON serialiser for status payloads.
  * Handles Buffers, Errors, BigInts, and circular refs — all of which can appear
@@ -3106,9 +3125,46 @@ function updateStatus(statusDir, phase, data, telemetryReporter = null) {
     if (__durablePhaseReporter) {
       try { __durablePhaseReporter(payload); } catch { /* non-blocking */ }
     }
+    if (__heartbeatReporter) {
+      try { __heartbeatReporter(phase); } catch { /* non-blocking */ }
+    }
   } catch (e) {
     Logger.error('PipelineWorker', 'Failed to write status', e);
   }
+}
+
+/**
+ * Build stub partial findings from the tier-0 generatedContracts map so the
+ * dashboard can show P0/P1/P2 counts before test execution completes.
+ * Each contract is represented as a "pending" finding — it becomes a real
+ * finding (pass or fail) only after the test run ingests.
+ */
+function buildTier0PartialFindings(generatedContracts) {
+  if (!generatedContracts || typeof generatedContracts !== 'object') return [];
+  const SEVERITY_MAP = {
+    rbacContracts: 'P0',
+    filterContracts: 'P1',
+    formValidationContracts: 'P1',
+    statusCodeContracts: 'P1',
+    boundaryValidationContracts: 'P1',
+    a11yContracts: 'P2',
+  };
+  const findings = [];
+  for (const [key, ids] of Object.entries(generatedContracts)) {
+    if (!Array.isArray(ids)) continue;
+    const severity = SEVERITY_MAP[key] || 'P3';
+    for (const id of ids) {
+      findings.push({
+        signature: `tier0-${key}-${id}`,
+        severity,
+        title: `[Tier-0] ${id}`,
+        status: 'pending',
+        findingType: 'tier0_contract_ready',
+        category: key.replace('Contracts', ''),
+      });
+    }
+  }
+  return findings;
 }
 
 function classifyErrorCode(error) {
@@ -3647,7 +3703,16 @@ function resolveFailureAnalysisProvider() {
 
 function resetGeneratedTestsDir(projectPath) {
   const testsDir = path.join(projectPath, 'tests', 'generated');
-  fs.rmSync(testsDir, { recursive: true, force: true });
+  if (fs.existsSync(testsDir)) {
+    for (const entry of fs.readdirSync(testsDir, { withFileTypes: true })) {
+      if (!isTier0Spec(entry.name)) {
+        fs.rmSync(path.join(testsDir, entry.name), { recursive: true, force: true });
+      }
+    }
+    // Remove the old monolithic spec left by runs before per-finding naming was introduced.
+    const legacy = path.join(testsDir, 'healix-qa-contracts.spec.ts');
+    if (fs.existsSync(legacy)) fs.rmSync(legacy, { force: true });
+  }
   ensureDir(testsDir);
   return testsDir;
 }
@@ -5941,12 +6006,19 @@ async function maybeGenerateViaSaaS({
   const strictAI = strictAIEnabled(config);
   const client = new WebappClient({ apiKey: healixApiKey });
 
+  // Only pass roles whose login was actually verified. Sending unverified roles
+  // to the generator causes it to produce @auth/@tierB tests that will all fail
+  // at execution time. An empty roles array is the correct signal to the
+  // generator that auth is unavailable → generate public-route and API tests only.
+  const verifiedRoles = (roles || []).filter((r) => r && r.loginVerified && r.storageStatePath);
+  const authAvailable = verifiedRoles.length > 0;
+
   const sharedPayload = {
     context,
     prd: prdContent || '',
     parsedPRD: parsedPRD || null,
     explorationArtifact: explorationArtifact || null,
-    roles: roles || [],
+    roles: verifiedRoles,
     testType: config.testType,
     projectInfo,
     options: {
@@ -5960,6 +6032,19 @@ async function maybeGenerateViaSaaS({
       maxExpansionAttempts: Number.isFinite(Number(config.maxExpansionAttempts))
         ? Math.max(0, Math.floor(Number(config.maxExpansionAttempts)))
         : 0,
+      // When auth is unavailable, tell the generator to avoid @auth/@tierB tests
+      // and focus on public routes and public API endpoints instead.
+      ...(!authAvailable && {
+        skipAuthTests: true,
+        generationFeedback: {
+          instructions: [
+            'Authentication credentials are unavailable or could not be verified. Do NOT generate tests tagged @auth or @tierB.',
+            'Focus ONLY on: (1) public page routes accessible without login, (2) public/unauthenticated API endpoints tagged @api or @tierC, (3) smoke tests and health checks.',
+            'If all observed routes require authentication, generate API-level tests for any REST endpoints in the codebase that can be called without a session (e.g. returning 200 or 401).',
+            'Tag all API tests with @api so they run in Tier C.',
+          ],
+        },
+      }),
     },
   };
 
@@ -7255,6 +7340,8 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
     finishedAt: null,
   };
 
+  const verifiedRoles = (roles || []).filter((r) => r && r.loginVerified && r.storageStatePath);
+
   const validateGeneratedTests = config.validateGeneratedTests !== false;
   const qualityRecoveryEvents = [];
   let deterministicTier0Pack = null;
@@ -7380,6 +7467,23 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
       roles,
       testType: config.testType,
     });
+
+    // SOAP Tier-0: detect WSDLs and emit SoapUI project + Groovy scaffolds (non-blocking)
+    runSoapTier0({
+      projectPath: config.projectPath,
+      outputDir: require('path').join(config.projectPath, 'tests', 'soap'),
+    }).then((soapResult) => {
+      if (soapResult.writtenCount > 0) {
+        Logger.info('PipelineWorker', '[soap-tier0] SOAP test files written', {
+          writtenCount: soapResult.writtenCount,
+          operations:   soapResult.operations,
+          services:     soapResult.services,
+        });
+      }
+    }).catch((soapErr) => {
+      Logger.warn('PipelineWorker', '[soap-tier0] SOAP codegen skipped', { reason: soapErr.message });
+    });
+
     if (qaContractPack.written) {
       Logger.info('PipelineWorker', 'Wrote deterministic QA contract spec', {
         filename: qaContractPack.filename,
@@ -8030,7 +8134,6 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
   const applyFixtureWiring = (generatorName) => {
     if (!config.generateTests) return null;
     try {
-      const verifiedRoles = (roles || []).filter((r) => r && r.loginVerified && r.storageStatePath);
       const fixtureResult = ensureHealixFixtureImports({ projectPath: config.projectPath, roles: verifiedRoles });
       if (fixtureResult.applied && fixtureResult.patchedFiles > 0) {
         Logger.info('PipelineWorker', 'Rewrote @playwright/test imports to __healix-fixture', {
@@ -8054,7 +8157,7 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
     prd: prdContent || '',
     parsedPRD: parsedPRD || null,
     explorationArtifact: explorationArtifact || null,
-    roles: roles || [],
+    roles: verifiedRoles,
     testType: config.testType,
     projectInfo,
     options: {
@@ -8252,6 +8355,17 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
           if (!recoveredPack.written || recoveredPack.generatedTests <= 0) {
             throw new Error('No runnable deterministic QA contract tests were available for rescue.');
           }
+          // Remove any broken AI-generated partials so validation only sees Tier-0.
+          // AI partials may have been written before the failure and would cause
+          // compile errors that mask a perfectly valid Tier-0 spec.
+          const tier0Dir = path.join(config.projectPath, 'tests', 'generated');
+          if (fs.existsSync(tier0Dir)) {
+            for (const entry of fs.readdirSync(tier0Dir, { withFileTypes: true })) {
+              if (!isTier0Spec(entry.name)) {
+                fs.rmSync(path.join(tier0Dir, entry.name), { recursive: true, force: true });
+              }
+            }
+          }
           generationMeta.fixtureWiring = applyFixtureWiring(`${generatorName}-qa-contracts`);
           const validation = await runValidation(`${generatorName}-qa-contracts`);
           generationMeta.provider = generatorName;
@@ -8399,6 +8513,17 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
             qaContractQuestions: deterministicTier0Pack.qaContractQuestions,
           },
         });
+
+        // Emit stub partial findings for each tier-0 contract so the dashboard
+        // can show a P0/P1/P2 count before test execution completes.
+        if (__partialFindingsReporter) {
+          try {
+            const partialFindings = buildTier0PartialFindings(deterministicTier0Pack.generatedContracts);
+            if (partialFindings.length > 0) {
+              __partialFindingsReporter(partialFindings);
+            }
+          } catch { /* non-blocking */ }
+        }
       }
     }
     const saasResult = await maybeGenerateViaSaaS({
@@ -8630,6 +8755,10 @@ async function runPipeline(config, runId) {
   const durableClient = process.env.HEALIX_API_KEY
     ? new WebappClient({ apiKey: process.env.HEALIX_API_KEY })
     : null;
+  // testRunId is the DB UUID for the in-flight run — obtained from the init
+  // call below. Used for partial-findings and heartbeat PATCH endpoints.
+  let testRunId = null;
+
   if (durableClient) {
     setDurablePhaseReporter((payload) => {
       durableClient.reportPhase({
@@ -8646,9 +8775,29 @@ async function runPipeline(config, runId) {
         metadata: { success },
       }).catch(() => undefined);
     });
+
+    // Create the test_runs row early so partial findings and heartbeats have
+    // a DB target. Fire-and-forget: if this fails the pipeline keeps running.
+    durableClient.initTestRun({
+      creationName: config.projectName || 'Untitled Run',
+      projectPath: config.projectPath || null,
+    }).then((result) => {
+      if (result?.id) {
+        testRunId = result.id;
+        // Wire heartbeat and partial-findings reporters now that we have the row.
+        setHeartbeatReporter((phase) => {
+          durableClient.patchHeartbeat({ testRunId, phase }).catch(() => undefined);
+        });
+        setPartialFindingsReporter((findings) => {
+          durableClient.patchFindings({ testRunId, findings }).catch(() => undefined);
+        });
+      }
+    }).catch(() => undefined);
   } else {
     setDurablePhaseReporter(null);
     setStageBudgetReporter(null);
+    setHeartbeatReporter(null);
+    setPartialFindingsReporter(null);
   }
 
   // Kill any leftover Healix-started dev server from a previous run.
@@ -9263,34 +9412,63 @@ async function runPipeline(config, runId) {
 
     routeAccessSummary = routeAccessSummary || buildRouteAccessSummary(explorationArtifact);
     const verifiedRoleCount = roles.filter((r) => r && r.loginVerified && r.storageStatePath).length;
+    const credentialsWereProvided = Array.isArray(config.testCredentials) && config.testCredentials.length > 0;
     if (
       routeAccessSummary.totalObservedRoutes > 0 &&
       routeAccessSummary.publicRoutes.length === 0 &&
       routeAccessSummary.protectedRoutes.length > 0 &&
       verifiedRoleCount === 0
     ) {
-      const authErr = new Error('All observed routes require authentication, but no verified credentials are available.');
-      authErr.code = 'AUTH_REQUIRED_NO_CREDENTIALS';
-      authErr.diagnostics = {
-        stage: 'auth',
-        reason: 'all_observed_routes_protected_no_verified_credentials',
+      if (!credentialsWereProvided) {
+        // No credentials supplied at all — hard abort.
+        const authErr = new Error('All observed routes require authentication, but no verified credentials are available.');
+        authErr.code = 'AUTH_REQUIRED_NO_CREDENTIALS';
+        authErr.diagnostics = {
+          stage: 'auth',
+          reason: 'all_observed_routes_protected_no_verified_credentials',
+          routeAccessSummary,
+        };
+        recordRunDecision(statusDir, telemetryReporter, {
+          runId,
+          decisionType: 'auth_decision',
+          phase: 'auth',
+          status: 'error',
+          errorCode: authErr.code,
+          reason: authErr.diagnostics.reason,
+          message: authErr.message,
+          metadata: {
+            verifiedRoleCount,
+            routeAccessSummary,
+            roles: summarizeAuthRoles(roles),
+          },
+        });
+        throw authErr;
+      }
+      // Credentials were provided but login verification could not confirm
+      // success (e.g. SPA that doesn't redirect or uses non-standard auth
+      // signals). Warn and proceed — tests may still pass if the app is
+      // actually authenticated, and a test-level auth failure is more
+      // actionable than a pipeline abort.
+      Logger.warn('PipelineWorker', 'All observed routes are protected but login verification could not confirm success; proceeding with unverified credentials', {
+        credentialCount: config.testCredentials.length,
         routeAccessSummary,
-      };
+        roles: summarizeAuthRoles(roles),
+      });
       recordRunDecision(statusDir, telemetryReporter, {
         runId,
         decisionType: 'auth_decision',
         phase: 'auth',
-        status: 'error',
-        errorCode: authErr.code,
-        reason: authErr.diagnostics.reason,
-        message: authErr.message,
+        status: 'warning',
+        errorCode: 'AUTH_UNVERIFIED_CREDENTIALS_PROCEEDING',
+        reason: 'all_observed_routes_protected_verification_failed_credentials_provided',
+        message: 'Login verification failed for all roles but credentials were supplied; proceeding anyway.',
         metadata: {
           verifiedRoleCount,
+          credentialCount: config.testCredentials.length,
           routeAccessSummary,
           roles: summarizeAuthRoles(roles),
         },
       });
-      throw authErr;
     }
 
     // -------------------------------------------------------
@@ -10272,7 +10450,26 @@ async function runPipeline(config, runId) {
     }
 
     // -------------------------------------------------------
-    // 8. Open dashboard
+    // 8. Dispatch findings (Slack / GitHub / Jira)
+    // -------------------------------------------------------
+    try {
+      const { dispatchFindings } = require('./dispatch/router');
+      const dispatchResult = await dispatchFindings(
+        report.qaFindings || [],
+        config.projectPath
+      );
+      if (!dispatchResult.skipped && dispatchResult.dispatched > 0) {
+        Logger.info('PipelineWorker', 'Dispatch complete', {
+          dispatched: dispatchResult.dispatched,
+          results: dispatchResult.results,
+        });
+      }
+    } catch (dispatchErr) {
+      Logger.warn('PipelineWorker', 'Dispatch failed (non-fatal)', { error: dispatchErr?.message });
+    }
+
+    // -------------------------------------------------------
+    // 9. Open dashboard
     // -------------------------------------------------------
     let dashboardUrl = null;
     if (config.openDashboard) {
@@ -10331,6 +10528,55 @@ async function runPipeline(config, runId) {
       dashboard: dashboardUrl || report.url,
       runId,
     });
+
+    // Merge partial findings with final findings and flip status to terminal.
+    if (durableClient && testRunId) {
+      const finalStatus = testResults.failed > 0 ? 'completed_with_findings' : 'passed';
+      durableClient.patchComplete({
+        testRunId,
+        status: finalStatus,
+        finalFindings: report.qaFindings || [],
+      }).catch(() => undefined);
+    }
+
+    // Commit-back: push newly-written Tier-0 specs and open a PR when the
+    // caller opted in. Skipped when writtenCount === 0 (surface unchanged).
+    if (config.commitTier0 && config.githubToken && (deterministicTier0Pack?.writtenCount || 0) > 0) {
+      try {
+        const gitCtx = await detectGitContext(config.projectPath);
+        if (gitCtx) {
+          const branch = await commitTier0Branch(
+            config.projectPath,
+            deterministicTier0Pack.paths,
+            runId,
+          );
+          const pr = await createTier0PR(
+            config.githubToken,
+            gitCtx.owner,
+            gitCtx.repo,
+            branch,
+            gitCtx.branch,
+            deterministicTier0Pack.writtenCount,
+          );
+          updateStatus(statusDir, 'tier0_committed', {
+            runId,
+            prUrl: pr.html_url,
+            prNumber: pr.number,
+            branch,
+            filesCommitted: deterministicTier0Pack.writtenCount,
+          }, telemetryReporter);
+          Logger.info('PipelineWorker', 'Tier-0 specs committed and PR opened', {
+            prUrl: pr.html_url,
+            branch,
+            filesCommitted: deterministicTier0Pack.writtenCount,
+          });
+        } else {
+          Logger.warn('PipelineWorker', 'Tier-0 commit-back skipped — project is not a GitHub-tracked git repo');
+        }
+      } catch (commitErr) {
+        Logger.warn('PipelineWorker', 'Tier-0 commit-back failed (non-fatal)', { reason: commitErr.message });
+      }
+    }
 
     // Stop any secondary (monorepo) services we started — primary server is
     // handled by playwright.runTests()'s own teardown (or by our pre-start
@@ -10409,6 +10655,11 @@ async function runPipeline(config, runId) {
         remainingMs: getBudgetRemainingMs(runBudget),
       },
     }, telemetryReporter);
+
+    // Mark the run as errored so the dashboard flips out of "running".
+    if (durableClient && testRunId) {
+      durableClient.patchComplete({ testRunId, status: 'error' }).catch(() => undefined);
+    }
 
     try {
       const reportGen = new ReportGenerator();
@@ -10694,4 +10945,8 @@ module.exports = {
   boundDecisionMetadata,
   pickAgentsForRun,
   rescuePartialGeneration,
+  buildTier0PartialFindings,
+  setHeartbeatReporter,
+  setPartialFindingsReporter,
+  updateStatus,
 };
