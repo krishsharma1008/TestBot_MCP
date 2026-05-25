@@ -45,6 +45,7 @@ const {
 } = require('./qa-contracts');
 const Logger = require('./logger');
 const MCPTelemetryReporter = require('./mcp-telemetry');
+const { createTier0PR } = require('./tier0-pr-creator'); // C01 Fix 5
 
 // Initialize logger for the worker process
 Logger.initialize();
@@ -3645,11 +3646,29 @@ function resolveFailureAnalysisProvider() {
   return { provider: null, reason: 'HEALIX_API_KEY is required for AI failure analysis' };
 }
 
+// ── C01: Directory paths ────────────────────────────────────────────────────
+// Tier-0 (deterministic QA-contract) specs live in generated-persistent/ and
+// are NEVER deleted. AI-generated specs live in generated/ and are wiped each
+// run so stale AI output never accumulates.
+const PERSISTENT_DIR_NAME = 'generated-persistent';
+const EPHEMERAL_DIR_NAME  = 'generated';
+
+function persistentTestsDir(projectPath) {
+  return path.join(projectPath, 'tests', PERSISTENT_DIR_NAME);
+}
+
+function ephemeralTestsDir(projectPath) {
+  return path.join(projectPath, 'tests', EPHEMERAL_DIR_NAME);
+}
+
 function resetGeneratedTestsDir(projectPath) {
-  const testsDir = path.join(projectPath, 'tests', 'generated');
-  fs.rmSync(testsDir, { recursive: true, force: true });
-  ensureDir(testsDir);
-  return testsDir;
+  // Fix 3: only wipe the AI (ephemeral) folder — never touch persistent Tier-0 specs.
+  const ephemeral  = ephemeralTestsDir(projectPath);
+  const persistent = persistentTestsDir(projectPath);
+  fs.rmSync(ephemeral, { recursive: true, force: true });
+  ensureDir(ephemeral);
+  ensureDir(persistent);           // create if first run
+  return ephemeral;                // callers get the ephemeral dir as before
 }
 
 /**
@@ -7383,12 +7402,36 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
       roles,
       testType: config.testType,
     });
+    if (qaContractPack.reused) {
+      // C01 Fix 4: surface unchanged — Tier-0 specs reused from persistent dir, no regen.
+      Logger.info('PipelineWorker', 'Tier-0 specs unchanged — reusing existing persistent specs', {
+        filename: qaContractPack.filename,
+        generatedTests: qaContractPack.generatedTests,
+      });
+    }
     if (qaContractPack.written) {
-      Logger.info('PipelineWorker', 'Wrote deterministic QA contract spec', {
+      Logger.info('PipelineWorker', 'Wrote deterministic QA contract spec to persistent dir', {
         filename: qaContractPack.filename,
         generatedTests: qaContractPack.generatedTests,
         qaContractSummary: qaContractPack.qaContractSummary,
       });
+      // C01 Fix 5: auto-create a GitHub PR for the new Tier-0 specs.
+      // Fire-and-forget — a PR failure must never block the pipeline.
+      try {
+        const specContent = require('fs').readFileSync(qaContractPack.path, 'utf-8');
+        createTier0PR({
+          projectPath: config.projectPath,
+          specFilename: qaContractPack.filename,
+          specContent,
+          baseBranch: process.env.HEALIX_BASE_BRANCH || 'capillary/sabre',
+        }).then((pr) => {
+          if (pr) Logger.info('PipelineWorker', 'Tier-0 PR created', { prUrl: pr.prUrl });
+        }).catch((prErr) => {
+          Logger.warn('PipelineWorker', 'Tier-0 PR creation failed (non-fatal)', { reason: prErr.message });
+        });
+      } catch (prSetupErr) {
+        Logger.warn('PipelineWorker', 'Tier-0 PR setup failed (non-fatal)', { reason: prSetupErr.message });
+      }
       try {
         const verifiedRoles = (roles || []).filter((role) => role && role.loginVerified && role.storageStatePath);
         qaContractPack.fixtureWiring = ensureHealixFixtureImports({
