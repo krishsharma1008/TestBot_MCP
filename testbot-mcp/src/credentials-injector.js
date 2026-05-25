@@ -346,6 +346,29 @@ async function waitForLoginVerification({
  * runtime require so missing deps fall through to a clear error, not a crash.
  */
 async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) {
+  // ── Pre-captured session (e.g. MSAL / OAuth popup flows) ──────────────────
+  // If a storageState file already exists and is less than 4 hours old, reuse
+  // it instead of trying to drive a headless login. This lets callers capture
+  // an authenticated session once (e.g. via capture-auth.js for Microsoft MSAL)
+  // and have Healix use it for all subsequent test runs.
+  if (fs.existsSync(storageStatePath)) {
+    try {
+      const ageMs = Date.now() - fs.statSync(storageStatePath).mtimeMs;
+      const maxAgeMs = 4 * 60 * 60 * 1000; // 4 hours
+      if (ageMs < maxAgeMs) {
+        const remainingMins = Math.round((maxAgeMs - ageMs) / 60000);
+        Logger.info('CredentialsInjector',
+          `Pre-captured auth state found (${Math.round(ageMs / 60000)}m old, valid for ~${remainingMins}m more) — skipping login drive`,
+          { storageStatePath });
+        return { ok: true, signal: 'pre_captured_state' };
+      }
+      Logger.info('CredentialsInjector',
+        'Pre-captured auth state is older than 4 hours — will attempt fresh login',
+        { storageStatePath });
+    } catch { /* if we can't stat the file, fall through to normal login */ }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   let chromium;
   try {
     ({ chromium } = require('playwright'));
@@ -380,6 +403,112 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
         // Use `load` not `networkidle` — Next.js/Supabase apps have persistent background
         // fetches that can prevent networkidle from firing within any reasonable timeout.
         await page.goto(loginUrl, { waitUntil: 'load', timeout: 30_000 });
+
+        // ── MSAL / OAuth popup-redirect detection ────────────────────────────
+        // If the page redirected to an external identity provider (Microsoft,
+        // Google, GitHub, Auth0, Okta …) we cannot drive login headlessly —
+        // those flows show popup windows or render outside the app's domain.
+        // Detect early and return an actionable error instead of hanging on
+        // "No login form found after trying …".
+        const finalUrl = page.url();
+        const matchedProvider = detectOAuthRedirect(finalUrl);
+        if (matchedProvider) {
+          return {
+            ok: false,
+            signal: 'msal_oauth_redirect',
+            reason:
+              `MSAL / OAuth detected: login page redirected to an external identity provider (${finalUrl}).\n` +
+              'Headless login cannot drive popup-based auth flows.\n\n' +
+              'To fix — pre-capture your session once and let Healix reuse it:\n' +
+              '  1. Run the capture script:  node testbot-mcp/scripts/capture-auth.js\n' +
+              `  2. Save the output to:      .healix/auth-state-${credentials.role || 'user'}.json\n` +
+              '  3. Re-run Healix — it will detect the file and skip headless login automatically.\n' +
+              '  The captured session is valid for 4 hours before a refresh is needed.',
+          };
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+        // ── MSAL / OAuth SSO-button detection (click-and-probe) ───────────────
+        // Some apps (e.g. Microsoft MSAL-JS, Azure Static Web Apps) do NOT
+        // auto-redirect to an OAuth provider. Instead they render an SSO button
+        // ("Sign in with Microsoft", "Continue with Google", etc.) that the user
+        // must click — only THEN does the redirect happen. The URL check above
+        // won't catch these. Detect the button, click it, and probe the resulting
+        // URL. If it lands on an OAuth provider, bail out with actionable guidance
+        // instead of falling through to the username/password finder and timing out.
+        const SSO_BUTTON_SELECTORS = [
+          'button:has-text("Sign in with Microsoft")',
+          'button:has-text("Sign in with Google")',
+          'button:has-text("Sign in with GitHub")',
+          'button:has-text("Sign in with Apple")',
+          'button:has-text("Continue with Microsoft")',
+          'button:has-text("Continue with Google")',
+          'button:has-text("Continue with GitHub")',
+          'a:has-text("Sign in with Microsoft")',
+          'a:has-text("Sign in with Google")',
+          '[data-provider="microsoft"]',
+          '[data-provider="google"]',
+          '.ms-login-button',
+          '#login-btn',            // common MSAL single-page app pattern
+          '.login-btn',
+        ];
+        for (const ssoSel of SSO_BUTTON_SELECTORS) {
+          try {
+            const btn = page.locator(ssoSel).first();
+            const visible = await btn.isVisible({ timeout: 800 }).catch(() => false);
+            if (!visible) continue;
+
+            Logger.info('CredentialsInjector',
+              `SSO button detected (${ssoSel}) — clicking to probe OAuth redirect`, { loginUrl });
+
+            // Click and wait briefly for a navigation
+            await Promise.all([
+              page.waitForNavigation({ timeout: 5_000, waitUntil: 'load' }).catch(() => null),
+              btn.click({ timeout: 3_000 }).catch(() => null),
+            ]);
+
+            const afterClickUrl = page.url();
+            const oauthMatch = detectOAuthRedirect(afterClickUrl);
+            if (oauthMatch) {
+              return {
+                ok: false,
+                signal: 'msal_oauth_redirect',
+                reason:
+                  `MSAL / OAuth detected: clicking the SSO button redirected to an external ` +
+                  `identity provider (${afterClickUrl}).\n` +
+                  'Headless login cannot drive popup-based or redirect-based OAuth flows.\n\n' +
+                  'To fix — pre-capture your session once and let Healix reuse it:\n' +
+                  '  1. Run the capture script:  node testbot-mcp/scripts/capture-auth.js\n' +
+                  `  2. Save the output to:      .healix/auth-state-${credentials.role || 'user'}.json\n` +
+                  '  3. Re-run Healix — it will detect the file and skip headless login automatically.\n' +
+                  '  The captured session is valid for 4 hours before a refresh is needed.',
+              };
+            }
+
+            // Button clicked but URL didn't redirect to an OAuth provider.
+            // It may have opened a popup. Either way, bail with a clear signal.
+            if (afterClickUrl === page.url()) {
+              // Page didn't navigate — likely a popup was opened. Still MSAL.
+              Logger.warn('CredentialsInjector',
+                `SSO button clicked but no navigation occurred — likely popup-based OAuth`, { ssoSel });
+              return {
+                ok: false,
+                signal: 'msal_oauth_redirect',
+                reason:
+                  `MSAL / OAuth detected: an SSO button was found (${ssoSel}) but its click ` +
+                  'opened a popup window instead of redirecting — headless Chromium cannot interact with popups.\n\n' +
+                  'To fix — pre-capture your session once and let Healix reuse it:\n' +
+                  '  1. Run the capture script:  node testbot-mcp/scripts/capture-auth.js\n' +
+                  `  2. Save the output to:      .healix/auth-state-${credentials.role || 'user'}.json\n` +
+                  '  3. Re-run Healix — it will detect the file and skip headless login automatically.\n' +
+                  '  The captured session is valid for 4 hours before a refresh is needed.',
+              };
+            }
+            break; // clicked a button — stop checking others
+          } catch { /* button not found or not clickable — try next */ }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         // Capture the actual rendered login path after redirects. Public roots
         // often redirect to /login; comparing final URL against the original
         // "/" candidate misclassifies successful login redirects back to "/".
@@ -493,6 +622,38 @@ async function injectCredentials({
   return roles;
 }
 
+// Exported so unit tests can verify the detection logic without a real browser.
+const OAUTH_DOMAINS = [
+  // Microsoft
+  'login.microsoftonline.com',
+  'login.microsoft.com',
+  'login.live.com',
+  // Google
+  'accounts.google.com',
+  // GitHub
+  'github.com/login',
+  'github.com/session',
+  // Auth0
+  'auth0.com',
+  // Okta
+  '.okta.com',
+  // OneLogin
+  '.onelogin.com',
+  // Ping Identity (specific — NOT bare 'ping' which false-positives on pingpong.app etc.)
+  'pingone.com',
+  'pingidentity.com',
+  'pingfederate',
+  // ADFS (on-premise Microsoft)
+  '/adfs/',
+  // NOTE: bare 'idp.' and bare 'ping' intentionally removed — too broad,
+  // would false-positive on lipid.example.com, pingpong.myapp.com, etc.
+];
+
+function detectOAuthRedirect(url) {
+  const lower = String(url || '').toLowerCase();
+  return OAUTH_DOMAINS.find(d => lower.includes(d)) || null;
+}
+
 module.exports = {
   injectCredentials,
   authDirFor,
@@ -502,4 +663,6 @@ module.exports = {
   summarizeAuthStateEvidence,
   shouldAcceptLoginVerification,
   buildSuccessLocators,
+  detectOAuthRedirect,
+  OAUTH_DOMAINS,
 };

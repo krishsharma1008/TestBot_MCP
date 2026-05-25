@@ -1844,6 +1844,7 @@ Return only the JSON array of generated files.`
 - In-place feedback rule: button clicks and form submissions often update UI without navigation. Do not write toHaveURL() after an action unless the action's observed endCondition/source proves navigation. For unproven actions, assert a toast/dialog/inline success message, changed button text/disabled state, updated count, or that the current route remains usable.
 - Conditional visibility rule: if content lives behind a menu, dropdown, modal/dialog, accordion, drawer, hamburger nav, filter panel, tab, or lazy/collapsed section, the test must perform the opening interaction first and then scope the assertion to the opened container.
 - Database/CMS grounding rule: exact names that appear only in browser exploration are still not stable enough for product/order/customer/card assertions. Never assert exact level-3 card headings, product names, brand labels, or cart line-item text unless the exact text is present in sourceContext.assertableText. Prefer structure such as main.locator('h3').first(), row/card/link visibility, and live detail links extracted from the listing.
+- Feature existence rule: ONLY generate tests for features, pages, and UI states that are explicitly present in OBSERVED_FLOWS.routes, sourceContext.routePaths, or sourceContext.files. If a concept (e.g., "cart", "checkout", "wishlist", "shopping bag", "empty state for X") cannot be traced to at least one route path or source file in the provided context, do NOT generate any test for it. This is a hard constraint — do not apply your general knowledge of web apps to invent features that are absent from the discovered context.
 - Login success rule: after submitting real credentials, success is leaving the login route/form or seeing authenticated account content. Never assert that the pre-auth login heading/form remains visible as the success condition.
 - Credential rule: generated tests must never invent real-looking email/password literals. If CONTEXT_JSON.meta.authContext.credentialFixtures is non-empty, API auth setup may use those exact username/password values only; UI protected-route tests must still use @auth/@tierB storageState. If credentialFixtures is empty, do not generate success login/API auth tests that require credentials.
 - Protected route rule: unauthenticated protected-route checks must assert the rendered auth boundary, not transport semantics. Do not require response.status() to be 3xx; accept either a /login URL or visible login/auth UI rendered in-place with HTTP 200.
@@ -2467,6 +2468,51 @@ Return JSON array only.`
         errors.push(...apiGroundingCheck.errors)
       }
     }
+
+    // ── Feature-existence hallucination guard ──────────────────────────────────
+    // Catches tests whose title/describe block references a feature (e.g. "cart",
+    // "checkout", "wishlist") that has no matching route, source file, or
+    // observed element in the generation context.  Only active when sourceContext
+    // is available so we have a reliable ground-truth set.
+    if (generationContext?.context?.sourceContext) {
+      const sourceContext = generationContext.context.sourceContext
+      const knownText = [
+        ...(sourceContext.routePaths || []),
+        ...(sourceContext.files || []).map((f: { file: string }) => f.file),
+        ...(sourceContext.assertableText || []),
+      ].join(' ').toLowerCase()
+
+      // Extract test/describe titles from the generated content
+      const titlePattern = /(?:test(?:\.describe)?\s*\(\s*['"`])([^'"`]{6,120})/g
+      let m: RegExpExecArray | null
+      const FEATURE_KEYWORDS = [
+        'cart', 'checkout', 'basket', 'wishlist', 'shopping bag',
+        'order history', 'order summary', 'empty cart', 'add to cart',
+        'payment', 'coupon', 'promo code', 'loyalty', 'reward',
+      ]
+      // For compound keywords (e.g. "empty cart"), the feature is considered
+      // grounded if ANY meaningful component word (>3 chars) is in knownText.
+      // Prevents false positives on real e-commerce apps that have /cart routes.
+      const isKeywordGrounded = (kw: string): boolean => {
+        if (knownText.includes(kw)) return true
+        const words = kw.split(' ').filter((w) => w.length > 3)
+        return words.length > 0 && words.some((w) => knownText.includes(w))
+      }
+      while ((m = titlePattern.exec(content)) !== null) {
+        const title = m[1].toLowerCase()
+        for (const kw of FEATURE_KEYWORDS) {
+          if (title.includes(kw) && !isKeywordGrounded(kw)) {
+            errors.push(
+              `Test title "${m[1]}" references feature "${kw}" which is not present in any ` +
+              `discovered route, source file, or observed element. ` +
+              `Remove this test or replace it with a feature that exists in OBSERVED_FLOWS/sourceContext.`
+            )
+            break
+          }
+        }
+      }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
 
     return { valid: errors.length === 0, errors }
   }
