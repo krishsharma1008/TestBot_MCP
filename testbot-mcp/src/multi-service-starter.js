@@ -68,6 +68,62 @@ function cleanupLeftoverServices(projectPath) {
   try { fs.unlinkSync(pidFilePath(projectPath)); } catch { /* ignore */ }
 }
 
+/**
+ * Spawn a service process with stderr captured to a bounded ring buffer.
+ *
+ * Why not stdio:'ignore' (the old behavior): when the readiness probe times
+ * out, the only signal we have is "the port never came up." The child's own
+ * error output — `EADDRINUSE`, missing-script, missing-env-var, syntax errors —
+ * gets thrown away, leaving nobody to blame except the timeout itself.
+ *
+ * Returns `{ proc, getRecentStderr }`. `getRecentStderr()` returns the last
+ * N lines of stderr (default 40) as a string. Lines are also forwarded to
+ * Logger.debug as they arrive so they show up in mcp.log under DEBUG.
+ *
+ * stdout is still discarded — dev servers are chatty and the signal-to-noise
+ * on stdout is poor. Crash diagnostics overwhelmingly land on stderr.
+ */
+function spawnService({ command, cwd, env, label = 'service', maxStderrLines = 40 }) {
+  const detached = process.platform !== 'win32';
+  const proc = spawn(command, {
+    cwd,
+    shell: true,
+    detached,
+    env,
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+
+  const stderrTail = [];
+  if (proc.stderr) {
+    let buffer = '';
+    proc.stderr.on('data', (chunk) => {
+      buffer += chunk.toString('utf8');
+      let nl;
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl).replace(/\r$/, '');
+        buffer = buffer.slice(nl + 1);
+        if (line.length === 0) continue;
+        stderrTail.push(line);
+        if (stderrTail.length > maxStderrLines) stderrTail.shift();
+        Logger.debug('MultiServiceStarter', `[${label} stderr] ${line}`);
+      }
+    });
+    proc.stderr.on('error', () => { /* pipe closed — non-fatal */ });
+  }
+
+  proc.on('error', (err) => {
+    Logger.warn('MultiServiceStarter', `${label} process error`, {
+      message: err.message,
+      code: err.code,
+    });
+  });
+
+  return {
+    proc,
+    getRecentStderr: () => stderrTail.join('\n'),
+  };
+}
+
 async function isPortOpen(host, port, timeoutMs = 400) {
   return new Promise((resolve) => {
     const sock = new net.Socket();
@@ -167,26 +223,45 @@ async function waitForServiceReady({
 }
 
 /**
- * Decide which service is "primary" (left to PlaywrightIntegration.startServer)
- * and which are "secondaries" (started here). Rules:
- *  - Exactly one service: nothing to do.
- *  - Frontend + backend: frontend is primary (the one users hit in the browser),
- *    backend is secondary.
- *  - Multiple services with no clear frontend: first one is primary.
+ * Decide which service is "primary" (the one Playwright/exploration/auth target)
+ * and which are "secondaries" (must be running but aren't the test subject).
+ *
+ * Precedence:
+ *  1. Explicit `isPrimary: true` on exactly one service (UI-driven choice).
+ *  2. The first `fullstack` service (it serves both halves).
+ *  3. The first `frontend` service (users hit the browser there).
+ *  4. The first service in the array.
+ *
+ * No service role is hardcoded as "always secondary" — anything not chosen as
+ * primary by the rules above becomes a secondary, regardless of role. This lets
+ * a backend-primary repo work without code changes.
  *
  * The primary's startCommand/baseURL/port should already be set on `config` by
  * the caller before we get here; this function touches only the secondaries.
  */
 function splitServices(services) {
-  if (!Array.isArray(services) || services.length < 2) {
-    return { primary: services?.[0] || null, secondaries: [] };
+  if (!Array.isArray(services) || services.length === 0) {
+    return { primary: null, secondaries: [] };
   }
-  const frontend = services.find((s) => s.role === 'frontend');
-  const backend = services.find((s) => s.role === 'backend');
-  if (frontend && backend) {
-    return { primary: frontend, secondaries: [backend] };
+  if (services.length === 1) {
+    return { primary: services[0], secondaries: [] };
   }
-  return { primary: services[0], secondaries: services.slice(1) };
+
+  const explicit = services.filter((s) => s && s.isPrimary === true);
+  let primary = null;
+  if (explicit.length === 1) {
+    primary = explicit[0];
+  } else {
+    // Ambiguous or no explicit primary — fall back to role-based heuristic.
+    // (When the UI sends >1 isPrimary we treat it as none and use the heuristic
+    // rather than silently picking one, so the warning is loud upstream.)
+    primary = services.find((s) => s?.role === 'fullstack')
+      || services.find((s) => s?.role === 'frontend')
+      || services[0];
+  }
+
+  const secondaries = services.filter((s) => s !== primary);
+  return { primary, secondaries };
 }
 
 /**
@@ -235,18 +310,16 @@ async function startSecondaryServices({ projectPath, services, waitMs = 30_000, 
     }
 
     const cwd = svc.path && svc.path !== '.' ? path.join(projectPath, svc.path) : projectPath;
-    const detached = process.platform !== 'win32';
     Logger.info('MultiServiceStarter', `Starting ${svc.role} service`, {
       cmd: svc.startCommand,
       cwd,
       port: svc.port,
     });
-    const proc = spawn(svc.startCommand, {
+    const { proc, getRecentStderr } = spawnService({
+      command: svc.startCommand,
       cwd,
-      shell: true,
-      detached,
       env: { ...process.env, PORT: String(svc.port || '') },
-      stdio: ['ignore', 'ignore', 'ignore'],
+      label: `${svc.role || 'secondary'} service`,
     });
     if (!proc.pid) {
       Logger.warn('MultiServiceStarter', `Failed to spawn ${svc.role} service`);
@@ -267,8 +340,12 @@ async function startSecondaryServices({ projectPath, services, waitMs = 30_000, 
       : false;
     if (!ready) {
       // Timeout is a warning, NOT a hard failure — some services legitimately
-      // don't answer GET / but serve test routes. Let Playwright try.
-      Logger.warn('MultiServiceStarter', `${svc.role} service at :${svc.port} did not become ready within ${waitMs}ms — continuing anyway (Playwright will probe routes directly)`);
+      // don't answer GET / but serve test routes. Surface the recent stderr
+      // tail so the next operator can see *why* the port never came up.
+      const tail = getRecentStderr();
+      Logger.warn('MultiServiceStarter', `${svc.role} service at :${svc.port} did not become ready within ${waitMs}ms — continuing anyway (Playwright will probe routes directly)`, {
+        recentStderr: tail || '(no stderr captured)',
+      });
     }
     started.push({ service: svc, pid: proc.pid, ready });
   }
@@ -288,4 +365,5 @@ module.exports = {
   cleanupLeftoverServices,
   waitForServiceReady,
   probeHttpReady,
+  spawnService,
 };

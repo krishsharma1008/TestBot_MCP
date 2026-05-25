@@ -50,6 +50,17 @@ const DEFAULT_USERNAME_SELECTORS = [
   'input[id*="user" i]',
   'input[autocomplete="username"]',
   'input[autocomplete="email"]',
+  'input[placeholder*="email" i]',
+  'input[placeholder*="user" i]',
+  // Label-bound inputs (no name/id linkage). Playwright resolves the input
+  // following a matching <label> even when htmlFor is missing.
+  'form :text("Username") >> .. >> input:not([type="password"]):not([type="hidden"]):not([type="submit"])',
+  'form :text("Email") >> .. >> input:not([type="password"]):not([type="hidden"]):not([type="submit"])',
+  // Last-resort positional: first non-password text input inside a form that
+  // also contains a password field — covers React forms that bind via state
+  // alone (no name, no id) like the DevAPI Hub demo login.
+  'form:has(input[type="password"]) input[type="text"]',
+  'form:has(input[type="password"]) input:not([type])',
   'input[type="text"]',
 ];
 const DEFAULT_PASSWORD_SELECTORS = [
@@ -236,17 +247,43 @@ function selectorCandidates(primary, defaults = []) {
 async function fillFirstVisible(page, selectors = [], value, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
+  const deferred = [];
+  // First pass: fast-fail any selector that has zero matches in the current DOM.
+  // Without this probe, each non-matching CSS selector burns ~4s waiting for
+  // visible, which exhausts the budget before later selectors get a turn —
+  // a common failure mode on apps whose inputs lack name/type="email" attrs.
   for (const selector of unique(selectors)) {
+    if (Date.now() >= deadline) break;
     const remaining = Math.max(500, deadline - Date.now());
+    const locator = page.locator(selector).first();
+    let count = 0;
+    try { count = await locator.count(); } catch { count = 0; }
+    if (count === 0) {
+      // Element doesn't exist yet; defer to second pass in case it hydrates.
+      deferred.push(selector);
+      continue;
+    }
     try {
-      const locator = page.locator(selector).first();
       await locator.waitFor({ state: 'visible', timeout: Math.min(remaining, 4_000) });
       await locator.fill(value, { timeout: Math.min(Math.max(500, deadline - Date.now()), 5_000) });
       return { ok: true, selector };
     } catch (err) {
       lastError = err;
     }
+  }
+  // Second pass: give deferred (not-yet-present) selectors a shorter wait each
+  // so a late-hydrating field still has a chance, without monopolising budget.
+  for (const selector of deferred) {
     if (Date.now() >= deadline) break;
+    const remaining = Math.max(500, deadline - Date.now());
+    try {
+      const locator = page.locator(selector).first();
+      await locator.waitFor({ state: 'visible', timeout: Math.min(remaining, 2_000) });
+      await locator.fill(value, { timeout: Math.min(Math.max(500, deadline - Date.now()), 5_000) });
+      return { ok: true, selector };
+    } catch (err) {
+      lastError = err;
+    }
   }
   return {
     ok: false,
@@ -502,4 +539,9 @@ module.exports = {
   summarizeAuthStateEvidence,
   shouldAcceptLoginVerification,
   buildSuccessLocators,
+  // Exposed for unit tests: selector fallback list + the matcher that decides
+  // which login field to fill.
+  fillFirstVisible,
+  DEFAULT_USERNAME_SELECTORS,
+  DEFAULT_PASSWORD_SELECTORS,
 };

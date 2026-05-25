@@ -33,7 +33,7 @@ const ArtifactUploader = require('./artifact-uploader');
 const DashboardLauncher = require('./dashboard-launcher');
 const AIAnalyzer = require('./ai-providers/index');
 const WebappClient = require('./webapp-client');
-const { startSecondaryServices, stopSecondaryServices, probeHttpReady, waitForServiceReady } = require('./multi-service-starter');
+const { startSecondaryServices, stopSecondaryServices, probeHttpReady, waitForServiceReady, splitServices, spawnService } = require('./multi-service-starter');
 const { runExplorationPhase, EMPTY_ARTIFACT, artifactHasUsefulContext } = require('./exploration-phase');
 const { injectCredentials, normalizeRoleLabel } = require('./credentials-injector');
 const { isUnsafeAuthFlow, sanitizeAuthFlow } = require('./auth-flow-utils');
@@ -9014,7 +9014,62 @@ async function runPipeline(config, runId) {
     };
 
     // -------------------------------------------------------
-    // 3b-pre. Start primary app before exploration.
+    // 3a. Start secondary services BEFORE exploration / Playwright.
+    //
+    // When the auto-detector / config UI returns multiple services
+    // (e.g. frontend + backend), the non-primary ones must be running before
+    // the credentials injector or browser exploration can talk to the primary —
+    // a frontend without its backend just renders broken pages, and the
+    // pre-auth probe sees ECONNREFUSED.
+    //
+    // Runs unconditionally on multi-service repos so the same secondaries are
+    // up for both the exploration phase AND the Playwright execution phase.
+    // The historical late call (just before Playwright runs) is gone — that
+    // ordering was the original bug.
+    // -------------------------------------------------------
+    let primaryServiceFromConfig = null;
+    if (Array.isArray(config.services) && config.services.length > 1) {
+      const { primary } = splitServices(config.services);
+      primaryServiceFromConfig = primary;
+      try {
+        const started = await startSecondaryServices({
+          projectPath: config.projectPath,
+          services: config.services,
+          // 30 s default matches the HTTP readiness-probe budget. Override via
+          // config.serverStartTimeoutMs for slow-booting backends.
+          waitMs: toFiniteNumber(config.serverStartTimeoutMs, 30_000),
+          onReady: ({ elapsedMs, url, service }) => {
+            updateStatus(statusDir, 'dev_server_ready', {
+              runId,
+              message: `${service?.role || 'secondary'} service ready at ${url} (${elapsedMs}ms)`,
+              elapsedMs,
+              url,
+              role: service?.role || null,
+              port: service?.port || null,
+            }, telemetryReporter);
+          },
+        });
+        if (started.length > 0) {
+          const reusedCount = started.filter((s) => s.reused).length;
+          const spawnedCount = started.length - reusedCount;
+          updateStatus(statusDir, 'secondary_services_started', {
+            runId,
+            message: `Prepared ${started.length} secondary service(s) (${spawnedCount} started, ${reusedCount} reused)`,
+            services: started.map((s) => ({
+              role: s.service.role,
+              port: s.service.port,
+              ready: s.ready,
+              reused: !!s.reused,
+            })),
+          }, telemetryReporter);
+        }
+      } catch (err) {
+        Logger.warn('PipelineWorker', 'Failed to start secondary services — continuing with primary only', { reason: err.message });
+      }
+    }
+
+    // -------------------------------------------------------
+    // 3b. Start primary app before exploration.
     // Browser-use and the Playwright heuristic explorer both need a live server
     // to navigate. If the user supplied a startCommand and the app is not yet
     // responding at baseURL, spawn it here and wait for HTTP readiness before
@@ -9037,15 +9092,22 @@ async function runPipeline(config, runId) {
           runId,
           message: `Starting app before exploration: ${config.startCommand}`,
         }, telemetryReporter);
+        // Run the primary in its own directory if the detector / UI gave us a
+        // sub-path. Falls back to projectPath for single-service repos, which
+        // preserves prior behavior.
+        const primaryCwd = primaryServiceFromConfig?.path && primaryServiceFromConfig.path !== '.'
+          ? path.join(config.projectPath, primaryServiceFromConfig.path)
+          : config.projectPath;
+        let primaryGetStderr = null;
         try {
-          const detached = process.platform !== 'win32';
-          preStartedProc = spawn(config.startCommand, {
-            cwd: config.projectPath,
-            shell: true,
-            detached,
+          const spawned = spawnService({
+            command: config.startCommand,
+            cwd: primaryCwd,
             env: { ...process.env, PORT: String(config.port || '') },
-            stdio: ['ignore', 'ignore', 'ignore'],
+            label: 'primary app',
           });
+          preStartedProc = spawned.proc;
+          primaryGetStderr = spawned.getRecentStderr;
           if (preStartedProc.pid) {
             const ready = await waitForServiceReady({
               baseURL: config.baseURL,
@@ -9062,7 +9124,13 @@ async function runPipeline(config, runId) {
               config = { ...config, _primaryAppPreStarted: true };
               Logger.info('PipelineWorker', 'Primary app pre-started for exploration', { url: config.baseURL, pid: preStartedProc.pid });
             } else {
-              Logger.warn('PipelineWorker', 'Primary app did not become ready within timeout — exploration will attempt anyway', { url: config.baseURL });
+              const tail = primaryGetStderr ? primaryGetStderr() : '';
+              Logger.warn('PipelineWorker', 'Primary app did not become ready within timeout — exploration will attempt anyway', {
+                url: config.baseURL,
+                cwd: primaryCwd,
+                startCommand: config.startCommand,
+                recentStderr: tail || '(no stderr captured — process may have started silently or exited cleanly without binding the port)',
+              });
             }
           }
         } catch (startErr) {
@@ -9694,52 +9762,10 @@ async function runPipeline(config, runId) {
       }
     };
 
-    // Monorepo multi-service startup: if the detector found both a frontend and
-    // a backend, start the backend here BEFORE Playwright launches the primary
-    // (frontend) server. Secondary service PIDs are tracked in
-    // healix-reports/.healix-services.pids and cleaned up on error or on the
-    // next pipeline run's boot.
-    if (Array.isArray(config.services) && config.services.length > 1) {
-      try {
-        const started = await startSecondaryServices({
-          projectPath: config.projectPath,
-          services: config.services,
-          // 30 s cap matches the HTTP readiness-probe budget. Beyond that we
-          // don't want to burn wall-clock on a dead service — emit a warning
-          // and let Playwright probe routes directly.
-          waitMs: toFiniteNumber(config.serverStartTimeoutMs, 30_000),
-          // Telemetry: when a secondary becomes HTTP-ready, emit
-          // `dev_server_ready` so the dashboard / MCP client can distinguish
-          // cold-start latency from genuine Playwright flakes.
-          onReady: ({ elapsedMs, url, service }) => {
-            updateStatus(statusDir, 'dev_server_ready', {
-              runId,
-              message: `${service?.role || 'secondary'} service ready at ${url} (${elapsedMs}ms)`,
-              elapsedMs,
-              url,
-              role: service?.role || null,
-              port: service?.port || null,
-            }, telemetryReporter);
-          },
-        });
-        if (started.length > 0) {
-          const reusedCount = started.filter((s) => s.reused).length;
-          const spawnedCount = started.length - reusedCount;
-          updateStatus(statusDir, 'secondary_services_started', {
-            runId,
-            message: `Prepared ${started.length} secondary service(s) (${spawnedCount} started, ${reusedCount} reused)`,
-            services: started.map((s) => ({
-              role: s.service.role,
-              port: s.service.port,
-              ready: s.ready,
-              reused: !!s.reused,
-            })),
-          }, telemetryReporter);
-        }
-      } catch (err) {
-        Logger.warn('PipelineWorker', 'Failed to start secondary services — continuing with primary only', { reason: err.message });
-      }
-    }
+    // Note: secondary services are now started earlier (phase 3a), before the
+    // pre-exploration probe — so the credentials injector and browser
+    // exploration both see a fully live stack. Re-spawning them here would
+    // wipe out the PIDs we already wrote and kill running children.
 
     // Guard: before we spin up the user's dev server + Playwright, verify
     // that there's actually something to run. Otherwise Playwright exits 1

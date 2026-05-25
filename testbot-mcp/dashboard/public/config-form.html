@@ -341,8 +341,8 @@
                 </div>
             </div>
 
-            <!-- Section 2 -->
-            <div>
+            <!-- Section 2 (single-service layout) -->
+            <div id="singleServiceSection">
                 <span class="section-badge-required">02 — Required</span>
                 <h3 style="font-size:1.1rem;font-weight:700;margin:4px 0 4px;color:#ffffff;">Execution Settings</h3>
                 <p style="font-size:13px;color:#a0a0a0;margin-bottom:14px;">Choose test generation and run behavior before launching the pipeline.</p>
@@ -367,6 +367,28 @@
                 </div>
             </div>
 
+            <!-- Section 2 (multi-service layout — shown when the detector returned
+                 >1 service; rendered dynamically by initMultiService() from the
+                 `services` URL param). When this section is active, the single-
+                 service Start Command + Local Server Port inputs are hidden and
+                 their values are derived from the row marked "primary". -->
+            <div id="multiServiceSection" class="hidden">
+                <span class="section-badge-required">02 — Required</span>
+                <h3 style="font-size:1.1rem;font-weight:700;margin:4px 0 4px;color:#ffffff;">Services to Launch</h3>
+                <p style="font-size:13px;color:#a0a0a0;margin-bottom:14px;">Healix detected multiple services in this repo. Configure each and pick exactly one as <strong>primary</strong> — that's the URL exploration, auth, and Playwright will target. Non-primary services are launched in parallel so the primary can talk to them.</p>
+                <div id="servicesContainer"></div>
+                <div class="field-row flex items-center gap-4" style="margin-top:20px;">
+                    <div class="field-label" style="padding-top:2px;">Generate Tests</div>
+                    <div style="flex:1;">
+                        <div class="toggle-group" id="generate-group-multi">
+                            <div class="toggle-btn active" data-value="true">Yes</div>
+                            <div class="toggle-btn" data-value="false">No</div>
+                        </div>
+                        <p style="font-size:12px;color:#505050;margin-top:8px;">When disabled, Healix runs existing tests only.</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Section 3 -->
             <div>
                 <span class="section-badge">03 — Optional</span>
@@ -380,7 +402,7 @@
                 </div>
             </div>
 
-            <div>
+            <div id="singleServerPortSection">
                 <span class="section-badge-required">04 — Required</span>
                 <h3 style="font-size:1.1rem;font-weight:700;margin:4px 0 4px;color:#ffffff;">Local Server Port</h3>
                 <p style="font-size:13px;color:#a0a0a0;margin-bottom:14px;">Port where your local server is running e.g. 3000 in localhost:3000. If there is a specific path you want to test, enter it in the Path field.</p>
@@ -462,6 +484,33 @@
             baseURL: urlParams.get('baseURL') || 'http://localhost:3000',
         };
 
+        // Multi-service mode: when the launcher detected >1 service it passes
+        // a JSON-encoded `services` query param. Each entry has role, host,
+        // port, path (sub-dir), startCommand, framework, isPrimary. Parsing
+        // errors silently fall back to single-service mode so a malformed URL
+        // never breaks the form.
+        function parseServicesParam() {
+            const raw = urlParams.get('services');
+            if (!raw) return null;
+            try {
+                const parsed = JSON.parse(raw);
+                if (!Array.isArray(parsed) || parsed.length < 2) return null;
+                return parsed.map((svc) => ({
+                    role: svc.role || '',
+                    host: svc.host || 'localhost',
+                    port: svc.port != null ? String(svc.port) : '',
+                    path: svc.path || '',
+                    startCommand: svc.startCommand || '',
+                    framework: svc.framework || '',
+                    isPrimary: !!svc.isPrimary,
+                }));
+            } catch {
+                return null;
+            }
+        }
+        const detectedServices = parseServicesParam();
+        const multiServiceMode = !!detectedServices;
+
         const MAX_PRD_FILES = 5;
 
         const state = {
@@ -471,7 +520,21 @@
             openDashboard: true,
             credentials: [],
             prdFiles: [],
+            // Populated by initMultiService() when multiServiceMode is true.
+            // Each row mirrors the detector's service shape, but values are
+            // user-editable. Exactly one row has isPrimary=true (enforced by
+            // the radio group).
+            services: detectedServices ? detectedServices.map((s) => ({ ...s })) : [],
         };
+        // If the detector didn't mark a primary, default to the first frontend
+        // or fullstack — falling back to row 0. This mirrors the precedence in
+        // multi-service-starter.splitServices.
+        if (state.services.length > 0 && !state.services.some((s) => s.isPrimary)) {
+            let primaryIdx = state.services.findIndex((s) => s.role === 'fullstack');
+            if (primaryIdx === -1) primaryIdx = state.services.findIndex((s) => s.role === 'frontend');
+            if (primaryIdx === -1) primaryIdx = 0;
+            state.services[primaryIdx].isPrimary = true;
+        }
 
         const hostInput = document.getElementById('host');
         const portInput = document.getElementById('port');
@@ -736,6 +799,140 @@
             renderCredentials();
             resetPRDFiles();
             updateBaseURLPreview();
+
+            if (multiServiceMode) initMultiService();
+        }
+
+        // ── Multi-service mode ─────────────────────────────────────────────
+        // Renders one card per detected service. When this layout is active,
+        // the single-service Start Command + Local Server Port sections are
+        // hidden — their values are derived from whichever row is marked
+        // primary at submit time.
+        function initMultiService() {
+            document.getElementById('singleServiceSection')?.classList.add('hidden');
+            document.getElementById('singleServerPortSection')?.classList.add('hidden');
+            document.getElementById('multiServiceSection')?.classList.remove('hidden');
+            // The single-service generate-group is now hidden; mirror its state
+            // onto the multi-service generate-group so the user's toggle there
+            // drives `state.generateTests`.
+            setActiveToggle('generate-group-multi', String(state.generateTests));
+            setupToggle('generate-group-multi', 'generateTests', (value) => value === 'true');
+            renderServices();
+        }
+
+        function renderServices() {
+            const container = document.getElementById('servicesContainer');
+            container.innerHTML = '';
+            state.services.forEach((svc, idx) => {
+                const card = document.createElement('div');
+                card.className = 'brutal-card p-6';
+                card.style.marginBottom = '16px';
+                const previewBase = (svc.host && svc.port) ? `http://${svc.host}:${svc.port}/` : '—';
+                const roleLabel = svc.role ? svc.role.toUpperCase() : `SERVICE #${idx + 1}`;
+                const frameworkBadge = svc.framework
+                    ? `<span style="font-family:'Space Mono',monospace;font-size:10px;color:#505050;margin-left:8px;">[${svc.framework}]</span>`
+                    : '';
+                card.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                        <div>
+                            <span style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#ffffff;letter-spacing:0.08em;">${roleLabel}</span>
+                            ${frameworkBadge}
+                        </div>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-family:'Space Mono',monospace;font-size:11px;color:#a0a0a0;text-transform:uppercase;letter-spacing:0.06em;">
+                            <input type="radio" name="primaryService" class="svc-primary" data-index="${idx}" ${svc.isPrimary ? 'checked' : ''} style="accent-color:#ffffff;">
+                            Primary (test target)
+                        </label>
+                    </div>
+                    <div class="field-row flex items-start gap-4">
+                        <div class="field-label" style="padding-top:11px;">Start Command</div>
+                        <div style="flex:1;">
+                            <input type="text" class="input-glass svc-startCommand" data-index="${idx}" value="${escapeAttr(svc.startCommand)}" placeholder="e.g. npm run dev">
+                            ${svc.path ? `<p style="font-size:11px;color:#505050;margin-top:6px;font-family:'Space Mono',monospace;">cwd: ${escapeAttr(svc.path)}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="field-row flex items-center gap-4" style="margin-top:16px;">
+                        <div class="field-label">Host</div>
+                        <div style="flex:1;"><input type="text" class="input-glass svc-host" data-index="${idx}" value="${escapeAttr(svc.host || 'localhost')}"></div>
+                    </div>
+                    <div class="field-row flex items-center gap-4" style="margin-top:16px;">
+                        <div class="field-label">Port</div>
+                        <div style="flex:1;"><input type="text" class="input-glass svc-port" data-index="${idx}" value="${escapeAttr(svc.port)}"></div>
+                    </div>
+                    <div class="url-preview" style="margin-top:14px;">
+                        <div class="url-preview-label">Base URL</div>
+                        <div class="svc-preview" data-index="${idx}">${previewBase}</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            container.querySelectorAll('.svc-primary').forEach((radio) => {
+                radio.addEventListener('change', (e) => {
+                    const idx = Number(e.target.dataset.index);
+                    state.services.forEach((s, i) => { s.isPrimary = (i === idx); });
+                });
+            });
+            const wireInput = (selector, field) => {
+                container.querySelectorAll(selector).forEach((input) => {
+                    input.addEventListener('input', (e) => {
+                        const idx = Number(e.target.dataset.index);
+                        state.services[idx][field] = e.target.value;
+                        updateServicePreview(idx);
+                    });
+                });
+            };
+            wireInput('.svc-startCommand', 'startCommand');
+            wireInput('.svc-host', 'host');
+            wireInput('.svc-port', 'port');
+        }
+
+        function updateServicePreview(idx) {
+            const svc = state.services[idx];
+            const preview = document.querySelector(`.svc-preview[data-index="${idx}"]`);
+            if (!preview) return;
+            preview.textContent = (svc.host && svc.port) ? `http://${svc.host}:${svc.port}/` : '—';
+        }
+
+        function escapeAttr(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        // Build a {services[], primary} bundle from current state for the
+        // submission payload. Returns { ok: true, services, primary } on success
+        // or { ok: false, message } on validation failure.
+        function buildServicesPayload() {
+            const primaries = state.services.filter((s) => s.isPrimary);
+            if (primaries.length !== 1) {
+                return { ok: false, message: 'Pick exactly one primary service.' };
+            }
+            const out = [];
+            for (let i = 0; i < state.services.length; i++) {
+                const svc = state.services[i];
+                const startCommand = (svc.startCommand || '').trim();
+                const host = (svc.host || '').trim() || 'localhost';
+                const portStr = String(svc.port || '').trim();
+                if (!startCommand) {
+                    return { ok: false, message: `Service ${i + 1} (${svc.role || 'unnamed'}): start command is required.` };
+                }
+                if (!/^\d+$/.test(portStr) || Number(portStr) < 1 || Number(portStr) > 65535) {
+                    return { ok: false, message: `Service ${i + 1} (${svc.role || 'unnamed'}): port must be a number between 1 and 65535.` };
+                }
+                out.push({
+                    role: svc.role || undefined,
+                    host,
+                    port: Number(portStr),
+                    path: svc.path || undefined,
+                    startCommand,
+                    framework: svc.framework || undefined,
+                    isPrimary: !!svc.isPrimary,
+                });
+            }
+            const primary = out.find((s) => s.isPrimary);
+            return { ok: true, services: out, primary };
         }
 
         setupToggle('mode-group', 'mode');
@@ -772,17 +969,31 @@
             clearError();
 
             let baseURL;
-            try {
-                baseURL = buildBaseURL();
-            } catch (error) {
-                showError(error.message);
-                return;
-            }
-
-            const startCommand = (startCommandInput.value || '').trim();
-            if (!startCommand) {
-                showError('Start command is required.');
-                return;
+            let startCommand;
+            let servicesPayload;
+            if (multiServiceMode) {
+                const built = buildServicesPayload();
+                if (!built.ok) {
+                    showError(built.message);
+                    return;
+                }
+                servicesPayload = built.services;
+                // Top-level fields mirror the primary so the legacy
+                // single-service code path stays valid downstream.
+                startCommand = built.primary.startCommand;
+                baseURL = `http://${built.primary.host}:${built.primary.port}/`;
+            } else {
+                try {
+                    baseURL = buildBaseURL();
+                } catch (error) {
+                    showError(error.message);
+                    return;
+                }
+                startCommand = (startCommandInput.value || '').trim();
+                if (!startCommand) {
+                    showError('Start command is required.');
+                    return;
+                }
             }
 
             const validCredentials = state.credentials.filter(c => c.username && c.password);
@@ -794,6 +1005,7 @@
                 startCommand,
                 generateTests: state.generateTests,
                 openDashboard: true,
+                ...(servicesPayload ? { services: servicesPayload } : {}),
                 ...(validCredentials.length > 0 ? { credentials: validCredentials } : {}),
                 prdFiles: state.prdFiles.length > 0 ? state.prdFiles : null,
             };
