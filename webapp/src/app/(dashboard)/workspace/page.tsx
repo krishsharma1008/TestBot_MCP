@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 
 interface Workspace {
   id: string;
@@ -35,11 +36,12 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function WorkspaceCard({ ws, onRefreshInvite, onViewCoverage, onDeleted }: {
+function WorkspaceCard({ ws, onRefreshInvite, onViewCoverage, onDeleted, onRenamed }: {
   ws: Workspace;
   onRefreshInvite: (id: string) => void;
   onViewCoverage: (id: string) => void;
   onDeleted: (id: string) => void;
+  onRenamed: (id: string, name: string) => void;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -51,8 +53,51 @@ function WorkspaceCard({ ws, onRefreshInvite, onViewCoverage, onDeleted }: {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [renameValue, setRenameValue] = useState(ws.projectName);
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [renameSaved, setRenameSaved] = useState(false);
+
+  useEffect(() => {
+    if (!workspaceMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setWorkspaceMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [workspaceMenuOpen]);
 
   const isOwner = ws.role === 'owner';
+
+  const handleRename = async () => {
+    const name = renameValue.trim();
+    if (!name || name === ws.projectName) return;
+    setRenameLoading(true);
+    setRenameError(null);
+    try {
+      const res = await fetch(`/api/workspaces/${ws.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectName: name }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        onRenamed(ws.id, name);
+        setRenameSaved(true);
+        setTimeout(() => setRenameSaved(false), 2000);
+      } else {
+        setRenameError(json.error || 'Failed to rename');
+      }
+    } catch {
+      setRenameError('Network error');
+    } finally {
+      setRenameLoading(false);
+    }
+  };
 
   const loadMembers = async () => {
     if (membersOpen) { setMembersOpen(false); return; }
@@ -193,12 +238,58 @@ function WorkspaceCard({ ws, onRefreshInvite, onViewCoverage, onDeleted }: {
         >
           {setupOpen ? 'HIDE SETUP' : 'SETUP INSTRUCTIONS'}
         </button>
-        <button
-          onClick={() => onViewCoverage(ws.id)}
-          className="flex-1 text-[10px] font-mono font-bold uppercase tracking-widest border border-[#333] hover:border-white text-[#888] hover:text-white py-1.5 transition-colors"
-        >
-          COVERAGE MAP →
-        </button>
+        <div className="flex-1 relative" ref={menuRef}>
+          <button
+            onClick={() => setWorkspaceMenuOpen((v) => !v)}
+            className="w-full text-[10px] font-mono font-bold uppercase tracking-widest border border-[#333] hover:border-white text-[#888] hover:text-white py-1.5 transition-colors flex items-center justify-center gap-1"
+          >
+            OPEN WORKSPACE
+            <span className={`transition-transform duration-150 ${workspaceMenuOpen ? 'rotate-180' : ''}`}>▾</span>
+          </button>
+          {workspaceMenuOpen && (
+            <div className="absolute right-0 bottom-full mb-1 z-50 bg-[#0a0a0a] border border-[#333] min-w-[190px] shadow-lg">
+              <Link
+                href={`/workspace/${ws.id}`}
+                onClick={() => setWorkspaceMenuOpen(false)}
+                className="flex items-center justify-between px-3 py-2 text-[10px] font-mono text-[#888] hover:text-white hover:bg-white/5 border-b border-[#1a1a1a] transition-colors"
+              >
+                <span>Overview</span>
+                <span>→</span>
+              </Link>
+              <Link
+                href={`/workspace/${ws.id}/run-comparison`}
+                onClick={() => setWorkspaceMenuOpen(false)}
+                className="flex items-center justify-between px-3 py-2 text-[10px] font-mono text-[#888] hover:text-white hover:bg-white/5 border-b border-[#1a1a1a] transition-colors"
+              >
+                <span>Run Comparison</span>
+                <span>→</span>
+              </Link>
+              <Link
+                href={`/workspace/${ws.id}/activity`}
+                onClick={() => setWorkspaceMenuOpen(false)}
+                className="flex items-center justify-between px-3 py-2 text-[10px] font-mono text-[#888] hover:text-white hover:bg-white/5 border-b border-[#1a1a1a] transition-colors"
+              >
+                <span>Activity Stream</span>
+                <span>→</span>
+              </Link>
+              <Link
+                href={`/all-tests?workspace_id=${ws.id}`}
+                onClick={() => setWorkspaceMenuOpen(false)}
+                className="flex items-center justify-between px-3 py-2 text-[10px] font-mono text-[#888] hover:text-white hover:bg-white/5 border-b border-[#1a1a1a] transition-colors"
+              >
+                <span>All Test Runs</span>
+                <span>→</span>
+              </Link>
+              <button
+                onClick={() => { setWorkspaceMenuOpen(false); onViewCoverage(ws.id); }}
+                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-mono text-[#888] hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <span>Coverage Summary</span>
+                <span>→</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Setup Instructions */}
@@ -260,6 +351,30 @@ function WorkspaceCard({ ws, onRefreshInvite, onViewCoverage, onDeleted }: {
                 </div>
               </div>
             ))
+          )}
+
+          {/* Rename workspace (owner only) */}
+          {isOwner && (
+            <div className="pt-2 border-t border-[#1a1a1a] space-y-1.5">
+              <div className="text-[9px] font-mono text-[#505050] uppercase tracking-widest">Rename Workspace</div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={renameValue}
+                  onChange={(e) => { setRenameValue(e.target.value); setRenameError(null); setRenameSaved(false); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); }}
+                  className="flex-1 bg-black border border-[#333] focus:border-white text-white font-mono text-xs px-3 py-1.5 outline-none min-w-0"
+                />
+                <button
+                  onClick={handleRename}
+                  disabled={renameLoading || !renameValue.trim() || renameValue.trim() === ws.projectName}
+                  className="text-[10px] font-mono font-bold uppercase tracking-widest border border-[#555] hover:border-white text-[#888] hover:text-white px-3 py-1.5 transition-colors disabled:opacity-40 flex-shrink-0"
+                >
+                  {renameLoading ? '...' : renameSaved ? 'SAVED' : 'SAVE'}
+                </button>
+              </div>
+              {renameError && <div className="text-red-400 font-mono text-[10px]">{renameError}</div>}
+            </div>
           )}
 
           {/* Add member (owner only) */}
@@ -557,6 +672,7 @@ export default function WorkspacePage() {
               onRefreshInvite={handleRefreshInvite}
               onViewCoverage={(id) => setCoverageWorkspaceId(id)}
               onDeleted={(id) => setWorkspaces((prev) => prev.filter((w) => w.id !== id))}
+              onRenamed={(id, name) => setWorkspaces((prev) => prev.map((w) => w.id === id ? { ...w, projectName: name } : w))}
             />
           ))}
         </div>
@@ -592,8 +708,8 @@ function CoverageMapView({ workspaceId, onBack }: { workspaceId: string; onBack:
   }, [workspaceId]);
 
   const tabs: Array<{ key: 'route' | 'api' | 'category' | 'requirement'; label: string; items: string[] }> = [
-    { key: 'route', label: 'Routes', items: coverage?.covered.routes || [] },
-    { key: 'api', label: 'API Endpoints', items: coverage?.covered.apiEndpoints || [] },
+    { key: 'route', label: 'Pages Visited', items: coverage?.covered.routes || [] },
+    { key: 'api', label: 'Direct API Calls', items: coverage?.covered.apiEndpoints || [] },
     { key: 'category', label: 'Categories', items: coverage?.covered.categories || [] },
     { key: 'requirement', label: 'Requirements', items: coverage?.covered.requirements || [] },
   ];

@@ -1020,7 +1020,7 @@ class WebappClient {
    *
    * Hard never-throws: solo and degraded modes share the same return shape.
    */
-  async fetchCorpus(workspaceId, projectFingerprint) {
+  async fetchCorpus(workspaceId, projectFingerprint, testType) {
     const emptySeed = {
       persistedTests: [],
       coveredAcTags: [],
@@ -1059,7 +1059,7 @@ class WebappClient {
     const snapshots = Array.isArray(data.contract_snapshots) ? data.contract_snapshots : [];
     const findings = Array.isArray(data.findings) ? data.findings : [];
 
-    const persistedTests = testCases.map((row) => ({
+    const allPersistedTests = testCases.map((row) => ({
       id: row.id || null,
       caseKey: row.case_key || row.caseKey || null,
       title: row.title || null,
@@ -1070,6 +1070,14 @@ class WebappClient {
       metadata: row.metadata || null,
       source: row.source || null,
     }));
+
+    // When a specific testType is requested (frontend or backend), filter the
+    // corpus so only matching tests are returned. Tests with no stored testType
+    // (legacy rows) are always included as they could belong to either type.
+    const normalizedRequestedType = String(testType || 'both').toLowerCase();
+    const persistedTests = normalizedRequestedType === 'both'
+      ? allPersistedTests
+      : allPersistedTests.filter((t) => !t.testType || t.testType === normalizedRequestedType || t.testType === 'both');
 
     // AC tags surface as bracketed markers in `tags[]` (e.g. "[REQ:F1.S1.AC1]"
     // or "[QAC:...]"). Pull the bracket contents out as a flat covered set so

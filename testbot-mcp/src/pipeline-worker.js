@@ -456,12 +456,12 @@ async function resolveWorkspaceContext({ projectPath, client } = {}) {
   };
 }
 
-async function fetchCorpusSeed({ client, workspaceId, projectFingerprint } = {}) {
+async function fetchCorpusSeed({ client, workspaceId, projectFingerprint, testType } = {}) {
   if (!client || !projectFingerprint || typeof client.fetchCorpus !== 'function') {
     return { ...EMPTY_CORPUS_SEED, projectFingerprint: projectFingerprint || null };
   }
   try {
-    const seed = await client.fetchCorpus(workspaceId || null, projectFingerprint);
+    const seed = await client.fetchCorpus(workspaceId || null, projectFingerprint, testType);
     if (!seed) return { ...EMPTY_CORPUS_SEED, projectFingerprint };
     return seed;
   } catch (err) {
@@ -1212,6 +1212,7 @@ function extractSpecSignals(content, filename = null) {
     apiEndpoints: [...new Set(apiEndpoints)],
     sourceRefs: extractBracketMarkers(text, 'SRC'),
     authTagged: /@auth|@tierB/i.test(text),
+    apiTagged: /@api|@tierC/i.test(text),
     totalTests,
     skippedTests,
     runnableTests: Math.max(0, totalTests - skippedTests),
@@ -5857,8 +5858,18 @@ function auditGeneratedTestQuality({ projectPath, testType, context, exploration
     summary.skippedTests += fileSkippedTests;
 
     const isApiFile = /request\.(get|post|put|patch|delete|fetch)\(/i.test(content) || /api/i.test(name);
+    // Synthetic test-fixture TLDs and obviously-fake local parts that should never trip the
+    // credential audit even if they happen to share a file with a sign-in assertion.
+    const isSyntheticFixtureEmail = (email) => {
+      const value = String(email || '').toLowerCase();
+      if (!value) return true;
+      if (/(?:^|\.)(?:invalid|test|example|localhost)$/i.test(value.split('@')[1] || '')) return true;
+      if (/^(?:test|fake|dummy|sample|fixture|noreply|no-reply|placeholder|invalid)[+._-]/i.test(value.split('@')[0] || '')) return true;
+      if (/\+(?:newsletter|test|fixture|signup|noreply)\b/i.test(value)) return true;
+      return false;
+    };
     const literalEmails = extractLiteralEmailStrings(content)
-      .filter((email) => !/example\.invalid$/i.test(email))
+      .filter((email) => !isSyntheticFixtureEmail(email))
       .filter((email) => !allowedCredentialLiterals.emails.has(String(email).toLowerCase()));
     const literalPasswords = [];
     for (const match of content.matchAll(hardcodedPasswordLiteralPattern)) {
@@ -5868,14 +5879,25 @@ function auditGeneratedTestQuality({ projectPath, testType, context, exploration
       if (/invalid|wrong|bad|fake|placeholder|not-real/i.test(password)) continue;
       literalPasswords.push(password);
     }
-    if (
-      literalEmails.length > 0 &&
-      (
-        literalPasswords.length > 0 ||
-        /\/api\/(?:auth\/)?(?:login|signin|session)|getByRole\([^)]*(?:login|log in|sign in)|password/i.test(content)
-      )
-    ) {
-      summary.errors.push(`hardcoded_unverified_credentials:${name}:${literalEmails.slice(0, 3).join('|')}`);
+    // Block-scope the check: only flag when a real credential literal and an auth signal
+    // co-occur inside the same test(...) block. Avoids quarantining a benign newsletter
+    // email purely because another test in the same file asserts a "Sign in" button.
+    const authSignalRe = /\/api\/(?:auth\/)?(?:login|signin|session)|password/i;
+    const authNavSignalRe = /getByRole\([^)]*(?:login|log in|sign in)/i;
+    const credentialBlocks = (literalEmails.length > 0 || literalPasswords.length > 0)
+      ? findGeneratedTestBlocks(content).filter((block) => {
+          const blockText = block.content;
+          const hasEmail = literalEmails.some((email) => blockText.includes(email));
+          const hasPassword = literalPasswords.some((password) => blockText.includes(password));
+          if (!hasEmail && !hasPassword) return false;
+          return hasPassword || authSignalRe.test(blockText) || authNavSignalRe.test(blockText);
+        })
+      : [];
+    if (credentialBlocks.length > 0) {
+      const offendingEmails = literalEmails.filter((email) =>
+        credentialBlocks.some((block) => block.content.includes(email))
+      );
+      summary.errors.push(`hardcoded_unverified_credentials:${name}:${(offendingEmails.length > 0 ? offendingEmails : literalEmails).slice(0, 3).join('|')}`);
       summary.riskyFiles.push(name);
     }
 
@@ -7795,6 +7817,7 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
         client: corpusClient,
         workspaceId: wsCtx.workspaceId,
         projectFingerprint: wsCtx.projectFingerprint,
+        testType: config.testType || 'both',
       });
       corpusBootstrap = { workspaceContext: wsCtx, corpusSeed };
       Logger.info('PipelineWorker', 'W2 corpus bootstrap', {
@@ -9523,6 +9546,16 @@ function isTier0Spec(testFile, content) {
 }
 
 /**
+ * Recognise AI-generated smoke specs by filename so they are tagged L0
+ * in the corpus (smoke / basic-sanity category) instead of defaulting to L1.
+ * Matches: smoke.spec.ts, smoke-1.spec.ts, smoke-auth.spec.ts, etc.
+ * Does NOT affect quarantine eligibility — only the corpus tier tag.
+ */
+function isSmokeSpec(testFile) {
+  return Boolean(testFile && /(?:^|[/\\])smoke[.-]/i.test(path.basename(testFile)));
+}
+
+/**
  * Pick the target source file for a spec. Strategy:
  *  1. The first `[SRC:<path>]` marker in the spec.
  *  2. Fallback: the most-referenced path under services/, src/, or app/.
@@ -9818,22 +9851,23 @@ function applyPromotionRules(verdict, corpus = {}, gitCommit = null) {
     };
   }
 
-  // Promotion to L1: green AND no existing dup AND sensitivity OK.
+  // Promotion to L1 (or L0 for smoke specs): green AND no existing dup AND sensitivity OK.
   // Sensitivity calibration is handled OUTSIDE this function — we just flag
-  // whether it's needed.
+  // whether it's needed. Smoke specs skip calibration (broad sanity checks).
   if (verdict.status === 'passed' && !existing) {
+    const smokeL0 = isSmokeSpec(verdict.filePath);
     return {
       upsert: {
         caseKey: verdict.caseKey,
         title: verdict.title,
         suite: verdict.suite || null,
         filePath: verdict.filePath || null,
-        tier: 'L1',
+        tier: smokeL0 ? 'L0' : 'L1',
         status: 'active',
         content: verdict.content || null,
-        // sensitivityScore will be filled in by calibrateSensitivity.
+        // sensitivityScore will be filled in by calibrateSensitivity (L1 only).
       },
-      calibrateNeeded: true,
+      calibrateNeeded: !smokeL0,
     };
   }
 
@@ -9845,7 +9879,7 @@ function applyPromotionRules(verdict, corpus = {}, gitCommit = null) {
         title: verdict.title,
         suite: verdict.suite || null,
         filePath: verdict.filePath || null,
-        tier: existing.tier || 'L1',
+        tier: existing.tier || (isSmokeSpec(verdict.filePath) ? 'L0' : 'L1'),
         status: 'active',
         content: verdict.content || null,
       },
@@ -10090,6 +10124,71 @@ async function runCorpusSync({
     Logger.warn('PipelineWorker', 'runCorpusSync failed (non-blocking)', { reason: err.message });
     return null;
   }
+}
+
+/**
+ * Temporarily move spec files that don't match the requested testType out of
+ * tests/generated/ before Playwright runs, so only the relevant type executes.
+ * Returns a restore function that moves them back — always call it in a
+ * finally block. No-op when testType is 'both' or undefined.
+ *
+ * Classification:
+ *   frontend — file has page.goto() calls (routes) and no direct API calls
+ *   backend  — file has request.method() calls (apiEndpoints) and no UI calls
+ *   smoke    — always kept regardless of testType
+ */
+function filterSpecFilesByTestType(projectPath, testType) {
+  const normalizedType = String(testType || 'both').toLowerCase();
+  if (normalizedType === 'both') return () => {};
+  const generatedDir = path.join(projectPath, 'tests', 'generated');
+  if (!fs.existsSync(generatedDir)) return () => {};
+  const stagingDir = path.join(projectPath, 'tests', '.healix-type-staging');
+  const movedFiles = [];
+  try {
+    const specFiles = listGeneratedTestFiles(projectPath);
+    for (const filePath of specFiles) {
+      try {
+        const fileName = path.basename(filePath);
+        const isSmoke = /smoke/i.test(fileName);
+        if (isSmoke) continue;
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const signals = extractSpecSignals(content, fileName);
+        const hasFrontend = (signals.routes || []).length > 0;
+        const hasBackend = (signals.apiEndpoints || []).length > 0;
+        const isApiTagged = signals.apiTagged === true;
+        let exclude = false;
+        if (normalizedType === 'frontend') {
+          // Exclude files that are backend/API tests: tagged @api/@tierC, or have
+          // backend signals with no frontend signals at all.
+          if (isApiTagged || (!hasFrontend && hasBackend)) exclude = true;
+        }
+        if (normalizedType === 'backend') {
+          // Exclude files that are pure UI tests: no backend signals, no @api/@tierC tag.
+          if (!isApiTagged && !hasBackend && hasFrontend) exclude = true;
+        }
+        if (!exclude) continue;
+        if (!fs.existsSync(stagingDir)) fs.mkdirSync(stagingDir, { recursive: true });
+        const dest = path.join(stagingDir, fileName);
+        fs.renameSync(filePath, dest);
+        movedFiles.push({ from: dest, to: filePath });
+      } catch { /* skip unreadable files */ }
+    }
+    if (movedFiles.length > 0) {
+      Logger.info('PipelineWorker', `testType=${normalizedType}: staged ${movedFiles.length} non-matching spec file(s) out of tests/generated before execution`);
+    }
+  } catch (err) {
+    Logger.warn('PipelineWorker', 'filterSpecFilesByTestType failed (non-blocking)', { reason: err.message });
+  }
+  return function restoreSpecFiles() {
+    for (const { from, to } of movedFiles) {
+      try { if (fs.existsSync(from)) fs.renameSync(from, to); } catch { /* ignore */ }
+    }
+    try {
+      if (fs.existsSync(stagingDir) && fs.readdirSync(stagingDir).length === 0) {
+        fs.rmdirSync(stagingDir);
+      }
+    } catch { /* ignore */ }
+  };
 }
 
 /**
@@ -11619,6 +11718,7 @@ async function runPipeline(config, runId) {
     }
 
     let testResults;
+    const restoreSpecFiles = filterSpecFilesByTestType(config.projectPath, config.testType);
 
     // Tier-0 self-heal: if some earlier path (quarantine, manual cleanup,
     // generator reset, etc.) removed the legacy-view copy of a Tier-0 spec,
@@ -11646,6 +11746,7 @@ async function runPipeline(config, runId) {
       Logger.warn('PipelineWorker', 'Tier-0 legacy view self-heal failed', { reason: healErr.message });
     }
 
+    try {
     testResults = await withStageBudget(runBudget, 'execution', async () => {
       if (!mcpParallelEnabled) {
         return playwright.runTests();
@@ -11689,6 +11790,9 @@ async function runPipeline(config, runId) {
       });
       return mcpOutcome.value;
     });
+    } finally {
+      restoreSpecFiles();
+    }
     if (progressFlushTimer) {
       clearTimeout(progressFlushTimer);
       progressFlushTimer = null;

@@ -4,14 +4,14 @@ import { db } from '@/lib/db'
 import { workspaceMembers, projectWorkspaces } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { getCurrentUser } from '@/lib/auth/session'
-import { computeWorkspaceCoverage } from '@/lib/coverage'
-import CoverageMatrixClient from './CoverageMatrixClient'
+import { computeRunComparison } from '@/app/api/workspaces/[id]/run-comparison/route'
+import RunComparisonClient from './RunComparisonClient'
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
-export default async function WorkspaceCoveragePage({ params }: PageProps) {
+export default async function WorkspaceRunComparisonPage({ params }: PageProps) {
   const { id: workspaceId } = await params
   const user = await getCurrentUser()
   if (!user) redirect('/login')
@@ -42,12 +42,12 @@ export default async function WorkspaceCoveragePage({ params }: PageProps) {
 
   if (!workspace) redirect('/workspace')
 
-  let matrix
+  let comparison
   try {
-    matrix = await computeWorkspaceCoverage(workspaceId)
+    comparison = await computeRunComparison(workspaceId)
   } catch (err) {
-    console.error('[coverage page] failed', err)
-    matrix = { rows: [], totals: { acsTotal: 0, acsCovered: 0, byTier: { L0: 0, L1: 0, L2: 0, L3: 0 } } }
+    console.error('[run-comparison page] failed', err)
+    comparison = { latest: null, previous: null, diff: null }
   }
 
   return (
@@ -58,14 +58,14 @@ export default async function WorkspaceCoveragePage({ params }: PageProps) {
             ← {workspace.projectName}
           </Link>
           <span className="text-[#4A6280]">/</span>
-          <h1 className="text-[#F0F6FF] text-2xl font-bold">Coverage matrix</h1>
+          <h1 className="text-[#F0F6FF] text-2xl font-bold">Run comparison</h1>
         </div>
         <p className="text-[#8BA4C8] text-xs">
-          PRD acceptance criteria × tier. Click a red cell to copy a generation prompt.
+          Latest run vs. previous run — which files were added, which recovered, which regressed.
         </p>
       </div>
 
-      <CoverageMatrixClient matrix={matrix} />
+      <RunComparisonClient comparison={comparison} workspaceId={workspaceId} />
     </div>
   )
 }

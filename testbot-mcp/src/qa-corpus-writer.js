@@ -41,6 +41,20 @@ const Logger = (() => {
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Tier helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Recognise AI-generated smoke specs by filename so they are tagged L0
+ * in the corpus (smoke / basic-sanity category) instead of defaulting to L1.
+ * Matches: smoke.spec.ts, smoke-1.spec.ts, smoke-auth.spec.ts, etc.
+ * Does NOT affect quarantine eligibility — only the corpus tier tag.
+ */
+function isSmokeSpec(testFile) {
+  return Boolean(testFile && /(?:^|[/\\])smoke[.-]/i.test(path.basename(testFile)));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // caseKey + content-hash helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -368,29 +382,34 @@ function applyPromotionRules(verdicts, corpus, workspaceContext = {}) {
       continue;
     }
 
-    // ── L1 PROMOTION CANDIDATE — only new (no existing row) and passed.
+    // ── L1 (or L0 for smoke) PROMOTION CANDIDATE — only new (no existing row) and passed.
     if (!existing && v.status === 'passed') {
-      // Dedup: same stableTestId OR same acTagSet+endpointSet already in corpus
-      const isDup = dedupIndex.some((row) => {
-        if (row.caseKey === caseKey) return true;
-        if (acTagSet.size > 0 && _setsOverlap(row.acTagSet, acTagSet)) return true;
-        if (endpointSet.size > 0 && _setsOverlap(row.endpointSet, endpointSet)) return true;
-        return false;
-      });
-      if (isDup) continue;
+      const smokeL0 = isSmokeSpec(v.filePath);
+
+      // Dedup: same stableTestId OR same acTagSet+endpointSet already in corpus.
+      // Smoke (L0) specs skip dedup — they are always present.
+      if (!smokeL0) {
+        const isDup = dedupIndex.some((row) => {
+          if (row.caseKey === caseKey) return true;
+          if (acTagSet.size > 0 && _setsOverlap(row.acTagSet, acTagSet)) return true;
+          if (endpointSet.size > 0 && _setsOverlap(row.endpointSet, endpointSet)) return true;
+          return false;
+        });
+        if (isDup) continue;
+      }
 
       const sensitivity = v.sensitivityScore;
       // null = uncalibrated; allow promotion but flag. >0 sensitive promote.
-      // 0 (insensitive) explicitly rejected.
-      if (sensitivity === 0) continue;
+      // 0 (insensitive) explicitly rejected — but smoke (L0) skips this gate.
+      if (!smokeL0 && sensitivity === 0) continue;
 
       upserts.push({
         caseKey,
         content: v.content || null,
-        tier: 'L1',
+        tier: smokeL0 ? 'L0' : 'L1',
         acTagSet: [...acTagSet],
         endpointSet: [...endpointSet],
-        sensitivityScore: sensitivity ?? null,
+        sensitivityScore: smokeL0 ? null : (sensitivity ?? null),
         contributorUserId: workspaceContext.contributorUserId || null,
         runId: workspaceContext.runId || null,
         status: 'active',

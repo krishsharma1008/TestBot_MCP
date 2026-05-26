@@ -142,10 +142,9 @@ export async function GET(request: NextRequest) {
       is_live: false,
     }))
 
-    // In workspace team mode, decorate each run with contributor identity so
-    // the team table can show "who ran it". One follow-up SELECT keeps this
-    // cheap regardless of page size.
-    if (workspaceId && mappedData.length > 0) {
+    // Decorate each run with contributor identity so the table can show "who
+    // ran it". One follow-up SELECT keeps this cheap regardless of page size.
+    if (mappedData.length > 0) {
       const uniqueUserIds = Array.from(new Set(mappedData.map((r) => r.user_id).filter(Boolean) as string[]))
       if (uniqueUserIds.length > 0) {
         const profileRows = await db

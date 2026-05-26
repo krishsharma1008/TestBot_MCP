@@ -128,8 +128,6 @@ interface WorkspaceMember {
   fullName: string | null;
 }
 
-type TierFilter = 'all' | 'L0' | 'L1' | 'L2' | 'L3';
-type CorpusStatus = 'all' | 'active' | 'flake-quarantine' | 'soft-deleted';
 
 export default function AllTestsPage() {
   const router = useRouter();
@@ -152,8 +150,6 @@ export default function AllTestsPage() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [contributorFilter, setContributorFilter] = useState<string>('all'); // 'all' | 'me' | userId
-  const [tierFilter, setTierFilter] = useState<TierFilter>('all');
-  const [corpusStatusFilter, setCorpusStatusFilter] = useState<CorpusStatus>('all');
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -437,35 +433,6 @@ export default function AllTestsPage() {
                   ))}
                 </select>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase tracking-widest text-[#4A6280] font-semibold">Tier</span>
-                <select
-                  data-testid="tier-filter"
-                  value={tierFilter}
-                  onChange={(e) => { setTierFilter(e.target.value as TierFilter); setPage(1); }}
-                  className="input-glass px-3 py-2 text-sm rounded-xl text-[#8BA4C8] cursor-pointer"
-                >
-                  <option value="all">All tiers</option>
-                  <option value="L0">L0</option>
-                  <option value="L1">L1</option>
-                  <option value="L2">L2</option>
-                  <option value="L3">L3</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase tracking-widest text-[#4A6280] font-semibold">Corpus</span>
-                <select
-                  data-testid="corpus-status-filter"
-                  value={corpusStatusFilter}
-                  onChange={(e) => { setCorpusStatusFilter(e.target.value as CorpusStatus); setPage(1); }}
-                  className="input-glass px-3 py-2 text-sm rounded-xl text-[#8BA4C8] cursor-pointer"
-                >
-                  <option value="all">All status</option>
-                  <option value="active">Active</option>
-                  <option value="flake-quarantine">Flake quarantine</option>
-                  <option value="soft-deleted">Soft-deleted</option>
-                </select>
-              </div>
             </>
           )}
         </motion.div>
@@ -645,6 +612,16 @@ export default function AllTestsPage() {
                                       {test.is_live ? 'live' : 'run'}{test.current_phase ? ` · ${test.current_phase}` : ''}{test.error_code ? ` · ${test.error_code}` : ''}
                                     </div>
                                   )}
+                                  {activeWorkspaceId && (test.contributor_name || test.contributor_email) && (
+                                    <div className="flex items-center gap-1">
+                                      <div className="w-4 h-4 rounded-full bg-[#1E3A5F] flex items-center justify-center text-[8px] text-[#60A5FA] font-bold flex-shrink-0">
+                                        {(test.contributor_name || test.contributor_email || '?')[0].toUpperCase()}
+                                      </div>
+                                      <span className="text-[10px] text-[#4A6280] truncate max-w-[160px]">
+                                        {test.contributor_name || test.contributor_email}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-4 py-3">
@@ -688,6 +665,16 @@ export default function AllTestsPage() {
                           {(test.current_phase || test.error_code || test.is_live) && (
                             <div className="text-[11px] text-[#60A5FA] mt-1 font-mono">
                               {test.is_live ? 'live' : 'run'}{test.current_phase ? ` · ${test.current_phase}` : ''}{test.error_code ? ` · ${test.error_code}` : ''}
+                            </div>
+                          )}
+                          {activeWorkspaceId && (test.contributor_name || test.contributor_email) && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <div className="w-4 h-4 rounded-full bg-[#1E3A5F] flex items-center justify-center text-[8px] text-[#60A5FA] font-bold flex-shrink-0">
+                                {(test.contributor_name || test.contributor_email || '?')[0].toUpperCase()}
+                              </div>
+                              <span className="text-[10px] text-[#4A6280] truncate max-w-[180px]">
+                                {test.contributor_name || test.contributor_email}
+                              </span>
                             </div>
                           )}
                         </td>

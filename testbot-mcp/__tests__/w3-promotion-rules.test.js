@@ -215,6 +215,53 @@ test('W3 — L0 tests always upserted, no calibration, no dedup', () => {
   assert.strictEqual(out.upserts[0].sensitivityScore, null);
 });
 
+test('W3 — smoke spec (smoke.spec.ts) is promoted as L0, not L1', () => {
+  const verdicts = [{
+    caseKey: 'case:smoke-1',
+    title: 'smoke: homepage loads',
+    filePath: 'tests/generated/smoke.spec.ts',
+    status: 'passed',
+    sensitivityScore: null,
+    acTagSet: [],
+    endpointSet: [],
+    content: 'test("smoke: homepage loads", ...)',
+  }];
+  const out = QACorpusWriter.applyPromotionRules(verdicts, makeCorpus([]), {});
+  assert.strictEqual(out.upserts.length, 1);
+  assert.strictEqual(out.upserts[0].tier, 'L0');
+  assert.strictEqual(out.upserts[0].sensitivityScore, null);
+});
+
+test('W3 — smoke-1.spec.ts is promoted as L0', () => {
+  const verdicts = [{
+    caseKey: 'case:smoke-2',
+    title: 'smoke: cart page loads',
+    filePath: 'tests/generated/smoke-1.spec.ts',
+    status: 'passed',
+    sensitivityScore: null,
+    acTagSet: [],
+    endpointSet: [],
+  }];
+  const out = QACorpusWriter.applyPromotionRules(verdicts, makeCorpus([]), {});
+  assert.strictEqual(out.upserts.length, 1);
+  assert.strictEqual(out.upserts[0].tier, 'L0');
+});
+
+test('W3 — non-smoke spec (admin-inventory.spec.ts) is still L1', () => {
+  const verdicts = [{
+    caseKey: 'case:admin-1',
+    title: 'admin: lists inventory',
+    filePath: 'tests/generated/admin-inventory.spec.ts',
+    status: 'passed',
+    sensitivityScore: 1.0,
+    acTagSet: ['REQ:F1.AC1'],
+    endpointSet: ['GET /api/inventory'],
+  }];
+  const out = QACorpusWriter.applyPromotionRules(verdicts, makeCorpus([]), {});
+  assert.strictEqual(out.upserts.length, 1);
+  assert.strictEqual(out.upserts[0].tier, 'L1');
+});
+
 test('W3 — solo-mode syncCorpus is a no-op', async () => {
   let called = false;
   const stubClient = { syncCorpus: async () => { called = true; } };

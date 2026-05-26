@@ -38,7 +38,7 @@ interface DashboardData {
   }>
   topContributors: Array<{
     userId: string
-    testsPromoted: number
+    runsCount: number
     email: string | null
     fullName: string | null
   }>
@@ -170,10 +170,10 @@ export default async function WorkspaceOverviewPage({ params }: PageProps) {
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-1">
           <Link
-            href={`/workspace/${workspaceId}/coverage`}
-            className="text-[10px] uppercase tracking-widest font-semibold border border-blue-500/30 text-[#60A5FA] hover:text-[#F0F6FF] hover:border-blue-500/60 px-3 py-1.5 rounded-lg"
+            href={`/workspace/${workspaceId}/run-comparison`}
+            className="text-[10px] uppercase tracking-widest font-semibold border border-white/10 text-[#8BA4C8] hover:text-[#F0F6FF] hover:border-white/30 px-3 py-1.5 rounded-lg"
           >
-            Coverage matrix →
+            Run comparison →
           </Link>
           <Link
             href={`/workspace/${workspaceId}/activity`}
@@ -193,7 +193,10 @@ export default async function WorkspaceOverviewPage({ params }: PageProps) {
       {/* Recent test runs across all members — surfaces the owner's runs too */}
       <div className="glass-card rounded-2xl p-4" data-testid="workspace-recent-runs">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[#F0F6FF] text-sm font-bold">Recent test runs</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-[#F0F6FF] text-sm font-bold">Recent test runs</h3>
+            <span className="text-[10px] font-mono text-[#4A6280]">{data.counts.testsRun7d} in last 7d</span>
+          </div>
           <Link
             href={`/all-tests?workspace_id=${workspaceId}`}
             className="text-[10px] uppercase tracking-widest text-[#60A5FA] hover:text-[#F0F6FF]"
@@ -236,20 +239,6 @@ export default async function WorkspaceOverviewPage({ params }: PageProps) {
         )}
       </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="kpi-cards">
-        {([
-          { label: 'L0 corpus', value: data.counts.byTier.L0, accent: 'text-emerald-400' },
-          { label: 'L1 corpus', value: data.counts.byTier.L1, accent: 'text-blue-400' },
-          { label: 'L2 corpus', value: data.counts.byTier.L2, accent: 'text-amber-400' },
-          { label: 'Runs (7d)', value: data.counts.testsRun7d, accent: 'text-[#F0F6FF]' },
-        ] as const).map((card) => (
-          <div key={card.label} className="glass-card rounded-2xl p-4 flex flex-col gap-1">
-            <div className={`text-2xl font-black ${card.accent}`}>{card.value}</div>
-            <div className="text-[10px] uppercase tracking-widest text-[#4A6280] font-semibold">{card.label}</div>
-          </div>
-        ))}
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Recent activity */}
@@ -298,7 +287,7 @@ export default async function WorkspaceOverviewPage({ params }: PageProps) {
                 <li key={c.userId} className="flex items-center gap-2 text-xs">
                   <span className="w-5 text-center text-[#4A6280] font-mono">{idx + 1}</span>
                   <span className="flex-1 text-[#F0F6FF] truncate">{c.fullName ?? c.email ?? c.userId.slice(0, 8)}</span>
-                  <span className="text-emerald-400 font-mono font-bold">{c.testsPromoted}</span>
+                  <span className="text-emerald-400 font-mono font-bold">{c.runsCount} run{c.runsCount !== 1 ? 's' : ''}</span>
                 </li>
               ))}
             </ul>
@@ -319,7 +308,6 @@ async function loadDashboardData(workspaceId: string): Promise<DashboardData | n
     workspaceMembers,
     projectWorkspaces,
     qaTestCases,
-    qaTestVersions,
     qaTestCaseRuns,
     testRuns,
     profiles,
@@ -429,11 +417,10 @@ async function loadDashboardData(workspaceId: string): Promise<DashboardData | n
   }
 
   const contributorRows = await db
-    .select({ userId: qaTestVersions.contributorUserId, value: sql<number>`count(*)::int` })
-    .from(qaTestVersions)
-    .innerJoin(testRuns, eq(testRuns.id, qaTestVersions.runId))
-    .where(and(eq(testRuns.workspaceId, workspaceId), gte(qaTestVersions.createdAt, thirtyDaysAgo)))
-    .groupBy(qaTestVersions.contributorUserId)
+    .select({ userId: testRuns.userId, value: sql<number>`count(*)::int` })
+    .from(testRuns)
+    .where(and(eq(testRuns.workspaceId, workspaceId), gte(testRuns.createdAt, thirtyDaysAgo)))
+    .groupBy(testRuns.userId)
     .orderBy(desc(sql`count(*)`))
     .limit(5)
 
@@ -498,7 +485,7 @@ async function loadDashboardData(workspaceId: string): Promise<DashboardData | n
     recentActivity,
     topContributors: contributorRows.map((c) => ({
       userId: c.userId,
-      testsPromoted: c.value,
+      runsCount: c.value,
       email: profileMap.get(c.userId)?.email ?? null,
       fullName: profileMap.get(c.userId)?.fullName ?? null,
     })),
