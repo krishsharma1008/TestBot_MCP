@@ -204,15 +204,10 @@ function ensureTier0InLegacyView(projectPath) {
 }
 
 module.exports = {
-  TIER0_REL,
-  TIER1_REL,
-  LEGACY_REL,
-  TIER0_FILENAMES,
   tierDirs,
   ensureTierDirs,
   resetTier1Dir,
   syncLegacyView,
   isTier0Path,
   ensureTier0InLegacyView,
-  mirrorInto,
 };

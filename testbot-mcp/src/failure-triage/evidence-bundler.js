@@ -318,10 +318,4 @@ async function bundleFailures({ failures = [], tests = [], projectPath, runId })
 
 module.exports = {
   bundleFailures,
-  bundleOne, // exported for unit tests
-  extractTestBlock,
-  findAcceptanceCriterion,
-  findExplorationRoute,
-  resolveTierAndRole,
-  redact,
 };

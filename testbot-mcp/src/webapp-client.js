@@ -31,13 +31,9 @@ const DEFAULT_TIMEOUT_MS = Number.isFinite(ENV_OVERRIDE) && ENV_OVERRIDE > 0
 // validate / phase endpoints (which MUST stay fast) doesn't accidentally
 // tighten generation.
 const ENDPOINT_TIMEOUTS_MS = {
-  validate: 6_000,
   phase: 4_000,
-  ingest: 60_000,
   analyze: 600_000,          // 10 min — gpt-5.5-mini high-reasoning triage
-  planExploration: 600_000,  // 10 min
   parsePRD: 600_000,         // 10 min
-  generateTests: 1_200_000,  // 20 min — legacy monolithic code-gen
   // Per-agent chunked generation. Localhost-first: each agent slice routinely
   // needs minutes under gpt-5.5-mini high-reasoning (frontend and error agents
   // especially). Override via HEALIX_WEBAPP_TIMEOUT_MS if you need a tighter
@@ -242,33 +238,6 @@ class WebappClient {
     return payload;
   }
 
-  async validateKey() {
-    this._assertKey('/api/mcp-auth/validate');
-    return this._post(
-      '/api/mcp-auth/validate',
-      { api_key: this.apiKey },
-      { timeoutMs: ENDPOINT_TIMEOUTS_MS.validate }
-    );
-  }
-
-  async generateTests({ context, prd, parsedPRD, explorationArtifact, roles, testType, projectInfo, options }) {
-    this._assertKey('/api/generate-tests');
-    return this._post(
-      '/api/generate-tests',
-      {
-        api_key: this.apiKey,
-        context,
-        prd: prd || '',
-        parsedPRD: parsedPRD || null,
-        explorationArtifact: explorationArtifact || null,
-        roles: roles || [],
-        testType,
-        projectInfo,
-        options,
-      },
-      { timeoutMs: ENDPOINT_TIMEOUTS_MS.generateTests }
-    );
-  }
 
   /**
    * Per-agent chunked generation. The MCP fans out 5 parallel calls (one per
@@ -857,19 +826,6 @@ class WebappClient {
     );
   }
 
-  async planExploration({ explorationArtifact, parsedPRD }) {
-    this._assertKey('/api/exploration/plan');
-    return this._post(
-      '/api/exploration/plan',
-      {
-        api_key: this.apiKey,
-        explorationArtifact,
-        parsedPRD: parsedPRD || null,
-      },
-      { timeoutMs: ENDPOINT_TIMEOUTS_MS.planExploration }
-    );
-  }
-
   async analyzeFailures(failures) {
     this._assertKey('/api/analyze-failures');
     if (!Array.isArray(failures) || failures.length === 0) return { analyses: [] };
@@ -881,13 +837,6 @@ class WebappClient {
       },
       { timeoutMs: ENDPOINT_TIMEOUTS_MS.analyze }
     );
-  }
-
-  async ingestTestRun(runPayload) {
-    this._assertKey('/api/test-runs/ingest');
-    return this._post('/api/test-runs/ingest', runPayload, {
-      timeoutMs: ENDPOINT_TIMEOUTS_MS.ingest,
-    });
   }
 
   async _get(path, { timeoutMs } = {}) {

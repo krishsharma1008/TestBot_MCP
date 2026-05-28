@@ -529,5 +529,3 @@ class ArtifactUploader {
 }
 
 module.exports = ArtifactUploader;
-module.exports.isCredentialFile = isCredentialFile;
-module.exports.CREDENTIAL_DENY_PATTERNS = CREDENTIAL_DENY_PATTERNS;

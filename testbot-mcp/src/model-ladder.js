@@ -120,5 +120,4 @@ module.exports = {
   getLadder,
   markUnavailable,
   runWithLadder,
-  isLadderAdvanceableError,
 };

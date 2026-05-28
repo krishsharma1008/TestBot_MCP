@@ -296,10 +296,4 @@ function driveExploration({
 
 module.exports = {
   driveExploration,
-  resolvePython,
-  isBrowserUseInstalled,
-  calibrateStepTimeoutS,
-  STEP_TIMEOUT_MIN_S,
-  STEP_TIMEOUT_MAX_S,
-  RUNNER_SCRIPT,
 };

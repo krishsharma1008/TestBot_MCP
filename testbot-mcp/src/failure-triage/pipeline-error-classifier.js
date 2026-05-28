@@ -276,6 +276,4 @@ function mergeWithClassification(partial, classification) {
 
 module.exports = {
   classifyPipelineErrorFromStderr,
-  mergeWithClassification,
-  CLASSIFIERS,
 };
