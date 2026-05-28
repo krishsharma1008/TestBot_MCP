@@ -841,7 +841,7 @@ class WebappClient {
     }
   }
 
-  async parsePRD({ prdContent, prdHash }) {
+  async parsePRD({ prdContent, prdHash, model }) {
     this._assertKey('/api/parse-prd');
     return this._post(
       '/api/parse-prd',
@@ -849,6 +849,9 @@ class WebappClient {
         api_key: this.apiKey,
         prd: prdContent,
         prdHash: prdHash || null,
+        // Optional model override — used by the worker's per-task model
+        // ladder so a 4xx on one model can be retried with the next rung.
+        model: model || undefined,
       },
       { timeoutMs: ENDPOINT_TIMEOUTS_MS.parsePRD }
     );
@@ -885,6 +888,354 @@ class WebappClient {
     return this._post('/api/test-runs/ingest', runPayload, {
       timeoutMs: ENDPOINT_TIMEOUTS_MS.ingest,
     });
+  }
+
+  async _get(path, { timeoutMs } = {}) {
+    const url = `${this.dashboardUrl}${path}`;
+    const fetchFn = getFetch();
+    const limit = Number.isFinite(timeoutMs) ? timeoutMs : 30_000;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), limit);
+    let response;
+    try {
+      response = await fetchFn(url, {
+        method: 'GET',
+        headers: { 'x-api-key': this.apiKey || '' },
+        signal: controller.signal,
+      });
+    } catch (networkErr) {
+      clearTimeout(timer);
+      if (networkErr.name === 'AbortError') {
+        const err = new Error(`Healix webapp GET timed out after ${limit}ms: ${path}`);
+        err.code = 'WEBAPP_TIMEOUT';
+        throw err;
+      }
+      const err = new Error(`Cannot reach Healix webapp at ${url}: ${networkErr.message}`);
+      err.code = 'WEBAPP_UNREACHABLE';
+      throw err;
+    }
+    clearTimeout(timer);
+
+    let payload = null;
+    const rawText = await response.text().catch(() => '');
+    try { payload = rawText ? JSON.parse(rawText) : null; } catch { payload = null; }
+
+    if (!response.ok) {
+      const detail = payload?.error || rawText.slice(0, 400) || `HTTP ${response.status}`;
+      const err = new Error(`Healix webapp GET ${path} failed (${response.status}): ${detail}`);
+      err.code = response.status === 401 ? 'INVALID_API_KEY' :
+                 response.status === 403 ? 'WORKSPACE_ACCESS_DENIED' :
+                 response.status === 404 ? 'NOT_FOUND' :
+                 response.status >= 500 ? 'WEBAPP_SERVER_ERROR' : 'WEBAPP_ERROR';
+      err.status = response.status;
+      err.payload = payload;
+      throw err;
+    }
+    return payload;
+  }
+
+  // ── Workspace sync methods ──────────────────────────────────────────────────
+
+  /**
+   * Resolve a workspace for the given project key.
+   * Returns { workspaceId, role, projectName, ... } or null if no workspace.
+   * Returns null (non-throwing) when the workspace doesn't exist (solo mode).
+   * Throws on auth errors so the pipeline can surface them.
+   */
+  async resolveWorkspace({ projectKey, gitRemote }) {
+    if (!this.apiKey || !projectKey) return null;
+    try {
+      const params = new URLSearchParams({ projectKey });
+      // Also send the raw gitRemote when we have it. The server uses it as
+      // a defense-in-depth fallback: if the primary hash doesn't match (e.g.
+      // because the client couldn't resolve a custom SSH host alias), the
+      // server will derive alternate hashes from this raw string and retry.
+      if (gitRemote && typeof gitRemote === 'string' && gitRemote.trim().length > 0) {
+        params.set('gitRemote', gitRemote.trim());
+      }
+      return await this._get(
+        `/api/workspaces/resolve?${params.toString()}`,
+        { timeoutMs: 10_000 }
+      );
+    } catch (err) {
+      if (err.status === 404) return { found: false };
+      if (err.status === 403) {
+        // The server uses two distinct 403 shapes:
+        //   { error: 'WORKSPACE_REQUIRES_PAID_PLAN', message } — caller is on
+        //     a free plan or inactive subscription. Every workspace member
+        //     must be on a paid plan; surface this so the user sees a clear
+        //     "upgrade required" message instead of a silent solo-mode run.
+        //   { found: true, member: false, message } — workspace exists but
+        //     the caller isn't a member of it. Surface as a join hint.
+        const payload = err.payload || null;
+        if (payload?.error === 'WORKSPACE_REQUIRES_PAID_PLAN') {
+          Logger.warn('WebappClient', 'Workspace blocked: this account needs a paid plan with an active subscription', {
+            projectKey,
+            message: payload?.message || null,
+            hint: 'Upgrade at /plan-billing in the Healix dashboard. Every workspace member must be on a paid plan.',
+          });
+          return {
+            found: true,
+            member: false,
+            paidPlanRequired: true,
+            message: payload?.message || 'Team workspaces are available on paid plans.',
+          };
+        }
+        if (payload && payload.member === false) {
+          Logger.warn('WebappClient', 'Workspace found but not a member — running solo', {
+            projectKey,
+            hint: 'Join the workspace via invite code in the Healix dashboard.',
+          });
+          return {
+            found: true,
+            member: false,
+            paidPlanRequired: false,
+            message: payload?.message || 'You are not a member of this workspace.',
+          };
+        }
+        // Generic 403 with no recognised payload shape — log and fall through.
+        Logger.warn('WebappClient', 'resolveWorkspace returned 403 with unrecognised payload — running solo', {
+          projectKey,
+          payload,
+        });
+        return null;
+      }
+      Logger.warn('WebappClient', 'resolveWorkspace failed (non-blocking)', { code: err.code, message: err.message });
+      return null;
+    }
+  }
+
+  /**
+   * Fetch the QA corpus for a project — the read-side of W2.
+   *
+   * Returns a normalised seed of:
+   *   { persistedTests, coveredAcTags, coveredEndpoints, lastFindingSignatures,
+   *     contractSnapshots, raw }
+   *
+   * Falls through to a benign empty seed (NOT null) on 404/5xx/network errors so
+   * callers can treat the result uniformly without branching on "corpus
+   * present?". When `workspaceId` is null we still fetch a per-user corpus —
+   * the webapp scopes by api-key user, so solo developers get their own row
+   * history.
+   *
+   * Hard never-throws: solo and degraded modes share the same return shape.
+   */
+  async fetchCorpus(workspaceId, projectFingerprint, testType) {
+    const emptySeed = {
+      persistedTests: [],
+      coveredAcTags: [],
+      coveredEndpoints: [],
+      lastFindingSignatures: [],
+      contractSnapshots: [],
+      raw: null,
+      workspaceId: workspaceId || null,
+      projectFingerprint: projectFingerprint || null,
+      status: 'empty',
+    };
+    if (!this.apiKey || !projectFingerprint) {
+      return { ...emptySeed, status: 'skipped_no_fingerprint' };
+    }
+
+    const params = new URLSearchParams();
+    params.set('projectFingerprint', projectFingerprint);
+    if (workspaceId) params.set('workspaceId', workspaceId);
+
+    let payload;
+    try {
+      payload = await this._get(`/api/qa-corpus?${params.toString()}`, { timeoutMs: 15_000 });
+    } catch (err) {
+      Logger.warn('WebappClient', 'fetchCorpus failed (non-blocking — falling through to solo mode)', {
+        workspaceId: workspaceId || null,
+        projectFingerprint,
+        code: err?.code,
+        status: err?.status,
+        message: err?.message,
+      });
+      return { ...emptySeed, status: err?.status === 404 ? 'not_found' : 'error' };
+    }
+
+    const data = payload?.data || payload || {};
+    const testCases = Array.isArray(data.test_cases) ? data.test_cases : [];
+    const snapshots = Array.isArray(data.contract_snapshots) ? data.contract_snapshots : [];
+    const findings = Array.isArray(data.findings) ? data.findings : [];
+
+    const allPersistedTests = testCases.map((row) => ({
+      id: row.id || null,
+      caseKey: row.case_key || row.caseKey || null,
+      title: row.title || null,
+      filePath: row.file_path || row.filePath || null,
+      testType: row.test_type || row.testType || null,
+      category: row.category || null,
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      metadata: row.metadata || null,
+      source: row.source || null,
+    }));
+
+    // When a specific testType is requested (frontend or backend), filter the
+    // corpus so only matching tests are returned. Tests with no stored testType
+    // (legacy rows) are always included as they could belong to either type.
+    const normalizedRequestedType = String(testType || 'both').toLowerCase();
+    const persistedTests = normalizedRequestedType === 'both'
+      ? allPersistedTests
+      : allPersistedTests.filter((t) => !t.testType || t.testType === normalizedRequestedType || t.testType === 'both');
+
+    // AC tags surface as bracketed markers in `tags[]` (e.g. "[REQ:F1.S1.AC1]"
+    // or "[QAC:...]"). Pull the bracket contents out as a flat covered set so
+    // the prompt-augmenter and the Tier-0 filter can index by string.
+    const coveredAcTagsSet = new Set();
+    const coveredEndpointsSet = new Set();
+    for (const t of persistedTests) {
+      for (const tag of t.tags) {
+        if (typeof tag !== 'string') continue;
+        const stripped = tag.trim();
+        if (!stripped) continue;
+        coveredAcTagsSet.add(stripped);
+        // also surface the bare id (without brackets) for substring matching
+        const m = stripped.match(/^\[?([A-Z]+):([^\]]+)\]?$/i);
+        if (m) coveredAcTagsSet.add(m[2]);
+      }
+      const md = t.metadata || {};
+      const method = (md.method || md.httpMethod || '').toString().toUpperCase();
+      const path = (md.path || md.endpoint || md.route || '').toString();
+      if (method && path) coveredEndpointsSet.add(`${method} ${path}`);
+      else if (path) coveredEndpointsSet.add(path);
+    }
+
+    const lastFindingSignatures = findings
+      .map((f) => f?.fingerprint || f?.signature || null)
+      .filter(Boolean);
+
+    return {
+      persistedTests,
+      coveredAcTags: [...coveredAcTagsSet],
+      coveredEndpoints: [...coveredEndpointsSet],
+      lastFindingSignatures,
+      contractSnapshots: snapshots,
+      raw: data,
+      workspaceId: workspaceId || null,
+      projectFingerprint,
+      status: 'ok',
+    };
+  }
+
+  /** Pull all shared test files for a workspace. Returns [] on any error. */
+  async pullWorkspaceTestFiles({ workspaceId }) {
+    if (!this.apiKey || !workspaceId) return [];
+    try {
+      const data = await this._get(`/api/workspaces/${workspaceId}/test-files`, { timeoutMs: 60_000 });
+      return Array.isArray(data?.files) ? data.files : [];
+    } catch (err) {
+      Logger.warn('WebappClient', 'pullWorkspaceTestFiles failed (non-blocking)', { code: err.code, message: err.message });
+      return [];
+    }
+  }
+
+  /** Push generated test files to the workspace. Fire-and-forget safe. */
+  async pushWorkspaceTestFiles({ workspaceId, files }) {
+    if (!this.apiKey || !workspaceId || !Array.isArray(files) || files.length === 0) return null;
+    try {
+      return await this._post(
+        `/api/workspaces/${workspaceId}/test-files`,
+        { files },
+        { timeoutMs: 60_000 }
+      );
+    } catch (err) {
+      Logger.warn('WebappClient', 'pushWorkspaceTestFiles failed (non-blocking)', { code: err.code, message: err.message });
+      return null;
+    }
+  }
+
+  /** Pull the aggregated coverage manifest for a workspace. Returns null on error. */
+  async pullWorkspaceCoverage({ workspaceId }) {
+    if (!this.apiKey || !workspaceId) return null;
+    try {
+      return await this._get(`/api/workspaces/${workspaceId}/coverage`, { timeoutMs: 15_000 });
+    } catch (err) {
+      Logger.warn('WebappClient', 'pullWorkspaceCoverage failed (non-blocking)', { code: err.code, message: err.message });
+      return null;
+    }
+  }
+
+  /**
+   * W3 — push the post-execution corpus upsert/demotion payload to the
+   * webapp. Used after every run that has a real workspaceId (solo dev with
+   * no workspace short-circuits and returns null — pipeline behaves as today).
+   *
+   * Idempotency: server uses ON CONFLICT (case_key) DO UPDATE so re-posting
+   * the same payload is a no-op on rows that didn't change. Versions are
+   * appended only when sha256(content) differs from the latest stored row.
+   *
+   * Retries: 3 outer attempts on 5xx with exponential backoff (0, 1s, 3s).
+   * 4xx (validation, auth) are NOT retried. Network-level errors are
+   * handled by the inner `_post` retry chain.
+   */
+  async syncCorpus(workspaceIdOrPayload, maybePayload) {
+    // Accept two shapes:
+    //   syncCorpus(workspaceId, payload)
+    //   syncCorpus(payload)            ← writer-style, workspaceId on payload
+    let workspaceId;
+    let payload;
+    if (typeof workspaceIdOrPayload === 'string' || workspaceIdOrPayload == null) {
+      workspaceId = workspaceIdOrPayload || null;
+      payload = maybePayload || {};
+    } else {
+      payload = workspaceIdOrPayload || {};
+      workspaceId = payload.workspaceId || null;
+    }
+    if (!this.apiKey) return null;
+    if (!workspaceId) {
+      // Brief: solo dev (no workspaceId) → skip corpus sync entirely.
+      return null;
+    }
+    const body = { ...(payload || {}) };
+    body.workspaceId = workspaceId;
+
+    const MAX_ATTEMPTS = 3;
+    const BACKOFF_MS = [0, 1000, 3000];
+    let lastErr = null;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (BACKOFF_MS[attempt] > 0) {
+        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
+        Logger.warn?.('WebappClient', `Retrying /api/qa-corpus/sync (attempt ${attempt + 1}/${MAX_ATTEMPTS})`, {
+          prevError: lastErr?.message,
+        });
+      }
+      try {
+        return await this._post('/api/qa-corpus/sync', body, { timeoutMs: 60_000 });
+      } catch (err) {
+        lastErr = err;
+        // Only retry on 5xx server errors. 4xx is a deterministic validation
+        // failure — retrying won't change anything. Network-level errors are
+        // already retried by `_post`'s inner loop.
+        if (err?.code !== 'WEBAPP_SERVER_ERROR') {
+          Logger.warn('WebappClient', 'syncCorpus failed (not retrying)', {
+            code: err?.code,
+            message: err?.message,
+          });
+          return null;
+        }
+      }
+    }
+    Logger.warn('WebappClient', 'syncCorpus exhausted retries', {
+      code: lastErr?.code,
+      message: lastErr?.message,
+    });
+    return null;
+  }
+
+  /** Append coverage entries after test execution. Fire-and-forget safe. */
+  async pushWorkspaceCoverage({ workspaceId, runId, targets }) {
+    if (!this.apiKey || !workspaceId || !Array.isArray(targets) || targets.length === 0) return null;
+    try {
+      return await this._post(
+        `/api/workspaces/${workspaceId}/coverage`,
+        { runId: runId || null, targets },
+        { timeoutMs: 15_000 }
+      );
+    } catch (err) {
+      Logger.warn('WebappClient', 'pushWorkspaceCoverage failed (non-blocking)', { code: err.code, message: err.message });
+      return null;
+    }
   }
 
   /**

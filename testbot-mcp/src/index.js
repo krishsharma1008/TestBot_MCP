@@ -66,8 +66,8 @@ const UI_SUBMISSION_SCHEMA = z.object({
   baseURL: z.string().url(),
   startCommand: z.string().min(1).max(500),
   services: z.array(UI_SERVICE_SCHEMA).max(10).optional(),
-  generateTests: z.boolean(),
-  openDashboard: z.boolean(),
+  generateTests: z.preprocess((v) => typeof v === 'string' ? v === 'true' : v, z.boolean()),
+  openDashboard: z.preprocess((v) => typeof v === 'string' ? v === 'true' : v, z.boolean()),
   credentials: z.union([
     CREDENTIAL_SCHEMA,
     z.array(CREDENTIAL_SCHEMA).max(10),

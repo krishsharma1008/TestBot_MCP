@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import {
   pgTable,
   uuid,
@@ -71,6 +72,11 @@ export const testRuns = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
+    // Nullable so legacy MCP clients (and any caller that doesn't yet pass a
+    // workspaceId) continue to ingest exactly as before. Set-null on workspace
+    // delete preserves the run's user-scoped history. `projectWorkspaces` is
+    // declared further down the file — Drizzle's reference callback is lazy.
+    workspaceId: uuid('workspace_id').references(() => projectWorkspaces.id, { onDelete: 'set null' }),
     creationName: text('creation_name').notNull(),
     status: text('status').default('running'),
     totalTests: integer('total_tests').default(0),
@@ -97,6 +103,7 @@ export const testRuns = pgTable(
   (table) => [
     index('test_runs_user_id_idx').on(table.userId),
     index('test_runs_created_at_idx').on(table.createdAt),
+    index('test_runs_workspace_id_idx').on(table.workspaceId),
   ]
 )
 
@@ -149,6 +156,17 @@ export const qaTestCases = pgTable(
     tags: text('tags').array().notNull().default(sql`'{}'`),
     source: text('source').notNull().default('mcp'),
     metadata: jsonb('metadata'),
+    // W1: corpus-quality fields. `sensitivityScore` is a learned flake/noise
+    // metric (0-1 or null when unknown). `tier` is the QA tier band assigned
+    // by the planner. `status` lets us soft-delete or quarantine flaky cases
+    // without destroying their history. firstSeen/lastSeen run pointers let
+    // dashboards link straight to the run that introduced / last exercised
+    // the case.
+    sensitivityScore: numeric('sensitivity_score', { precision: 4, scale: 3 }),
+    tier: text('tier'),
+    firstSeenRunId: uuid('first_seen_run_id').references(() => testRuns.id, { onDelete: 'set null' }),
+    lastSeenRunId: uuid('last_seen_run_id').references(() => testRuns.id, { onDelete: 'set null' }),
+    status: text('status').notNull().default('active'),
     firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -156,6 +174,49 @@ export const qaTestCases = pgTable(
     uniqueIndex('qa_test_cases_user_project_key_idx').on(table.userId, table.projectFingerprint, table.caseKey),
     index('qa_test_cases_user_project_idx').on(table.userId, table.projectFingerprint),
     index('qa_test_cases_last_seen_idx').on(table.lastSeenAt.desc()),
+    index('qa_test_cases_tier_idx').on(table.tier),
+    index('qa_test_cases_status_idx').on(table.status),
+    check(
+      'qa_test_cases_tier_check',
+      sql`tier IS NULL OR tier IN ('L0','L1','L2','L3')`
+    ),
+    check(
+      'qa_test_cases_status_check',
+      sql`status IN ('active','flake-quarantine','soft-deleted')`
+    ),
+    check(
+      'qa_test_cases_sensitivity_score_check',
+      sql`sensitivity_score IS NULL OR (sensitivity_score >= 0 AND sensitivity_score <= 1)`
+    ),
+  ]
+)
+
+/**
+ * W1: latest-write-wins-with-history. Every time we ingest a new version of
+ * a test case's content, we append a row here. `(caseKey, version)` is the
+ * natural key — version is monotonically increasing per caseKey. The latest
+ * version's content is the "current" body; older rows are kept so we can
+ * diff / blame / revert. Triggered from /api/test-runs/ingest (or future
+ * code-sync paths) — not auto-bumped on every run.
+ */
+export const qaTestVersions = pgTable(
+  'qa_test_versions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    caseKey: text('case_key').notNull(),
+    version: integer('version').notNull(),
+    content: text('content').notNull(),
+    contributorUserId: uuid('contributor_user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    runId: uuid('run_id').references(() => testRuns.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('qa_test_versions_case_version_idx').on(table.caseKey, table.version),
+    index('qa_test_versions_case_idx').on(table.caseKey),
+    index('qa_test_versions_contributor_idx').on(table.contributorUserId),
+    index('qa_test_versions_run_idx').on(table.runId),
   ]
 )
 
@@ -557,6 +618,107 @@ export const tokenLedger = pgTable(
       'token_ledger_agent_check',
       sql`agent IS NULL OR agent IN ('smoke','frontend','api','workflow','error','expansion','planner','parse_prd','analyze_failures')`
     ),
+  ]
+)
+
+// ─── Team Test Sharing ────────────────────────────────────────────────────────
+
+export type CoverageSignals = {
+  routes?: string[]
+  apiEndpoints?: string[]
+  catMarkers?: string[]
+  reqMarkers?: string[]
+}
+
+/**
+ * One row per shared project repo. The workspace IS the "team".
+ * Identified by a sha256 of the normalised git remote URL (or HEALIX_PROJECT_KEY).
+ */
+export const projectWorkspaces = pgTable(
+  'project_workspaces',
+  {
+    id:          uuid('id').primaryKey().defaultRandom(),
+    projectKey:  text('project_key').notNull(),
+    gitRemote:   text('git_remote'),
+    projectName: text('project_name').notNull(),
+    inviteCode:  text('invite_code').notNull().$defaultFn(() => randomBytes(12).toString('hex')),
+    createdBy:   uuid('created_by').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('project_workspaces_project_key_idx').on(table.projectKey),
+    uniqueIndex('project_workspaces_invite_code_idx').on(table.inviteCode),
+    index('project_workspaces_created_by_idx').on(table.createdBy),
+  ]
+)
+
+export const workspaceMembers = pgTable(
+  'workspace_members',
+  {
+    id:          uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull().references(() => projectWorkspaces.id, { onDelete: 'cascade' }),
+    userId:      uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    role:        text('role').notNull().default('member'),
+    joinedAt:    timestamp('joined_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('workspace_members_workspace_user_idx').on(table.workspaceId, table.userId),
+    index('workspace_members_workspace_idx').on(table.workspaceId),
+    index('workspace_members_user_idx').on(table.userId),
+  ]
+)
+
+/**
+ * Stores actual .spec.ts content generated by any workspace member.
+ * Teammates pull this on every run to restore the shared test suite locally.
+ * UNIQUE(workspace_id, file_name) — upsert, last writer wins.
+ */
+export const sharedTestFiles = pgTable(
+  'shared_test_files',
+  {
+    id:              uuid('id').primaryKey().defaultRandom(),
+    workspaceId:     uuid('workspace_id').notNull().references(() => projectWorkspaces.id, { onDelete: 'cascade' }),
+    fileName:        text('file_name').notNull(),
+    content:         text('content').notNull(),
+    contentHash:     text('content_hash').notNull(),
+    agent:           text('agent'),
+    testType:        text('test_type'),
+    runId:           text('run_id'),
+    uploadedBy:      uuid('uploaded_by').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    coverageSignals: jsonb('coverage_signals').$type<CoverageSignals>(),
+    createdAt:       timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt:       timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('shared_test_files_workspace_file_idx').on(table.workspaceId, table.fileName),
+    index('shared_test_files_workspace_idx').on(table.workspaceId),
+    index('shared_test_files_content_hash_idx').on(table.contentHash),
+    index('shared_test_files_uploaded_by_idx').on(table.uploadedBy),
+    index('shared_test_files_updated_at_idx').on(table.updatedAt.desc()),
+  ]
+)
+
+/**
+ * Append-only log of which coverage targets each run has covered.
+ * The GET /coverage API aggregates DISTINCT target_keys per type to build
+ * the team's existingSuiteManifest injected into each subsequent run.
+ */
+export const workspaceCoverageRegistry = pgTable(
+  'workspace_coverage_registry',
+  {
+    id:          uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull().references(() => projectWorkspaces.id, { onDelete: 'cascade' }),
+    targetType:  text('target_type').notNull(),
+    targetKey:   text('target_key').notNull(),
+    coveredBy:   uuid('covered_by').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    fileName:    text('file_name').notNull(),
+    runId:       text('run_id'),
+    createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('wcr_workspace_type_key_idx').on(table.workspaceId, table.targetType, table.targetKey),
+    index('wcr_workspace_run_idx').on(table.workspaceId, table.runId),
+    index('wcr_covered_by_idx').on(table.coveredBy),
   ]
 )
 

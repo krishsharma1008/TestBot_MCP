@@ -1445,12 +1445,17 @@ module.exports = defineConfig({
 
       for (const file of files) {
         const fullPath = path.join(generatedDir, file);
-        const content = stripComments(fs.readFileSync(fullPath, 'utf-8'));
-        for (const match of content.matchAll(testTitleRe)) {
+        const rawContent = fs.readFileSync(fullPath, 'utf-8');
+        const strippedContent = stripComments(rawContent);
+        for (const match of strippedContent.matchAll(testTitleRe)) {
           const title = match[2] || '';
           if (phaseTwoTagPattern.test(title)) {
             return true;
           }
+        }
+        const contentWithoutLineComments = rawContent.replace(/\/\/[^\n]*/g, '');
+        if (phaseTwoTagPattern.test(contentWithoutLineComments)) {
+          return true;
         }
       }
     } catch (error) {
@@ -1534,11 +1539,41 @@ module.exports = defineConfig({
       };
     }
 
-    const phaseTwo = await this.executePlaywright({ 
-      grep: gatePattern,
-      outputDir: phase2OutputDir
-    });
-    
+    let phaseTwo;
+    try {
+      phaseTwo = await this.executePlaywright({
+        grep: gatePattern,
+        outputDir: phase2OutputDir,
+      });
+    } catch (err) {
+      if (err?.code === 'NO_TESTS_TO_RUN') {
+        Logger.info('PlaywrightIntegration', 'Phase 2 grep matched no test titles (tag likely in a comment only); returning phase 1 results.', { gatePattern });
+        return {
+          ...phaseOne,
+          phaseResults: {
+            phase1: {
+              status: phaseOne.failed > 0 ? 'failed' : 'passed',
+              total: Number(phaseOne.total || 0),
+              passed: Number(phaseOne.passed || 0),
+              failed: Number(phaseOne.failed || 0),
+              skipped: Number(phaseOne.skipped || 0),
+              duration: Number(phaseOne.duration || 0),
+            },
+            phase2: {
+              status: 'skipped',
+              total: 0,
+              passed: 0,
+              failed: 0,
+              skipped: 0,
+              duration: 0,
+              reason: 'no_tests_matching_phase2_grep',
+            },
+          },
+        };
+      }
+      throw err;
+    }
+
     return this.combinePhaseResults(phaseOne, phaseTwo);
   }
 

@@ -529,6 +529,12 @@ class ConfigUILauncher {
       this.server = null;
     }
 
+    if (this._startingPort) {
+      this.config.port = this._startingPort;
+    }
+    this._portRetries = 0;
+    this._startingPort = null;
+
     this.submissionPromise = null;
     this.resolveConfig = null;
     this.rejectConfig = null;
