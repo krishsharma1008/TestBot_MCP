@@ -52,8 +52,8 @@ const UI_SUBMISSION_SCHEMA = z.object({
   scope: z.enum(['codebase', 'diff']).optional(),
   baseURL: z.string().url(),
   startCommand: z.string().min(1).max(500),
-  generateTests: z.boolean(),
-  openDashboard: z.boolean(),
+  generateTests: z.preprocess((v) => typeof v === 'string' ? v === 'true' : v, z.boolean()),
+  openDashboard: z.preprocess((v) => typeof v === 'string' ? v === 'true' : v, z.boolean()),
   credentials: z.union([
     CREDENTIAL_SCHEMA,
     z.array(CREDENTIAL_SCHEMA).max(10),

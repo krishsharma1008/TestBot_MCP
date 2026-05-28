@@ -222,12 +222,22 @@ interface GenerationMetaShape {
   [key: string]: unknown;
 }
 
+interface WorkspaceBindingShape {
+  status?: 'attached' | 'skipped' | 'solo';
+  workspaceId?: string | null;
+  reason?: string | null;
+  message?: string | null;
+  projectKey?: string | null;
+  paidPlanRequired?: boolean;
+}
+
 interface ReportJson {
   metadata?: {
     projectPath?: string;
     runId?: string;
     run_id?: string;
     generationMeta?: GenerationMetaShape | null;
+    workspaceBinding?: WorkspaceBindingShape | null;
     live?: {
       isLive?: boolean;
       phase?: string;
@@ -1641,6 +1651,8 @@ function MainTypeGroup({ mainType, subGroups, aiAnalysis = [], failuresByName, r
 // ─── Phase display helpers ───────────────────────────────────────────────────
 
 const PHASE_LABELS: Record<string, string> = {
+  awaiting_config_ui: 'Configuration UI Ready',
+  config_received: 'Configuration Submitted',
   starting_pipeline: 'Starting Healix',
   started: 'Healix Started',
   port_conflict: 'Port Conflict',
@@ -1800,6 +1812,99 @@ function DecisionEventDetails({ ev }: { ev: LiveEvent }) {
   );
 }
 
+// ─── Config event details (collapsible) ─────────────────────────────────────
+
+interface AutoFix {
+  kind: string;
+  detail: string;
+  field?: string;
+  from?: unknown;
+  to?: unknown;
+}
+
+function ConfigEventDetails({ ev, allEvents }: { ev: LiveEvent; allEvents: LiveEvent[] }) {
+  const [open, setOpen] = useState(false);
+  const phase = (ev.phase || '').toLowerCase();
+
+  // For starting_pipeline: gather fixes from the config_auto_fixed event at same phase
+  const autoFixEvent = allEvents.find(
+    (e) => e.eventType === 'config_auto_fixed' && (e.phase || '').toLowerCase() === 'starting_pipeline'
+  );
+  const fixes: AutoFix[] = Array.isArray(autoFixEvent?.metadata?.fixes)
+    ? (autoFixEvent!.metadata!.fixes as AutoFix[])
+    : (Array.isArray(ev.metadata?.fixes) ? (ev.metadata!.fixes as AutoFix[]) : []);
+
+  // For config_received: collect submitted config values if available
+  const submittedConfig = ev.metadata?.config as Record<string, unknown> | undefined;
+  const configUrl = (ev.metadata?.configUrl as string | undefined) ||
+    allEvents.find((e) => (e.phase || '').toLowerCase() === 'awaiting_config_ui')?.metadata?.configUrl as string | undefined;
+
+  // Determine what to show
+  const showFixes = phase === 'starting_pipeline' && fixes.length > 0;
+  const showConfigUrl = phase === 'awaiting_config_ui' && typeof configUrl === 'string';
+  const showSubmitted = phase === 'config_received' && submittedConfig && Object.keys(submittedConfig).length > 0;
+
+  if (!showFixes && !showConfigUrl && !showSubmitted) return null;
+
+  return (
+    <div className="mt-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1 text-[10px] text-[#4A6280] hover:text-[#8BA4C8] transition-colors cursor-pointer"
+      >
+        <svg
+          width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          className={`transition-transform duration-150 flex-shrink-0 ${open ? 'rotate-90' : ''}`}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+        {showFixes
+          ? `${fixes.length} auto-correction${fixes.length !== 1 ? 's' : ''} applied`
+          : showConfigUrl
+          ? 'Config form URL'
+          : 'Submitted values'}
+      </button>
+      {open && (
+        <div className="mt-1.5 pl-3 border-l border-white/10 flex flex-col gap-1.5">
+          {showFixes && fixes.map((fix, fi) => (
+            <div key={fi} className="text-[10px] text-[#8BA4C8]">
+              <span className="inline-block px-1 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300/80 font-mono mr-1.5">
+                {fix.field || fix.kind}
+              </span>
+              {fix.from !== undefined && fix.to !== undefined ? (
+                <span>
+                  <span className="line-through text-red-400/60 font-mono">{String(fix.from)}</span>
+                  <span className="mx-1 text-[#4A6280]">→</span>
+                  <span className="text-emerald-400/80 font-mono">{String(fix.to)}</span>
+                </span>
+              ) : (
+                <span className="text-[#8BA4C8]">{fix.detail}</span>
+              )}
+            </div>
+          ))}
+          {showConfigUrl && (
+            <a
+              href={configUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-blue-400/80 hover:text-blue-300 font-mono break-all"
+            >
+              {configUrl}
+            </a>
+          )}
+          {showSubmitted && Object.entries(submittedConfig).map(([k, v]) => (
+            <div key={k} className="text-[10px] flex items-center gap-1.5">
+              <span className="text-[#4A6280] font-mono">{k}:</span>
+              <span className="text-[#8BA4C8] font-mono">{String(v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LiveTimeline({ events, liveFiles, pipelineEnded }: {
   events: LiveEvent[];
   liveFiles: string[];
@@ -1955,6 +2060,11 @@ function LiveTimeline({ events, liveFiles, pipelineEnded }: {
                 </>
               )}
 
+              {/* Config-phase collapsible details */}
+              {['awaiting_config_ui', 'config_received', 'starting_pipeline'].includes((ev.phase || '').toLowerCase()) && (
+                <ConfigEventDetails ev={ev} allEvents={events} />
+              )}
+
               {/* Live file badges — drip in under generating phase AND tests_generated */}
               {showFiles && (
                 <div className="mt-2 flex flex-wrap gap-1">
@@ -2071,6 +2181,58 @@ function GenerationJobProgressChip({ job }: { job: GenerationJobSnapshot | null 
     );
   }
   return null;
+}
+
+function WorkspaceBindingBanner({ binding }: { binding: WorkspaceBindingShape }) {
+  const reason = binding.reason || 'unknown';
+  const paid = binding.paidPlanRequired === true;
+  const isMembershipIssue = reason === 'not_a_member';
+  const isProjectKeyIssue = reason === 'workspace_not_found' || reason === 'no_project_identity';
+
+  let title = 'This run was not shared with any workspace';
+  let action: { href: string; label: string } | null = null;
+
+  if (paid) {
+    title = 'This run was not shared because workspace access requires a paid plan';
+    action = { href: '/plan-billing', label: 'Upgrade plan →' };
+  } else if (isMembershipIssue) {
+    title = 'This run was not shared because you are not a member of the workspace for this project';
+    action = { href: '/workspace', label: 'Join workspace →' };
+  } else if (isProjectKeyIssue) {
+    title = 'This run was not shared because no workspace is bound to this project';
+    action = { href: '/workspace', label: 'Create or join workspace →' };
+  } else if (reason === 'no_api_key') {
+    title = 'This run was not shared because HEALIX_API_KEY is missing from the MCP environment';
+  }
+
+  const accent = paid ? 'border-amber-500/40 bg-amber-500/10' : 'border-blue-500/40 bg-blue-500/10';
+  const titleClass = paid ? 'text-amber-300' : 'text-[#60A5FA]';
+
+  return (
+    <div className={`rounded-2xl border ${accent} p-4 flex flex-col gap-2`} data-testid="workspace-binding-banner">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <div className={`text-sm font-semibold ${titleClass}`}>{title}</div>
+          {binding.message && (
+            <div className="text-[#C8D9EF] text-xs">{binding.message}</div>
+          )}
+          {binding.projectKey && (
+            <div className="text-[10px] uppercase tracking-widest text-[#4A6280] font-mono mt-1">
+              project key: <code className="text-[#8BA4C8]">{binding.projectKey.slice(0, 28)}…</code>
+            </div>
+          )}
+        </div>
+        {action && (
+          <Link
+            href={action.href}
+            className="text-[10px] uppercase tracking-widest font-semibold border border-white/20 hover:border-white/40 text-[#F0F6FF] px-3 py-1.5 rounded-lg whitespace-nowrap"
+          >
+            {action.label}
+          </Link>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function QualityWarningBanner({ warning }: { warning: QualityWarning }) {
@@ -3719,6 +3881,7 @@ export default function TestRunDetailPage() {
   // actually annotated generationMeta — legacy runs have neither field and
   // the banner stays hidden.
   const generationMeta = (report?.metadata?.generationMeta ?? null) as GenerationMetaShape | null;
+  const workspaceBinding = (report?.metadata?.workspaceBinding ?? null) as WorkspaceBindingShape | null;
   const partialWarning = generationMeta?.partialGenerationWarning ?? null;
   const qualityWarning = generationMeta?.qualityWarning ?? null;
   const coverageTopUps = Array.isArray(generationMeta?.coverageTopUps)
@@ -3955,6 +4118,10 @@ export default function TestRunDetailPage() {
           agentsCompleted={agentsCompletedFromMeta}
           agentsRequested={agentsRequestedFromMeta}
         />
+      )}
+
+      {workspaceBinding && workspaceBinding.status === 'skipped' && (
+        <WorkspaceBindingBanner binding={workspaceBinding} />
       )}
 
       {!pipelineError && qualityWarning && (

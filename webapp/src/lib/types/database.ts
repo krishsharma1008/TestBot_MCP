@@ -136,6 +136,8 @@ export interface TestRun {
   current_phase?: string | null
   error_code?: string | null
   is_live?: boolean
+  contributor_email?: string | null
+  contributor_name?: string | null
 }
 
 export interface ImportSession {

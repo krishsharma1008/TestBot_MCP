@@ -729,7 +729,7 @@
 
             state.mode = defaults.mode;
             state.scope = 'codebase';
-            state.generateTests = defaults.generateTests;
+            state.generateTests = defaults.generateTests === true || defaults.generateTests === 'true';
             state.openDashboard = true;
             state.credentials = [];
             state.prdFiles = [];
