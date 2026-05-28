@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const HealixMCPServer = require('../src/index.js');
+const HealixMCPServer = require('../dist/index.js');
 
 const server = new HealixMCPServer();
 server.start().catch((err) => {
