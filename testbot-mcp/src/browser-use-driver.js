@@ -106,6 +106,31 @@ function isBrowserUseInstalled(pythonCmd) {
   }
 }
 
+async function autoInstallBrowserUse(pythonCmd) {
+  const runAsync = (cmd, args, timeoutMs) => new Promise((resolve) => {
+    let stderr = '';
+    const proc = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    const timer = setTimeout(() => {
+      try { proc.kill('SIGKILL'); } catch { /* ignore */ }
+      resolve({ status: -1, stderr: 'timed out' });
+    }, timeoutMs);
+    proc.stderr.on('data', (chunk) => { stderr += chunk.toString('utf-8'); });
+    proc.on('close', (code) => { clearTimeout(timer); resolve({ status: code ?? -1, stderr }); });
+    proc.on('error', (err) => { clearTimeout(timer); resolve({ status: -1, stderr: err.message }); });
+  });
+
+  Logger.info('BrowserUseDriver', 'browser-use not installed — auto-installing via pip (this may take ~30s)...');
+  const pipResult = await runAsync(pythonCmd, ['-m', 'pip', 'install', 'browser-use', '--quiet'], 120_000);
+  if (pipResult.status !== 0) {
+    return { success: false, reason: `pip install browser-use failed: ${pipResult.stderr.slice(0, 300)}` };
+  }
+  // Best-effort: install Playwright chromium browser binaries that browser-use needs.
+  // Non-fatal — browser-use may already have a browser or handle this on first run.
+  Logger.info('BrowserUseDriver', 'Installing Playwright chromium for browser-use...');
+  await runAsync(pythonCmd, ['-m', 'playwright', 'install', 'chromium'], 120_000);
+  return { success: true };
+}
+
 function readEnvValueFromFile(envPath, key) {
   try {
     if (!fs.existsSync(envPath)) return '';
@@ -159,12 +184,20 @@ function driveExploration({
     }
 
     if (!isBrowserUseInstalled(pythonCmd)) {
-      resolve({
-        available: false,
-        reason: 'browser-use package not installed',
-        pythonCmd,
-      });
-      return;
+      const installed = await autoInstallBrowserUse(pythonCmd);
+      if (!installed.success) {
+        resolve({ available: false, reason: installed.reason, pythonCmd });
+        return;
+      }
+      if (!isBrowserUseInstalled(pythonCmd)) {
+        resolve({
+          available: false,
+          reason: 'browser-use auto-install reported success but import still fails — try: pip install browser-use',
+          pythonCmd,
+        });
+        return;
+      }
+      Logger.info('BrowserUseDriver', 'browser-use auto-install complete');
     }
 
     // Derive the LLM proxy URL from the dashboard URL so the Python runner

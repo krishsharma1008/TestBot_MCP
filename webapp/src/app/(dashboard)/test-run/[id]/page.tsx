@@ -4120,7 +4120,9 @@ export default function TestRunDetailPage() {
         />
       )}
 
-      {workspaceBinding && workspaceBinding.status === 'skipped' && (
+      {workspaceBinding && workspaceBinding.status === 'skipped' &&
+        workspaceBinding.reason !== 'workspace_not_found' &&
+        workspaceBinding.reason !== 'no_project_identity' && (
         <WorkspaceBindingBanner binding={workspaceBinding} />
       )}
 
