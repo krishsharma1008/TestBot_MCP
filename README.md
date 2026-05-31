@@ -39,9 +39,72 @@ Get your API key from the Healix dashboard → API Keys.
 
 ### 3. Run a test
 
-In your IDE prompt:
+#### Option A — IDE / MCP chat (default)
+
+In your IDE prompt (Cursor, Windsurf, Claude Code):
 
 > "Test my app using the healix mcp"
+
+That invokes the `healix_test_my_app` MCP tool through the IDE’s agent. It works well, but it depends on the IDE’s model credits and chat session staying active.
+
+#### Option B — Terminal CLI (no IDE chat required)
+
+Earlier versions effectively required you to trigger Healix only through the IDE’s MCP modal or agent chat. If those credits are exhausted, or you simply want a repeatable one-liner for CI or local dev, you can **skip the chat entirely** and run the same pipeline from a terminal.
+
+From the **Healix repo root** (`TestBot_MCP/`), with `HEALIX_API_KEY` set in your environment (and the webapp reachable at `HEALIX_DASHBOARD_URL`, usually `http://localhost:3000` when developing locally):
+
+```bash
+# Heal-Sphere (Vite on port 5173) — full example
+node testbot-mcp/bin/healix-mcp.js test-my-app ^
+  --projectPath "C:\Users\NithishReddyNama\OneDrive - ZapCom Solutions Pvt. ltd\Documents\Heal-Sphere" ^
+  --baseURL "http://localhost:5173" ^
+  --port 5173 ^
+  --testType both ^
+  --headless true ^
+  --generateTests true ^
+  --openDashboard true ^
+  --force true
+```
+
+On **macOS / Linux**, use `\` instead of `^` for line continuation, or paste as one line:
+
+```bash
+node testbot-mcp/bin/healix-mcp.js test-my-app --projectPath "C:\Users\NithishReddyNama\OneDrive - ZapCom Solutions Pvt. ltd\Documents\Heal-Sphere" --baseURL "http://localhost:5173" --port 5173 --testType both --headless true --generateTests true --openDashboard true --force true
+```
+
+**Generic template** — swap in your project path, URL, and port:
+
+```bash
+node testbot-mcp/bin/healix-mcp.js test-my-app ^
+  --projectPath "C:\path\to\your-app" ^
+  --baseURL "http://localhost:3000" ^
+  --port 3000 ^
+  --testType frontend ^
+  --headless true ^
+  --generateTests true ^
+  --openDashboard true ^
+  --force true
+```
+
+| Flag | Purpose |
+|------|---------|
+| `--projectPath` | Absolute path to the app under test |
+| `--baseURL` / `--port` | Where Playwright and exploration should attach |
+| `--testType` | `frontend`, `backend`, or `both` |
+| `--generateTests` | `true` to run AI test generation before execution |
+| `--openDashboard` | `true` to open the Healix dashboard when the run finishes |
+| `--force` | `true` to start a new run even if a recent run exists for the same project |
+| `--wait` / `--live` | `true` to print live `[HEALIX] phase=...` lines in the terminal until the run ends |
+
+After the command returns a `runId`, you can manage the run without the IDE:
+
+```bash
+node testbot-mcp/bin/healix-mcp.js watch --projectPath "C:\path\to\your-app" --runId "<runId>"
+node testbot-mcp/bin/healix-mcp.js cancel --projectPath "C:\path\to\your-app" --runId "<runId>"
+node testbot-mcp/bin/healix-mcp.js status --projectPath "C:\path\to\your-app" --runId "<runId>"
+```
+
+If you installed the package globally, replace `node testbot-mcp/bin/healix-mcp.js` with `healix-mcp`.
 
 The pipeline runs automatically:
 
