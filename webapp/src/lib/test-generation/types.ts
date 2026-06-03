@@ -380,6 +380,18 @@ export interface GenerationMeta {
     code: string | null
     message: string
   }>
+  // One entry per feature×agent pair that used spec-driven generation.
+  specValidation?: SpecValidationResult[]
+}
+
+export interface SpecValidationResult {
+  featureId: string
+  agentType: 'ui' | 'api'
+  specCount: number
+  covered: string[]   // spec IDs found via // @spec annotation
+  uncovered: string[] // planned spec IDs missing from generated code
+  unplanned: string[] // // @spec IDs in code that weren't in the plan
+  valid: boolean      // true when uncovered is empty
 }
 
 export type TestCaseKind = 'positive' | 'negative' | 'boundary'

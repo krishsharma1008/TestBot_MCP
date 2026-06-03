@@ -34,6 +34,7 @@ import type {
   TestCaseSpec,
 } from './types'
 import { tagTestContent } from './tag-utils'
+import { validateSpecCoverage } from './spec-validator'
 
 const TEST_CASE_KINDS: TestCaseKind[] = ['positive', 'negative', 'boundary']
 
@@ -454,6 +455,12 @@ export class OpenAITestGenerator {
       projectInfo,
     })
 
+    if (uiSpecs?.length && tests.length > 0 && this.generationMeta) {
+      const result = validateSpecCoverage(uiSpecs, tests, this.activeFeature?.id ?? '', 'ui')
+      if (!this.generationMeta.specValidation) this.generationMeta.specValidation = []
+      this.generationMeta.specValidation.push(result)
+    }
+
     for (const test of tests) {
       this.storeTestFile(test)
     }
@@ -479,6 +486,12 @@ export class OpenAITestGenerator {
       prd,
       projectInfo,
     })
+
+    if (apiSpecs?.length && tests.length > 0 && this.generationMeta) {
+      const result = validateSpecCoverage(apiSpecs, tests, this.activeFeature?.id ?? '', 'api')
+      if (!this.generationMeta.specValidation) this.generationMeta.specValidation = []
+      this.generationMeta.specValidation.push(result)
+    }
 
     for (const test of tests) {
       this.storeTestFile(test)
@@ -831,6 +844,7 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
       task: `Implement the following ${specs.length} pre-planned test cases for the "${slug}" feature. ${fileNote} Do NOT add or remove test cases — implement exactly the specs listed below.`,
       requirements: [
         'Each test() title MUST start with [REQ:{acId}][{kind}] exactly as specified in the "Required title prefix" for each spec.',
+        'Each test() block MUST be preceded by a // @spec {spec.id} comment on its own line (e.g., // @spec F1-UI-01). Use the exact spec id from the spec definition.',
         'Implement each spec as one test() block. Steps and assertions are already decided — translate them to Playwright code.',
         'Use selector ladder preference: testId → role/name → label → placeholder → text.',
         'Do not invent additional test cases beyond those listed.',
