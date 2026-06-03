@@ -3,6 +3,7 @@ const test = require('node:test');
 
 const {
   buildLoginCandidates,
+  pageHasCredentialForm,
   buildSuccessLocators,
   normalizeRoleLabel,
   shouldAcceptLoginVerification,
@@ -215,10 +216,35 @@ test('credential injector probes common login routes when authFlow is unknown', 
   );
 });
 
-test('credential injector honors explicit authFlow loginUrl before fallbacks', () => {
+test('credential injector tries the discovered loginUrl first, then falls back', () => {
+  // A discovered loginUrl can be a wrong guess (e.g. a redirect target that
+  // 404s). It must lead the list but NOT strand the role — the common paths
+  // follow as fallbacks so driveLogin can recover by validating each one.
   assert.deepEqual(
     buildLoginCandidates('http://localhost:3001', { loginUrl: '/admin/login' }),
-    ['http://localhost:3001/admin/login'],
+    [
+      'http://localhost:3001/admin/login',
+      'http://localhost:3001/login',
+      'http://localhost:3001/signin',
+      'http://localhost:3001/sign-in',
+      'http://localhost:3001/auth/login',
+      'http://localhost:3001/auth/signin',
+      'http://localhost:3001/auth/sign-in',
+      'http://localhost:3001/users/sign_in',
+      'http://localhost:3001/account/login',
+    ],
+  );
+});
+
+test('credential injector dedupes when discovered loginUrl equals a common path', () => {
+  // /signin is both the discovered URL and a common fallback — it should appear
+  // once, at the front.
+  const candidates = buildLoginCandidates('http://localhost:3001', { loginUrl: '/signin' });
+  assert.equal(candidates[0], 'http://localhost:3001/signin');
+  assert.equal(
+    candidates.filter((c) => c === 'http://localhost:3001/signin').length,
+    1,
+    'discovered loginUrl that matches a common path must not be duplicated',
   );
 });
 
@@ -322,6 +348,66 @@ test('credential injector treats discovered successIndicator as advisory', () =>
     authStateEvidence: { hasAuthState: true },
     failureVisible: true,
   }), false);
+});
+
+// Fake page for pageHasCredentialForm: `visible` maps selector → bool. A
+// selector absent from the map has count 0 (does not exist).
+function makeGatePage(visible = {}) {
+  return {
+    waits: 0,
+    locator(selector) {
+      return {
+        first() {
+          return {
+            async count() { return selector in visible ? 1 : 0; },
+            async isVisible() { return Boolean(visible[selector]); },
+          };
+        },
+      };
+    },
+    async waitForTimeout() { this.waits += 1; },
+  };
+}
+
+test('pageHasCredentialForm accepts a page with a visible password field', async () => {
+  const page = makeGatePage({ 'input[type="password"]': true });
+  const res = await pageHasCredentialForm(
+    page,
+    ['input[type="email"]'],
+    ['input[type="password"]'],
+    2_500,
+  );
+  assert.equal(res.ok, true);
+  assert.equal(res.via, 'password');
+});
+
+test('pageHasCredentialForm accepts a two-step (email-first) login page', async () => {
+  // Only the username field is present initially — password appears after step 1.
+  const page = makeGatePage({ 'input[type="email"]': true });
+  const res = await pageHasCredentialForm(
+    page,
+    ['input[type="email"]'],
+    ['input[type="password"]'],
+    2_500,
+  );
+  assert.equal(res.ok, true);
+  assert.equal(res.via, 'username');
+});
+
+test('pageHasCredentialForm rejects a 404 / wrong-route shell with no inputs', async () => {
+  // This is the Bevara case: /login 404s, so it must NOT be treated as a login
+  // page (which previously got mislabelled as "Invalid credentials").
+  const page = makeGatePage({});
+  const started = Date.now();
+  const res = await pageHasCredentialForm(
+    page,
+    ['input[type="email"]', 'input[name="username"]'],
+    ['input[type="password"]'],
+    1_000,
+  );
+  assert.equal(res.ok, false);
+  // Must resolve near the settle window, not hang on per-selector timeouts.
+  assert.ok(Date.now() - started < 3_000, 'empty page should resolve quickly');
 });
 
 test('credential injector checks durable logged-in markers and username text', () => {

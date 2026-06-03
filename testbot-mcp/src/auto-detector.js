@@ -531,12 +531,18 @@ class AutoDetector {
     }
 
     // Node.js framework defaults
-    if (packageJson?.dependencies) {
-      if (packageJson.dependencies.vite) return 5173;
-      if (packageJson.dependencies.next) return 3000;
-      if (packageJson.dependencies['@angular/core']) return 4200;
-      if (packageJson.dependencies['create-react-app']) return 3000;
-      if (packageJson.dependencies.express) return 3000;
+    if (packageJson?.dependencies || packageJson?.devDependencies) {
+      const deps = {
+        ...(packageJson.dependencies || {}),
+        ...(packageJson.devDependencies || {}),
+      };
+      if (deps.vite) return 5173;
+      if (deps.next) return 3000;
+      if (deps['@angular/core']) return 4200;
+      // Create React App projects depend on `react-scripts` (not a package
+      // named `create-react-app`); CRA's dev server defaults to 3000.
+      if (deps['react-scripts']) return 3000;
+      if (deps.express) return 3000;
     }
 
     // Language-specific defaults
