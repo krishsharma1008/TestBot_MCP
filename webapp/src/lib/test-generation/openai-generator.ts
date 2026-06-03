@@ -31,6 +31,7 @@ import type {
   PRDFeature,
   FeatureAgentType,
   FeatureManifest,
+  TestCaseSpec,
 } from './types'
 import { tagTestContent } from './tag-utils'
 
@@ -286,9 +287,9 @@ export class OpenAITestGenerator {
       if (agentType === 'auth') {
         agentTasks.push({ agent: 'auth', run: this.generateAuthTests(context, prd, projectInfo) })
       } else if (agentType === 'ui') {
-        agentTasks.push({ agent: 'ui', run: this.generateFeatureUITests(context, prd, projectInfo) })
+        agentTasks.push({ agent: 'ui', run: this.generateFeatureUITests(context, prd, projectInfo, params.specs) })
       } else if (agentType === 'api') {
-        agentTasks.push({ agent: 'api', run: this.generateFeatureAPITests(context, prd, projectInfo) })
+        agentTasks.push({ agent: 'api', run: this.generateFeatureAPITests(context, prd, projectInfo, params.specs) })
       } else if (agentType === 'e2e') {
         agentTasks.push({ agent: 'e2e', run: this.generateE2ETests(context, prd, projectInfo) })
       }
@@ -438,10 +439,14 @@ export class OpenAITestGenerator {
   private async generateFeatureUITests(
     context: CapturedContext,
     prd: string | undefined,
-    projectInfo: ProjectInfo
+    projectInfo: ProjectInfo,
+    specs?: TestCaseSpec[]
   ) {
+    const uiSpecs = specs?.filter((s) => s.agentType === 'ui')
     const systemPrompt = this.buildFeatureUISystemPrompt(projectInfo)
-    const userPrompt = this.buildFeatureUIUserPrompt(context, prd, projectInfo)
+    const userPrompt = uiSpecs?.length
+      ? this.buildSpecsDrivenUserPrompt(uiSpecs, 'ui', context, prd, projectInfo)
+      : this.buildFeatureUIUserPrompt(context, prd, projectInfo)
 
     const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'ui', {
       context,
@@ -457,13 +462,17 @@ export class OpenAITestGenerator {
   private async generateFeatureAPITests(
     context: CapturedContext,
     prd: string | undefined,
-    projectInfo: ProjectInfo
+    projectInfo: ProjectInfo,
+    specs?: TestCaseSpec[]
   ) {
+    const apiSpecs = specs?.filter((s) => s.agentType === 'api')
     const endpoints = context.apiEndpoints || []
-    if (endpoints.length === 0 && !prd) return
+    if (endpoints.length === 0 && !prd && !apiSpecs?.length) return
 
     const systemPrompt = this.buildFeatureAPISystemPrompt(projectInfo)
-    const userPrompt = this.buildFeatureAPIUserPrompt(context, prd, projectInfo)
+    const userPrompt = apiSpecs?.length
+      ? this.buildSpecsDrivenUserPrompt(apiSpecs, 'api', context, prd, projectInfo)
+      : this.buildFeatureAPIUserPrompt(context, prd, projectInfo)
 
     const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'api', {
       context,
@@ -784,6 +793,49 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
       task: `Generate feature API tests for the "${slug}" feature.`,
       requirements,
       payload,
+    })
+  }
+
+  // ─── Spec-driven prompt builder (Phase 2 of two-phase generation) ───────────
+
+  buildSpecsDrivenUserPrompt(
+    specs: TestCaseSpec[],
+    agentType: 'ui' | 'api',
+    context: CapturedContext,
+    prd: string | undefined,
+    projectInfo: ProjectInfo
+  ): string {
+    const slug = this.getFeatureSlug()
+    const payload = this.buildPrioritizedContextPayload({ context, prd, projectInfo, testKind: agentType })
+
+    const specLines = specs.map((spec) => {
+      const lines = [
+        `### ${spec.id}: ${spec.title}`,
+        `- Kind: ${spec.kind}`,
+        `- AC: ${spec.acId}`,
+        spec.targetRoute ? `- Route: ${spec.targetRoute}` : null,
+        spec.targetEndpoint ? `- Endpoint: ${spec.targetEndpoint}` : null,
+        spec.preconditions.length ? `- Preconditions: ${spec.preconditions.join('; ')}` : null,
+        `- Steps:\n${spec.steps.map((s, i) => `  ${i + 1}. ${s}`).join('\n')}`,
+        `- Assertions:\n${spec.assertions.map((a) => `  - ${a}`).join('\n')}`,
+        `- Required title prefix: [REQ:${spec.acId}][${spec.kind}]`,
+      ].filter(Boolean)
+      return lines.join('\n')
+    }).join('\n\n')
+
+    const fileNote = agentType === 'ui'
+      ? `Emit TWO files: ${slug}-actions.ts (exported helpers, no test blocks) and ${slug}-ui.spec.ts (tests importing from ./${slug}-actions).`
+      : `Emit a single file: ${slug}-api.spec.ts.`
+
+    return this.buildStructuredUserPrompt({
+      task: `Implement the following ${specs.length} pre-planned test cases for the "${slug}" feature. ${fileNote} Do NOT add or remove test cases — implement exactly the specs listed below.`,
+      requirements: [
+        'Each test() title MUST start with [REQ:{acId}][{kind}] exactly as specified in the "Required title prefix" for each spec.',
+        'Implement each spec as one test() block. Steps and assertions are already decided — translate them to Playwright code.',
+        'Use selector ladder preference: testId → role/name → label → placeholder → text.',
+        'Do not invent additional test cases beyond those listed.',
+      ],
+      payload: { ...payload as object, TEST_CASES: specLines },
     })
   }
 

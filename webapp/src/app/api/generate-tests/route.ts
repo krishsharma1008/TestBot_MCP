@@ -15,6 +15,7 @@ import type {
   AgentRunRecord,
   FeatureAgentType,
   FeatureManifest,
+  TestCaseSpec,
 } from '@/lib/test-generation/types'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { checkTokenBalance, recordTokenUsage, MIN_TOKENS_GENERATE, REC_TOKENS_GENERATE } from '@/lib/tokens'
@@ -136,6 +137,11 @@ export async function POST(request: NextRequest) {
     // 6c. featureManifest — passed to e2e agent only
     const featureManifest = Array.isArray((body as { featureManifest?: unknown }).featureManifest)
       ? ((body as { featureManifest: FeatureManifest[] }).featureManifest)
+      : undefined
+
+    // 6d. specs — pre-planned test cases from scenario planner (optional)
+    const specs = Array.isArray((body as { specs?: unknown }).specs)
+      ? ((body as { specs: TestCaseSpec[] }).specs)
       : undefined
 
     // 7. AI cost guard
@@ -271,6 +277,7 @@ export async function POST(request: NextRequest) {
       agentType,
       featureId,
       featureManifest,
+      specs,
       abortSignal: generationAbort.signal,
       generatorConfig: {
         apiKey: process.env.OPENAI_API_KEY,

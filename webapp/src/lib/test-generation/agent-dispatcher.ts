@@ -24,6 +24,7 @@ import type {
   GenerationMeta,
   GenerationQuality,
   PRDFeature,
+  TestCaseSpec,
 } from './types'
 
 export interface DispatchParams extends GenerateTestsParams {
@@ -80,6 +81,7 @@ export async function dispatchFeature(params: DispatchParams): Promise<DispatchR
     agentType,
     featureId,
     featureManifest: params.featureManifest,
+    specs: params.specs,
   })
 
   const summary = generator.getSummary()

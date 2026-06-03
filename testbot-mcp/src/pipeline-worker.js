@@ -7494,7 +7494,7 @@ async function runFeatureBasedGeneration({
   };
 
   // Helper: call one feature agent and handle success/failure
-  const callFeatureAgent = async ({ featureId, agentType, featureSlug, featureManifest }) => {
+  const callFeatureAgent = async ({ featureId, agentType, featureSlug, featureManifest, specs }) => {
     const agentLabel = `${featureSlug}-${agentType}`;
     try {
       const agentTransportTimeoutMs = computeGenerationAgentTimeoutMs({
@@ -7510,6 +7510,7 @@ async function runFeatureBasedGeneration({
         featureId: featureId || null,
         agentType,
         featureManifest: Array.isArray(featureManifest) && featureManifest.length > 0 ? featureManifest : undefined,
+        specs: Array.isArray(specs) && specs.length > 0 ? specs : undefined,
         context: sharedPayload.context,
         prd: sharedPayload.prd,
         parsedPRD: sharedPayload.parsedPRD,
@@ -7585,55 +7586,179 @@ async function runFeatureBasedGeneration({
     await callFeatureAgent({ featureId: authFeatureId, agentType: 'auth', featureSlug: authSlug });
   }
 
-  // ── Step 3: Feature loop (sequential, UI+API parallel per feature) ─────────
+  // ── Step 3: Producer-consumer across all non-auth features ─────────────────
+  //
+  // Process 1 (Planner) — sequential: plan feature → append test-plan.md → enqueue
+  // Process 2 (Generator) — concurrent with planner: dequeue → generate UI+API
+  //
+  // While F1 is being generated, F2 is already being planned.
+
   const featureManifest = [];
   const nonAuthFeatures = (parsedPRD?.features || []).filter((f) => f.id !== authFeatureId);
 
-  for (const feature of nonAuthFeatures) {
-    const featureSlug = featureNameToSlug(feature.name);
-    const agentTypes = testType === 'frontend' ? ['ui']
-      : testType === 'backend' ? ['api']
-      : ['ui', 'api'];
-
-    Logger.info('PipelineWorker', `[Feature Gen] Step 3 — feature: ${featureSlug} agents: [${agentTypes.join(', ')}]`);
-    if (statusDir) {
-      updateStatus(statusDir, 'generating_tests', {
-        runId,
-        message: `Generating tests for feature: ${featureSlug}`,
-        feature: featureSlug,
-      }, telemetryReporter);
+  // ── Inline async queue ──────────────────────────────────────────────────────
+  class AsyncQueue {
+    constructor() {
+      this._items = [];
+      this._waiters = [];
+      this._done = false;
     }
+    enqueue(item) {
+      if (this._waiters.length > 0) {
+        this._waiters.shift()(item);
+      } else {
+        this._items.push(item);
+      }
+    }
+    dequeue() {
+      if (this._items.length > 0) return Promise.resolve(this._items.shift());
+      if (this._done) return Promise.resolve(null);
+      return new Promise((resolve) => { this._waiters.push(resolve); });
+    }
+    markDone() {
+      this._done = true;
+      while (this._waiters.length > 0) this._waiters.shift()(null);
+    }
+  }
 
-    // Run UI + API (or subset) in parallel for this feature
-    const results = await Promise.all(
-      agentTypes.map((agentType) => callFeatureAgent({ featureId: feature.id, agentType, featureSlug }))
-    );
+  // ── test-plan.md helpers ────────────────────────────────────────────────────
+  const testPlanFile = path.join(config.projectPath, '.healix', 'test-plan.md');
 
-    // Build feature manifest entry from the UI agent's generated actions file
-    const uiIdx = agentTypes.indexOf('ui');
-    if (uiIdx >= 0 && results[uiIdx]?.ok) {
-      const uiWrittenFiles = results[uiIdx].files || [];
-      const actionsFile = uiWrittenFiles.find((f) => f.filename?.endsWith('-actions.ts'));
-      if (actionsFile) {
-        try {
-          const actionsContent = fs.readFileSync(path.join(testsDir, actionsFile.filename), 'utf-8');
-          const actions = extractActionSignatures(actionsContent);
-          featureManifest.push({
-            featureId: feature.id,
-            featureSlug,
-            featureName: feature.name,
-            actionsFile: actionsFile.filename,
-            actions,
-          });
-        } catch (readErr) {
-          Logger.warn('PipelineWorker', `Could not build feature manifest for ${featureSlug}`, {
-            filename: actionsFile?.filename,
-            reason: readErr?.message,
-          });
+  function initTestPlanFile() {
+    try {
+      fs.mkdirSync(path.dirname(testPlanFile), { recursive: true });
+      const header = `# Healix Test Plan\nGenerated: ${new Date().toISOString()}\nTarget: ${sharedPayload.projectInfo?.baseURL || 'http://localhost:3000'}\n`;
+      fs.writeFileSync(testPlanFile, header, 'utf-8');
+    } catch (err) {
+      Logger.warn('PipelineWorker', '[test-plan.md] could not initialise', { reason: err?.message });
+    }
+  }
+
+  function appendFeaturePlan(feature, specs) {
+    try {
+      const uiSpecs = specs.filter((s) => s.agentType === 'ui');
+      const apiSpecs = specs.filter((s) => s.agentType === 'api');
+      const lines = [`\n## Feature: ${feature.name} (${feature.id})\n`];
+
+      if (uiSpecs.length > 0) {
+        lines.push('### UI Tests\n');
+        lines.push('| ID | Title | Kind | AC | Route |');
+        lines.push('|----|-------|------|----|-------|');
+        for (const s of uiSpecs) {
+          lines.push(`| ${s.id} | ${s.title} | ${s.kind} | ${s.acId} | ${s.targetRoute || '-'} |`);
+        }
+        lines.push('');
+      }
+
+      if (apiSpecs.length > 0) {
+        lines.push('### API Tests\n');
+        lines.push('| ID | Title | Kind | AC | Endpoint |');
+        lines.push('|----|-------|------|----|----------|');
+        for (const s of apiSpecs) {
+          lines.push(`| ${s.id} | ${s.title} | ${s.kind} | ${s.acId} | ${s.targetEndpoint || '-'} |`);
+        }
+        lines.push('');
+      }
+
+      fs.appendFileSync(testPlanFile, lines.join('\n'), 'utf-8');
+    } catch (err) {
+      Logger.warn('PipelineWorker', '[test-plan.md] could not append feature plan', { feature: feature.id, reason: err?.message });
+    }
+  }
+
+  initTestPlanFile();
+  const queue = new AsyncQueue();
+
+  // ── Process 1: Planner (sequential) ────────────────────────────────────────
+  const plannerProcess = (async () => {
+    for (const feature of nonAuthFeatures) {
+      let specs = [];
+      try {
+        Logger.info('PipelineWorker', `[Feature Gen] Planning: ${feature.name} (${feature.id})`);
+        const planResult = await client.planFeatureTestCases({
+          feature,
+          explorationArtifact: sharedPayload.explorationArtifact,
+          context: sharedPayload.context,
+          testType: sharedPayload.testType,
+          prd: sharedPayload.prd,
+          projectInfo: sharedPayload.projectInfo,
+        });
+        specs = Array.isArray(planResult?.specs) ? planResult.specs : [];
+        Logger.info('PipelineWorker', `[Feature Gen] Planned ${specs.length} specs for ${feature.id}`);
+      } catch (planErr) {
+        Logger.warn('PipelineWorker', `[Feature Gen] Planning failed for ${feature.id}, proceeding without specs`, { reason: planErr?.message });
+      }
+      appendFeaturePlan(feature, specs);
+      queue.enqueue({ feature, specs });
+    }
+    queue.markDone();
+  })();
+
+  // ── Process 2: Generator (concurrent with planner) ─────────────────────────
+  const generatorProcess = (async () => {
+    while (true) {
+      const item = await queue.dequeue();
+      if (!item) break;
+
+      const { feature, specs } = item;
+      const featureSlug = featureNameToSlug(feature.name);
+      const agentTypes = testType === 'frontend' ? ['ui']
+        : testType === 'backend' ? ['api']
+        : ['ui', 'api'];
+
+      Logger.info('PipelineWorker', `[Feature Gen] Generating: ${featureSlug} agents: [${agentTypes.join(', ')}]`);
+      if (statusDir) {
+        updateStatus(statusDir, 'generating_tests', {
+          runId,
+          message: `Generating tests for feature: ${featureSlug}`,
+          feature: featureSlug,
+        }, telemetryReporter);
+      }
+
+      const uiSpecs = specs.filter((s) => s.agentType === 'ui');
+      const apiSpecs = specs.filter((s) => s.agentType === 'api');
+
+      const agentCalls = agentTypes.map((agentType) => {
+        const agentSpecs = agentType === 'ui' ? uiSpecs : apiSpecs;
+        return callFeatureAgent({
+          featureId: feature.id,
+          agentType,
+          featureSlug,
+          specs: agentSpecs.length > 0 ? agentSpecs : undefined,
+        });
+      });
+
+      const results = await Promise.all(agentCalls);
+
+      // Build feature manifest entry from the UI agent's generated actions file
+      const uiIdx = agentTypes.indexOf('ui');
+      if (uiIdx >= 0 && results[uiIdx]?.ok) {
+        const uiWrittenFiles = results[uiIdx].files || [];
+        const actionsFile = uiWrittenFiles.find((f) => f.filename?.endsWith('-actions.ts'));
+        if (actionsFile) {
+          try {
+            const actionsContent = fs.readFileSync(path.join(testsDir, actionsFile.filename), 'utf-8');
+            const actions = extractActionSignatures(actionsContent);
+            featureManifest.push({
+              featureId: feature.id,
+              featureSlug,
+              featureName: feature.name,
+              actionsFile: actionsFile.filename,
+              actions,
+            });
+          } catch (readErr) {
+            Logger.warn('PipelineWorker', `Could not build feature manifest for ${featureSlug}`, {
+              filename: actionsFile?.filename,
+              reason: readErr?.message,
+            });
+          }
         }
       }
     }
-  }
+  })();
+
+  // Wait for both processes to finish before moving to E2E
+  await Promise.all([plannerProcess, generatorProcess]);
 
   // ── Step 4: E2E generation (after all features) ────────────────────────────
   Logger.info('PipelineWorker', `[Feature Gen] Step 4 — e2e agent (featureManifest entries: ${featureManifest.length})`);

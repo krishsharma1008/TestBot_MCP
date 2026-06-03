@@ -285,6 +285,7 @@ class WebappClient {
     featureId,
     agentType,
     featureManifest,
+    specs,
     context,
     prd,
     parsedPRD,
@@ -325,6 +326,10 @@ class WebappClient {
     if (Array.isArray(featureManifest) && featureManifest.length > 0) {
       body.featureManifest = featureManifest;
     }
+    // Include pre-planned specs when provided by the scenario planner
+    if (Array.isArray(specs) && specs.length > 0) {
+      body.specs = specs;
+    }
     return this._post(
       '/api/generate-tests',
       body,
@@ -338,6 +343,50 @@ class WebappClient {
         retryMaxElapsedMs: Number.isFinite(Number(transportRetryMaxElapsedMs))
           ? Number(transportRetryMaxElapsedMs)
           : 15_000,
+      }
+    );
+  }
+
+  /**
+   * Scenario planner — Phase 1 of two-phase test generation.
+   *
+   * Calls /api/generate-tests/cases with one PRDFeature + exploration artifact
+   * and returns TestCaseSpec[] describing WHAT to test (no code).
+   *
+   * Return shape: { success, featureId, specs: TestCaseSpec[] }
+   */
+  async planFeatureTestCases({
+    feature,
+    explorationArtifact,
+    context,
+    testType,
+    prd,
+    projectInfo,
+    transportTimeoutMs,
+    transportRetryDelaysMs,
+  } = {}) {
+    this._assertKey('/api/generate-tests/cases');
+    const effectiveTimeoutMs = Number.isFinite(Number(transportTimeoutMs)) && Number(transportTimeoutMs) > 0
+      ? Number(transportTimeoutMs)
+      : 120_000;   // planning is faster than generation — 2 min ceiling
+    const body = {
+      api_key: this.apiKey,
+      feature,
+      explorationArtifact: explorationArtifact || null,
+      context: context || null,
+      testType: testType || 'both',
+      prd: prd || '',
+      projectInfo: projectInfo || {},
+    };
+    return this._post(
+      '/api/generate-tests/cases',
+      body,
+      {
+        timeoutMs: effectiveTimeoutMs,
+        retryDelaysMs: Array.isArray(transportRetryDelaysMs) && transportRetryDelaysMs.length > 0
+          ? transportRetryDelaysMs
+          : [0, 1000],
+        retryMaxElapsedMs: 15_000,
       }
     );
   }

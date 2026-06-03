@@ -563,6 +563,35 @@ export interface AgentRunRecord {
 
 export type AgentCompleteHook = (record: AgentRunRecord) => void | Promise<void>
 
+/**
+ * One planned test case produced by the scenario planner for a single feature.
+ * The generator's only job is to translate this into a Playwright test() block.
+ */
+export interface TestCaseSpec {
+  id: string                // "F1-UI-01", "F1-API-02" — unique within a FeatureTestPlan
+  featureId: string         // "F1" — parent PRDFeature.id
+  acId: string              // "F1.S1.AC1" — traces to AcceptanceCriterion
+  agentType: 'ui' | 'api'  // which generator owns this spec
+  kind: TestCaseKind        // 'positive' | 'negative' | 'boundary'
+  title: string             // human label — NO [REQ:...] prefix, generator adds that
+  targetRoute?: string      // "/login" — resolved from ExplorationArtifact.routes
+  targetEndpoint?: string   // "POST /api/auth/login" — resolved from exploration/context
+  preconditions: string[]   // plain English: ["user exists in DB", "not authenticated"]
+  steps: string[]           // plain English action steps
+  assertions: string[]      // plain English expected outcomes
+}
+
+/**
+ * Planning output for one feature. Appended to test-plan.md and enqueued for
+ * the generator immediately — not held in memory across features.
+ */
+export interface FeatureTestPlan {
+  featureId: string
+  featureName: string
+  plannedAt: string         // ISO timestamp
+  specs: TestCaseSpec[]
+}
+
 export interface GenerateTestsParams {
   context?: CapturedContext
   prd?: string
@@ -574,9 +603,10 @@ export interface GenerateTestsParams {
   options?: GenerationOptions
   onAgentComplete?: AgentCompleteHook
   // Feature-based generation params (new model)
-  featureId?: string | null        // PRDFeature.id — e.g. "F1". Null = all features (legacy)
-  agentType?: FeatureAgentType     // which agent to run for this feature
+  featureId?: string | null          // PRDFeature.id — e.g. "F1". Null = all features (legacy)
+  agentType?: FeatureAgentType       // which agent to run for this feature
   featureManifest?: FeatureManifest[] // passed to e2e agent only
+  specs?: TestCaseSpec[]             // pre-planned test cases from scenario planner
 }
 
 export interface OpenAIClientConfig {

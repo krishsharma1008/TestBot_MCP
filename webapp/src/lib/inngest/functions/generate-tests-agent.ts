@@ -21,7 +21,7 @@ import { db } from '@/lib/db'
 import { generationJobs } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { dispatchFeature } from '@/lib/test-generation/agent-dispatcher'
-import type { FeatureAgentType, GenerateTestsParams, AgentRunRecord, FeatureManifest } from '@/lib/test-generation/types'
+import type { FeatureAgentType, GenerateTestsParams, AgentRunRecord, FeatureManifest, TestCaseSpec } from '@/lib/test-generation/types'
 import { recordTokenUsage } from '@/lib/tokens'
 import { resolveModel } from '@/lib/pricing'
 import { profiles } from '@/lib/db/schema'
@@ -97,11 +97,17 @@ export const generateTestsAgent = inngest.createFunction(
             : []
         }
 
+        // Specs stored in job payload by the MCP scenario planner step
+        const specs = Array.isArray((payload as Record<string, unknown>).specs)
+          ? ((payload as Record<string, unknown>).specs as TestCaseSpec[])
+          : undefined
+
         const dispatchResult = await dispatchFeature({
           ...payload,
           agentType,
           featureId: featureId === 'e2e' ? null : featureId,
           featureManifest,
+          specs,
           abortSignal: generationAbort.signal,
           generatorConfig: {
             apiKey: process.env.OPENAI_API_KEY,
