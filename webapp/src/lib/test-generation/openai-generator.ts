@@ -29,6 +29,7 @@ import type {
   Role,
   TestCaseKind,
 } from './types'
+import { tagTestContent, buildFeatureMap } from './tag-utils'
 
 const TEST_CASE_KINDS: TestCaseKind[] = ['positive', 'negative', 'boundary']
 
@@ -1485,6 +1486,10 @@ IMPORTANT: Return ONLY valid JSON.`
       )
     }
 
+    promptRequirements.push(
+      'Append Playwright tags to each test title: @auth when the acceptance criterion has authRequired=true.'
+    )
+
     // If a structured PRD is available, require one test per AC with a stable
     // [REQ:...] tag derived from AC id, and assert against the AC text (not
     // just navigation).
@@ -1495,6 +1500,7 @@ IMPORTANT: Return ONLY valid JSON.`
         `Each test title MUST start with its AC id and kind in square brackets, e.g. \`[REQ:F1.S1.AC1][${TEST_CASE_KINDS[0]}] ...\`, \`[REQ:F1.S1.AC1][${TEST_CASE_KINDS[1]}] ...\`, \`[REQ:F1.S1.AC1][${TEST_CASE_KINDS[2]}] ...\`.`,
         'Each test body MUST contain at least one expect(...) assertion that grounds in the AC text — bare page.goto without assertions is rejected.',
         'For AC with authRequired=true, use tier-B-auth routing only when routeAccess proves the target route is protected. If routeAccess.authMode is public_app and the route is public, generate a normal runnable public test.',
+        'For AC with authRequired=true, append @auth to the test title.',
       )
     }
 
@@ -2904,6 +2910,10 @@ Return JSON array only.`
     }
 
     let content = this.normalizeGeneratedContent(test.content || '')
+
+    const agentType = String(test.type || 'generated')
+    content = tagTestContent(content, agentType, buildFeatureMap(this.parsedPRD))
+
     const hasPwImport = content.includes("from '@playwright/test'")
     const hasFixtureImport = content.includes("from './__healix-fixture'")
     if (hasPwImport) {
@@ -3001,7 +3011,7 @@ Return JSON array only.`
 ${baseUrlComment}
 // Fallback reason: ${reason}
 test.describe('Fallback smoke checks', () => {
-  test('root route responds with non-error status and main landmark is visible', async ({ page }) => {
+  test('root route responds with non-error status and main landmark is visible @smoke @sanity @regression @happy-path', async ({ page }) => {
     const response = await page.goto('/');
     expect(response).not.toBeNull();
     const status = response?.status() ?? 0;
@@ -3011,7 +3021,7 @@ test.describe('Fallback smoke checks', () => {
     await expect(page.locator('main, [role="main"], body').first()).toBeVisible();
   });
 
-  test('mobile viewport still renders the app shell', async ({ page }) => {
+  test('mobile viewport still renders the app shell @smoke @sanity @regression @happy-path', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const response = await page.goto('/');
     expect(response).not.toBeNull();
@@ -3041,7 +3051,7 @@ const routes = ${JSON.stringify(fallbackRoutes)};
 
 test.describe('Fallback frontend checks', () => {
   for (const route of routes) {
-    test(\`route \${route} renders stable layout\`, async ({ page }) => {
+    test(\`route \${route} renders stable layout @sanity @regression @happy-path\`, async ({ page }) => {
       const response = await page.goto(route);
       expect(response).not.toBeNull();
       const status = response?.status() ?? 0;
@@ -3081,13 +3091,13 @@ function methodSupportsBody(method: string) {
 }
 
 test.describe('Fallback API checks', () => {
-  test(${JSON.stringify(`${endpointMethod} ${endpointPath} returns expected status class`)}, async ({ request }) => {
+  test(${JSON.stringify(`${endpointMethod} ${endpointPath} returns expected status class @api @regression @happy-path`)}, async ({ request }) => {
     const response = await request.fetch(REQUEST_PATH, { method: REQUEST_METHOD });
     const status = response.status();
     expect(EXPECTED_SUCCESS_STATUSES${endpointRequiresAuth ? '.concat(EXPECTED_AUTH_STATUSES)' : ''}).toContain(status);
   });
 
-  test('handles lightweight burst traffic without 5xx', async ({ request }) => {
+  test('handles lightweight burst traffic without 5xx @api @regression', async ({ request }) => {
     const burst = Math.max(2, Math.min(12, STRESS_BURST));
     const timings: number[] = [];
     const responses = await Promise.all(
@@ -3125,7 +3135,7 @@ ${baseUrlComment}
 // Fallback reason: ${reason}
 
 test.describe('Fallback workflow checks', () => {
-  test(${JSON.stringify(`${workflowName} basic navigation`)}, async ({ page }) => {
+  test(${JSON.stringify(`${workflowName} basic navigation @e2e @regression @happy-path`)}, async ({ page }) => {
     const response = await page.goto('/');
     expect(response).not.toBeNull();
     await expect(page.locator('main, [role="main"], body').first()).toBeVisible();
@@ -3158,7 +3168,7 @@ test.describe('Fallback workflow checks', () => {
 ${baseUrlComment}
 // Fallback reason: ${reason}
 test.describe('Fallback error handling checks', () => {
-  test('invalid route is handled with explicit not-found behavior', async ({ page }) => {
+  test('invalid route is handled with explicit not-found behavior @regression @negative', async ({ page }) => {
     const response = await page.goto('/__healix_invalid_route__');
     expect(response).not.toBeNull();
     const status = response?.status() ?? 0;
