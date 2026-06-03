@@ -36,7 +36,6 @@ OUTPUT FORMAT — reply with a single JSON object and NOTHING else:
           "acceptanceCriteria": [
             {
               "id": "F1.S1.AC1",
-              "kind": "positive" | "negative" | "boundary",
               "authRequired": true | false,
               "roleHint": "<role-name or empty string>",
               "text": "<AC text copied verbatim from the PRD>"
@@ -56,7 +55,6 @@ OUTPUT FORMAT — reply with a single JSON object and NOTHING else:
 
 RULES:
 - Preserve AC wording verbatim. Do not paraphrase.
-- Include at least one "negative" and one "boundary" AC per story where plausible.
 - "authRequired: true" means the AC can only be exercised by a logged-in user.
 - If the AC names a specific role (admin, manager, etc.), set "roleHint" to that role.
 - If the PRD is thin, infer missing stories conservatively — do NOT hallucinate features.
@@ -230,9 +228,6 @@ function regexFallbackParsedPRD(chunk: string, chunkIndex: number): ParsedPRD {
     .slice(0, 30)
   const criteria = (acLines.length > 0 ? acLines : lines.slice(0, 8)).map((text, index) => ({
     id: `F${chunkIndex}.S1.AC${index + 1}`,
-    kind: /invalid|error|cannot|unauthorized|forbidden|reject|missing/i.test(text)
-      ? 'negative' as const
-      : (/boundary|empty|whitespace|null|max|min|required/i.test(text) ? 'boundary' as const : 'positive' as const),
     authRequired: /login|auth|role|admin|viewer|member|user|account|dashboard/i.test(text),
     roleHint: inferRoleHint(text),
     text,
@@ -341,13 +336,8 @@ function normalizeAC(raw: unknown, storyId: string, index: number): AcceptanceCr
   const a = (raw ?? {}) as Record<string, unknown>
   const text = String(a.text || '').trim()
   if (!text) return null
-  const kindRaw = String(a.kind || 'positive').toLowerCase()
-  const kind = (['positive', 'negative', 'boundary'] as const).includes(kindRaw as 'positive')
-    ? (kindRaw as 'positive' | 'negative' | 'boundary')
-    : 'positive'
   return {
     id: String(a.id || `${storyId}.AC${index}`).trim(),
-    kind,
     authRequired: a.authRequired === true,
     roleHint: typeof a.roleHint === 'string' && a.roleHint.trim() ? a.roleHint.trim() : undefined,
     text,

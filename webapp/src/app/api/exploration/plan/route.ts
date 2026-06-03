@@ -67,7 +67,7 @@ function planFlows(artifact: ExplorationArtifact, parsedPRD: ParsedPRD | null): 
             name: `ac:${ac.id}`,
             tier: ac.authRequired ? 'B-auth' : 'A-public',
             reason: `PRD AC ${ac.id}`,
-            priority: ac.kind === 'negative' ? 70 : 50,
+            priority: ac.authRequired ? 65 : 50,
           })
         }
       }

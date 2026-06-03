@@ -382,11 +382,16 @@ export interface GenerationMeta {
   }>
 }
 
-export type AcceptanceCriterionKind = 'positive' | 'negative' | 'boundary'
+export type TestCaseKind = 'positive' | 'negative' | 'boundary'
+
+export interface GeneratedTestCase {
+  id: string          // e.g. "[REQ:F1.S1.AC1]"
+  kind: TestCaseKind
+  title: string       // full test title including [REQ:...][kind] prefix
+}
 
 export interface AcceptanceCriterion {
   id: string                  // e.g. "F1.S1.AC1"
-  kind: AcceptanceCriterionKind
   authRequired: boolean
   roleHint?: string           // e.g. "admin" if the AC is admin-only
   text: string                // original AC language, preserved verbatim

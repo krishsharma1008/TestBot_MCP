@@ -27,7 +27,10 @@ import type {
   ApiEndpoint,
   MockableApiContract,
   Role,
+  TestCaseKind,
 } from './types'
+
+const TEST_CASE_KINDS: TestCaseKind[] = ['positive', 'negative', 'boundary']
 
 const GENERATED_TEST_FILE_SCHEMA = z.object({
   filename: z.string().min(1).max(180).optional(),
@@ -1488,8 +1491,8 @@ IMPORTANT: Return ONLY valid JSON.`
     const acSection = this.buildAcceptanceCriteriaSection()
     if (acSection) {
       promptRequirements.push(
-        'Emit exactly ONE test(...) block per acceptance criterion listed in ACCEPTANCE_CRITERIA.',
-        'Each test title MUST start with its AC id in square brackets, e.g. `[REQ:F1.S1.AC1] ...`.',
+        `For each acceptance criterion in ACCEPTANCE_CRITERIA, emit AT LEAST 3 test(...) blocks — one per kind (${TEST_CASE_KINDS.join(', ')}): 1+ positive test (happy path), 1+ negative test (invalid input, error state, or unauthorised access), and 1+ boundary test (min/max values, empty strings, or edge-case limits). You may emit more than one test of the same kind when the AC warrants it.`,
+        `Each test title MUST start with its AC id and kind in square brackets, e.g. \`[REQ:F1.S1.AC1][${TEST_CASE_KINDS[0]}] ...\`, \`[REQ:F1.S1.AC1][${TEST_CASE_KINDS[1]}] ...\`, \`[REQ:F1.S1.AC1][${TEST_CASE_KINDS[2]}] ...\`.`,
         'Each test body MUST contain at least one expect(...) assertion that grounds in the AC text — bare page.goto without assertions is rejected.',
         'For AC with authRequired=true, use tier-B-auth routing only when routeAccess proves the target route is protected. If routeAccess.authMode is public_app and the route is public, generate a normal runnable public test.',
       )
@@ -1613,7 +1616,7 @@ Return only the JSON array of generated files.`
           const authTag = ac.authRequired ? ' AUTH' : ''
           const role = ac.roleHint ? ` ROLE=${ac.roleHint}` : ''
           lines.push(
-            `- ${ac.id} [${ac.kind}${authTag}${role}] ${this.sanitizePromptText(ac.text)}`,
+            `- ${ac.id} [${authTag.trim() || 'public'}${role}] ${this.sanitizePromptText(ac.text)}`,
           )
         }
       }
