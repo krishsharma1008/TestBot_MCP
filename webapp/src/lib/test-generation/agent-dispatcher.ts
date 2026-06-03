@@ -1,145 +1,34 @@
 /**
- * Agent dispatcher — thin façade over `OpenAITestGenerator` that:
+ * Feature-based agent dispatcher.
  *
- *   1. Derives a rule-based plan of which agents to run from the request
- *      (smoke / frontend / api / workflow / error) so the generator no longer
- *      hard-codes that decision.
- *   2. Invokes the generator, streaming per-agent telemetry back to the caller
- *      via `onAgentComplete`.
- *   3. Leaves room for an opt-in `planner-agent.ts` (set `HEALIX_PLANNER_AGENT=1`)
- *      that lets an LLM override the rule-based plan when the inputs are thin.
+ * Replaces the old rule-based 5-agent plan with a per-feature dispatch:
+ *   - 'auth'  → auth tests + auth-actions.ts + auth-setup.ts  (always first)
+ *   - 'ui'    → {feature}-actions.ts + {feature}-ui.spec.ts
+ *   - 'api'   → {feature}-api.spec.ts
+ *   - 'e2e'   → e2e-workflows.spec.ts  (always last)
  *
- * The underlying generator is unchanged — this keeps the surface area small and
- * the refactor incremental. When we split the prompt builders into individual
- * `agents/*.ts` files, this dispatcher is the integration point that picks them.
+ * The MCP pipeline-worker controls the loop order:
+ *   1. auth (blocking)
+ *   2. sequential feature loop — UI + API in parallel per testType
+ *   3. E2E (blocking, after all features)
+ *   4. Dynamic playwright.config.ts generation
  */
 
 import { OpenAITestGenerator, OpenAITestGeneratorConfig } from './openai-generator'
-import { isPlannerAgentEnabled, runPlannerAgent } from './planner-agent'
 import type {
-  AgentName,
+  FeatureAgentType,
+  FeatureManifest,
   AgentCompleteHook,
   GenerateTestsParams,
   GeneratedTestFile,
   GenerationMeta,
   GenerationQuality,
-  ProjectInfo,
-  CapturedContext,
-  ParsedPRD,
-  ExplorationArtifact,
+  PRDFeature,
 } from './types'
-
-export interface AgentPlan {
-  agents: AgentName[]
-  reason: string
-  apiOnly: boolean
-}
-
-function hasBackendService(projectInfo: ProjectInfo = {}): boolean {
-  return (projectInfo.services || []).some((service) =>
-    service?.role === 'backend' || service?.role === 'fullstack'
-  )
-}
-
-function isSyntheticHealthEndpoint(endpoint: { method?: string; path?: string; synthetic?: boolean; source?: string } | null | undefined): boolean {
-  return String(endpoint?.method || 'GET').toUpperCase() === 'GET'
-    && endpoint?.path === '/api/health'
-    && (endpoint.synthetic === true || endpoint.source === 'healix_fallback' || !endpoint.source)
-}
-
-function hasApiSurface(context: CapturedContext = {}, projectInfo: ProjectInfo = {}): boolean {
-  return (context.apiEndpoints || []).filter((endpoint) => !isSyntheticHealthEndpoint(endpoint)).length > 0
-    || (context.mockableApiContracts || []).filter((contract) => !isSyntheticHealthEndpoint(contract)).length > 0
-    || hasBackendService(projectInfo)
-}
-
-export function planAgents(input: {
-  testType: 'frontend' | 'backend' | 'both'
-  projectInfo?: ProjectInfo
-  context?: CapturedContext
-  parsedPRD?: ParsedPRD | null
-  explorationArtifact?: ExplorationArtifact | null
-  options?: GenerateTestsParams['options']
-}): AgentPlan {
-  const projectInfo = input.projectInfo || {}
-  const context = input.context || {}
-  const options = input.options || {}
-  const apiOnly = projectInfo.apiOnly === true
-  const testType = apiOnly ? 'backend' : input.testType
-  const explicitBackend = testType === 'backend'
-  const apiSurface = hasApiSurface(context, projectInfo)
-
-  const agents: AgentName[] = []
-  const why: string[] = []
-
-  if (apiOnly) {
-    agents.push('api')
-    why.push('api-only repo → single API flow agent')
-    if (options.includeErrorStates && (context.errorScenarios?.length ?? 0) > 0) {
-      agents.push('error')
-      why.push('error scenarios present')
-    }
-    return { agents, reason: why.join('; '), apiOnly: true }
-  }
-
-  if (options.includeSmoke !== false) {
-    agents.push('smoke')
-    why.push('smoke on by default')
-  }
-
-  if (testType === 'frontend' || testType === 'both') {
-    if ((context.pages?.length ?? 0) > 0 || context.navigationGraph) {
-      agents.push('frontend')
-      why.push('pages detected')
-    } else if (input.parsedPRD || input.explorationArtifact) {
-      agents.push('frontend')
-      why.push('PRD/exploration present — frontend runs even without static pages')
-    }
-  }
-
-  if (testType === 'backend' || testType === 'both') {
-    if (explicitBackend || apiSurface) {
-      agents.push('api')
-      why.push(explicitBackend ? 'backend explicitly requested' : 'API/backend surface detected')
-    } else if (testType === 'both') {
-      why.push('no API/backend surface detected → skip API agent')
-    }
-  }
-
-  if (options.includeWorkflows !== false && (context.workflows?.length ?? 0) > 0) {
-    agents.push('workflow')
-    why.push('workflows detected')
-  }
-
-  if (options.includeErrorStates && (context.errorScenarios?.length ?? 0) > 0) {
-    agents.push('error')
-    why.push('error scenarios present')
-  }
-
-  if (agents.length === 0) {
-    agents.push('smoke')
-    why.push('fallback: empty plan → smoke')
-  }
-
-  return { agents, reason: why.join('; '), apiOnly: false }
-}
 
 export interface DispatchParams extends GenerateTestsParams {
   generatorConfig?: OpenAITestGeneratorConfig
   onAgentComplete?: AgentCompleteHook
-  // Optional per-agent scoping. When provided, only agents in the set run.
-  // When undefined, the rule-based / LLM plan chooses. The actual filtering
-  // happens inside OpenAITestGenerator (see P1-a2); this type lets callers
-  // (the /api/generate-tests route) thread the value through today.
-  agentsAllowlist?: Set<AgentName>
-  // P1.5 — optional per-agent plan slice. When present, the generator folds
-  // it into the agent-level prompt as an "ONLY generate tests for these
-  // targets" preamble. When absent, the generator falls back to its
-  // open-ended prompt (existing behavior).
-  agentPlanSlice?: Record<string, unknown>
-  // Caller-supplied abort signal. The /api/generate-tests route fires this
-  // the moment the user's balance hits 0 (after any agent's debit lands), so
-  // in-flight OpenAI calls die instead of running for free on our dime.
   abortSignal?: AbortSignal
 }
 
@@ -159,37 +48,25 @@ export interface DispatchResult {
     byType: Record<string, number>
     agentRuns: Array<import('./types').AgentRunRecord>
   }
-  plan: AgentPlan
+  agentType: FeatureAgentType
+  featureId: string | null
 }
 
-export async function dispatchAgents(params: DispatchParams): Promise<DispatchResult> {
-  const rulePlan = planAgents({
-    testType: params.testType || 'both',
-    projectInfo: params.projectInfo,
-    context: params.context,
-    parsedPRD: params.parsedPRD,
-    explorationArtifact: params.explorationArtifact,
-    options: params.options,
-  })
-
-  // Opt-in LLM planner (HEALIX_PLANNER_AGENT=1). Falls back to rule-based plan
-  // if disabled or if the planner returns null (current placeholder behavior).
-  const llmPlan = isPlannerAgentEnabled()
-    ? await runPlannerAgent({
-        testType: params.testType || 'both',
-        projectInfo: params.projectInfo,
-        context: params.context,
-        parsedPRD: params.parsedPRD,
-        explorationArtifact: params.explorationArtifact,
-        options: params.options,
-      })
-    : null
-  const plan = llmPlan ?? rulePlan
-  const effectiveAgentsAllowlist =
-    params.agentsAllowlist ?? new Set<AgentName>(plan.agents)
+/**
+ * Dispatch a single feature+agentType generation unit.
+ *
+ * Callers pass:
+ *   params.agentType   — which agent to run ('auth' | 'ui' | 'api' | 'e2e')
+ *   params.featureId   — PRDFeature.id to scope the AC list (null for auth/e2e)
+ *   params.featureManifest — list of feature action signatures (e2e only)
+ */
+export async function dispatchFeature(params: DispatchParams): Promise<DispatchResult> {
+  const agentType: FeatureAgentType = params.agentType ?? 'ui'
+  const featureId = params.featureId ?? null
 
   const generator = new OpenAITestGenerator(params.generatorConfig)
   generator.setAbortSignal(params.abortSignal)
+
   const files = await generator.generateTests({
     context: params.context,
     prd: params.prd,
@@ -200,10 +77,166 @@ export async function dispatchAgents(params: DispatchParams): Promise<DispatchRe
     projectInfo: params.projectInfo,
     options: params.options,
     onAgentComplete: params.onAgentComplete,
-    agentsAllowlist: effectiveAgentsAllowlist,
-    agentPlanSlice: params.agentPlanSlice,
+    agentType,
+    featureId,
+    featureManifest: params.featureManifest,
   })
 
   const summary = generator.getSummary()
-  return { files, summary, plan }
+  return { files, summary, agentType, featureId }
+}
+
+/**
+ * Resolve the PRDFeature object from parsedPRD by featureId.
+ * Returns null when featureId is null or not found.
+ */
+export function resolveFeature(
+  parsedPRD: import('./types').ParsedPRD | null | undefined,
+  featureId: string | null | undefined,
+): PRDFeature | null {
+  if (!featureId || !parsedPRD?.features) return null
+  return parsedPRD.features.find((f) => f.id === featureId) ?? null
+}
+
+/**
+ * Detect the auth feature in a parsed PRD.
+ *
+ * The auth feature is the one whose name matches common auth patterns
+ * (authentication, login, auth, sign-in) OR is the first feature that
+ * contains ACs with authRequired: true.
+ *
+ * Returns null when no auth feature is detected.
+ */
+export function detectAuthFeature(
+  parsedPRD: import('./types').ParsedPRD | null | undefined,
+): PRDFeature | null {
+  if (!parsedPRD?.features?.length) return null
+
+  const AUTH_NAMES = /^(auth|authentication|login|sign.?in|sign.?up|register|account)$/i
+
+  // First pass: name match
+  for (const feature of parsedPRD.features) {
+    if (AUTH_NAMES.test(feature.name.trim())) return feature
+  }
+
+  // Second pass: first feature with any authRequired AC
+  for (const feature of parsedPRD.features) {
+    for (const story of feature.userStories || []) {
+      for (const ac of story.acceptanceCriteria || []) {
+        if (ac.authRequired) return feature
+      }
+    }
+  }
+
+  return null
+}
+
+/**
+ * Build a feature manifest entry from a feature and its generated actions file content.
+ * Extracts exported function signatures via a lightweight regex parse.
+ */
+export function buildFeatureManifestEntry(
+  feature: PRDFeature,
+  actionsFileContent: string,
+): FeatureManifest {
+  const featureSlug = feature.name
+    .toLowerCase().trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    || feature.id.toLowerCase()
+
+  // Regex: export async function name(params): returnType {
+  const fnRegex = /export\s+async\s+function\s+(\w+)\s*\(([^)]*)\)/g
+  const actions: import('./types').ActionSignature[] = []
+  let m: RegExpExecArray | null
+  while ((m = fnRegex.exec(actionsFileContent)) !== null) {
+    const name = m[1]
+    const rawParams = m[2].trim()
+    const params = rawParams ? rawParams.split(',').map((p) => p.trim()).filter(Boolean) : []
+    actions.push({ name, params })
+  }
+
+  return {
+    featureId: feature.id,
+    featureSlug,
+    featureName: feature.name,
+    actionsFile: `${featureSlug}-actions.ts`,
+    actions,
+  }
+}
+
+/**
+ * Generate a dynamic playwright.config.ts from the feature list and auth roles.
+ */
+export function generatePlaywrightConfig({
+  features,
+  authFeatureId,
+  roles,
+  testType,
+  baseURL = 'http://localhost:3000',
+}: {
+  features: PRDFeature[]
+  authFeatureId: string | null
+  roles: Array<{ name?: string; role?: string; storageStatePath?: string }>
+  testType: 'frontend' | 'backend' | 'both'
+  baseURL?: string
+}): string {
+  const defaultRole = roles[0]
+    ? (roles[0].name || roles[0].role || 'user').toLowerCase().replace(/[^a-z0-9_-]/g, '')
+    : 'user'
+
+  const featureSlug = (f: PRDFeature) =>
+    f.name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || f.id.toLowerCase()
+
+  const nonAuthFeatures = features.filter((f) => f.id !== authFeatureId)
+  const hasAuth = authFeatureId !== null
+
+  // Determine which spec patterns to include per testType
+  const specPatternFor = (slug: string): string => {
+    if (testType === 'frontend') return `**/${slug}-ui.spec.ts`
+    if (testType === 'backend') return `**/${slug}-api.spec.ts`
+    return `**/${slug}-*.spec.ts`
+  }
+
+  const featureProjectLines = nonAuthFeatures.map((f) => {
+    const slug = featureSlug(f)
+    const storageState = hasAuth ? `\n      use: { storageState: '.healix/${defaultRole}.json' },` : ''
+    const deps = hasAuth ? `\n      dependencies: ['auth-setup'],` : ''
+    return `    {
+      name: '${slug}',
+      testMatch: '${specPatternFor(slug)}',${deps}${storageState}
+    }`
+  })
+
+  const allFeatureSlugs = nonAuthFeatures.map((f) => `'${featureSlug(f)}'`).join(', ')
+
+  const authProject = hasAuth
+    ? `    {
+      name: 'auth-setup',
+      testMatch: '**/auth-setup.ts',
+    },\n`
+    : ''
+
+  const e2eProject = `    {
+      name: 'e2e',
+      testMatch: '**/e2e-workflows.spec.ts',
+      dependencies: [${allFeatureSlugs}],
+    }`
+
+  return `// playwright.config.ts — generated by Healix. Do not edit manually.
+import { defineConfig } from '@playwright/test'
+
+export default defineConfig({
+  testDir: './tests/generated',
+  fullyParallel: false,
+  use: {
+    baseURL: '${baseURL}',
+    trace: 'on-first-retry',
+  },
+  projects: [
+${authProject}${featureProjectLines.join(',\n')},
+${e2eProject},
+  ],
+})
+`
 }

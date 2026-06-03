@@ -508,7 +508,43 @@ export interface ExplorationArtifact {
   errorProbe?: ErrorProbe | null
 }
 
-export type AgentName = 'smoke' | 'frontend' | 'api' | 'workflow' | 'error' | 'expansion'
+/** New feature-based agent types replacing the old 5-agent model */
+export type FeatureAgentType = 'ui' | 'api' | 'e2e' | 'auth'
+
+/** Legacy agent names retained only for Inngest DB rows / telemetry back-compat */
+export type AgentName = FeatureAgentType | 'smoke' | 'frontend' | 'workflow' | 'error' | 'expansion'
+
+/**
+ * A single exported async function extracted from a feature's actions file.
+ * The E2E agent receives these signatures to compose cross-feature journeys.
+ */
+export interface ActionSignature {
+  name: string          // e.g. "submitPaymentForm"
+  params: string[]      // e.g. ["page: Page", "card: CardDetails"]
+  description?: string  // optional JSDoc summary
+}
+
+/**
+ * Per-feature manifest entry built after all feature agents have completed.
+ * Passed to the E2E agent as its primary input alongside the raw PRD.
+ */
+export interface FeatureManifest {
+  featureId: string        // e.g. "F1"
+  featureSlug: string      // e.g. "billing"
+  featureName: string      // e.g. "Billing"
+  actionsFile: string      // e.g. "billing-actions.ts"
+  actions: ActionSignature[]
+}
+
+/**
+ * Describes one unit of work in the feature-based generation loop.
+ * One job per (featureId × agentType) pair.
+ */
+export interface FeatureGenerationJob {
+  featureId: string
+  featureSlug: string
+  agentType: FeatureAgentType
+}
 
 export interface AgentRunRecord {
   agent: AgentName
@@ -537,15 +573,10 @@ export interface GenerateTestsParams {
   projectInfo?: ProjectInfo
   options?: GenerationOptions
   onAgentComplete?: AgentCompleteHook
-  // When set, only agents whose name is in the set are run. Undefined means
-  // "run the full rule-based plan" (legacy behavior). The MCP sets this to
-  // `new Set(['smoke'])` etc. to chunk generation across 5 parallel HTTP calls
-  // so each call fits under Vercel Hobby's 60s ceiling.
-  agentsAllowlist?: Set<AgentName>
-  // P1.5 — per-agent plan slice. When present, each generate*Tests method
-  // prepends an "ONLY generate tests for these targets: {slice}" preamble to
-  // the prompt so the agent's output is scoped to the planner's decisions.
-  agentPlanSlice?: Record<string, unknown>
+  // Feature-based generation params (new model)
+  featureId?: string | null        // PRDFeature.id — e.g. "F1". Null = all features (legacy)
+  agentType?: FeatureAgentType     // which agent to run for this feature
+  featureManifest?: FeatureManifest[] // passed to e2e agent only
 }
 
 export interface OpenAIClientConfig {

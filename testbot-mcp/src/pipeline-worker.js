@@ -36,7 +36,7 @@ const WebappClient = require('./webapp-client');
 const QACorpusWriter = require('./qa-corpus-writer');
 const { startSecondaryServices, stopSecondaryServices, probeHttpReady, waitForServiceReady } = require('./multi-service-starter');
 const { runExplorationPhase, EMPTY_ARTIFACT, artifactHasUsefulContext } = require('./exploration-phase');
-const { injectCredentials, normalizeRoleLabel } = require('./credentials-injector');
+const { normalizeRoleLabel } = require('./credentials-injector');
 const { isUnsafeAuthFlow, sanitizeAuthFlow } = require('./auth-flow-utils');
 const {
   ensureQaContractSpec,
@@ -6508,164 +6508,35 @@ async function maybeGenerateViaSaaS({
     } : {}),
   };
 
-  const agents = pickAgentsForRun(config.testType, projectInfo, context);
-  const backendGenerationSkippedReason =
-    String(config.testType || '').toLowerCase() === 'both' && !agents.includes('api')
-      ? 'no_api_or_backend_surface_detected'
-      : null;
-
-  // ── P1.5 planner pre-pass ────────────────────────────────────────────────
-  // One HTTP call to /api/generate-tests/plan BEFORE the fan-out. The plan
-  // gets projected into per-agent slices so each agent's prompt scopes down
-  // to its assigned targets. Gated on !HEALIX_SKIP_PLANNER so an env flip
-  // can disable the new path without redeploying. Any failure (timeout,
-  // network, 5xx, feature-absent 404) degrades cleanly to the legacy
-  // no-plan fan-out.
-  let plan = null;
-  let planMeta = null;
-  if (!process.env.HEALIX_SKIP_PLANNER) {
-    try {
-      const planResult = await client.planGeneration({
-        context,
-        prd: prdContent || '',
-        parsedPRD: parsedPRD || null,
-        explorationArtifact: explorationArtifact || null,
-        roles: roles || [],
-        projectInfo,
-        options: sharedPayload.options,
-      });
-      if (planResult && planResult.fallback) {
-        planMeta = { status: `plan_skipped_${planResult.fallback}` };
-      } else if (planResult && planResult.plan) {
-        plan = planResult.plan;
-        planMeta = {
-          status: 'plan_generated',
-          totalPlannedTests: plan.totalPlannedTests,
-          cache: planResult.cache || null,
-        };
-        const pt = planResult.plannerTokens;
-        if (pt && pt.totalTokens > 0) {
-          Logger.info('PipelineWorker', '[TOKEN USAGE] planner prompt=' + pt.promptTokens + ' completion=' + pt.completionTokens + ' total=' + pt.totalTokens + ' cache=' + (planResult.cache || 'miss'));
-        } else {
-          Logger.info('PipelineWorker', '[TOKEN USAGE] planner — cache=' + (planResult.cache || 'miss') + ' (no tokens charged)');
-        }
-        // Persist the plan to runDir for post-mortem inspection. The MCP
-        // already writes status.json / manifest here, so reusing the same
-        // dir keeps all run telemetry in one place.
-        const runDir = statusDir; // statusDir == runDir when provided
-        if (runDir) {
-          try {
-            fs.writeFileSync(
-              path.join(runDir, 'plan.json'),
-              JSON.stringify(plan, null, 2),
-            );
-          } catch {
-            /* best-effort — never block generation on a disk hiccup */
-          }
-          try {
-            updateStatus(runDir, 'plan_generated', {
-              totalPlannedTests: plan.totalPlannedTests,
-              runId,
-            });
-          } catch {
-            /* noop */
-          }
-        }
-      }
-    } catch (err) {
-      planMeta = {
-        status: err?.code === 'WEBAPP_TIMEOUT' ? 'plan_skipped_timeout' : 'plan_failed_fallback',
-        error: err?.message || String(err),
-      };
-    }
-  } else {
-    planMeta = { status: 'plan_skipped_env_flag' };
-  }
-
-  const planSliceFor = (agent) => {
-    // Expansion sits outside the planner's scope — it's a coverage
-    // gap-filler triggered post-fan-out, so no slice applies.
-    if (agent === 'expansion') return null;
-    if (!plan) return null;
-    const fe = plan.frontendPlan || null;
-    const be = plan.backendPlan || null;
-    switch (agent) {
-      case 'smoke':
-        return {
-          smokeTargets: fe?.smokeTargets || [],
-          plannedTests: fe?.plannedTests || 0,
-        };
-      case 'frontend':
-        return {
-          pages: fe?.pages || [],
-          workflows: fe?.workflows || [],
-        };
-      case 'api':
-        return {
-          endpoints: be?.endpoints || [],
-          apiFlows: be?.apiFlows || [],
-        };
-      case 'workflow':
-        return {
-          workflows: fe?.workflows || [],
-        };
-      case 'error': {
-        const negativeRegex = /not |fail|error|invalid/i;
-        const negativeAssertions = (fe?.pages || []).flatMap((p) =>
-          (p.assertions || []).filter((a) => negativeRegex.test(String(a))),
-        );
-        const errorCases = (be?.endpoints || []).flatMap((e) => e.errorCases || []);
-        return { negativeAssertions, errorCases };
-      }
-      default:
-        return null;
-    }
-  };
-
-  // ── P2-h async branch decision ───────────────────────────────────────────
-  // When HEALIX_GEN_ASYNC=true, skip the per-agent HTTP fan-out and enqueue
-  // a single async generation job instead, progressively polling for partials.
-  // The webapp orchestrator handles per-agent dispatch on the server side.
+  // ── Async branch (Inngest) ───────────────────────────────────────────────
+  // When HEALIX_GEN_ASYNC=true, enqueue a single job on the Inngest
+  // orchestrator. It fans out per-feature agents internally (auth → feature
+  // loop → e2e) and the MCP polls for partials as they arrive.
   const asyncMode = String(process.env.HEALIX_GEN_ASYNC || '').toLowerCase() === 'true';
   if (asyncMode) {
     return await runAsyncGenerationPath({
       client,
-      agents,
       sharedPayload,
       testsDir,
       runId,
       statusDir,
       runBudget,
       telemetryReporter,
-      plan,
-      planMeta,
       config,
-      // Phase-1 sync fallback reuses these to stay DRY:
-      context,
-      prdContent,
-      projectInfo,
-      parsedPRD,
-      explorationArtifact,
-      roles,
-      planSliceFor,
-      backendGenerationSkippedReason,
     });
   }
 
-  return await runPhase1FanOut({
+  // ── Sync feature-based generation ────────────────────────────────────────
+  return await runFeatureBasedGeneration({
     client,
-    agents,
     sharedPayload,
+    parsedPRD: parsedPRD || null,
     testsDir,
     runId,
     statusDir,
     config,
     runBudget,
     telemetryReporter,
-    plan,
-    planMeta,
-    planSliceFor,
-    backendGenerationSkippedReason,
   });
 }
 
@@ -6799,18 +6670,24 @@ async function maybeRunCoverageTopUp({
     const retryBudgetMs = Number.isFinite(remainingMs)
       ? Math.max(15_000, Math.min(90_000, remainingMs - timeoutMs - 15_000))
       : 90_000;
-    const payload = await client.generateTestsForAgent({
-      agent: 'expansion',
-      ...sharedPayload,
+    const payload = await client.generateTestsForFeature({
+      agentType: 'ui',     // coverage top-up maps to the UI feature agent
+      featureId: null,     // not scoped to a specific feature — targets whole suite gaps
       context: feedbackContext,
-      transportTimeoutMs: timeoutMs,
-      transportRetryDelaysMs: [0, 1000, 3000, 8000, 15000, 30000],
-      transportRetryMaxElapsedMs: retryBudgetMs,
+      prd: sharedPayload?.prd || '',
+      parsedPRD: sharedPayload?.parsedPRD || null,
+      explorationArtifact: sharedPayload?.explorationArtifact || null,
+      roles: sharedPayload?.roles || [],
+      testType: sharedPayload?.testType,
+      projectInfo: sharedPayload?.projectInfo || {},
       options: {
         ...(sharedPayload?.options || {}),
         minGeneratedTests: requestedAdditional,
         maxExpansionAttempts: 1,
       },
+      transportTimeoutMs: timeoutMs,
+      transportRetryDelaysMs: [0, 1000, 3000, 8000, 15000, 30000],
+      transportRetryMaxElapsedMs: retryBudgetMs,
     });
 
     const incoming = Array.isArray(payload?.tests) ? payload.tests : [];
@@ -6999,7 +6876,7 @@ async function maybeRunCoverageTopUp({
 }
 
 /**
- * P1 per-agent parallel fan-out — one generateTestsForAgent call per agent,
+ * P1 per-agent parallel fan-out (legacy) — one generateTestsForFeature call per agent,
  * all in flight simultaneously. A rejection in one agent cannot cancel the
  * others; failures accumulate in `agentFailures[]` and we only hard-fail the
  * stage if every agent rejected AND nothing landed on disk.
@@ -7091,28 +6968,32 @@ async function runPhase1FanOut({
     Math.min(12, Math.ceil(globalMinGeneratedTests / Math.max(1, agents.length))),
   );
 
+  // Map legacy agent names to new feature-based agent types
+  const legacyAgentTypeMap = { smoke: 'ui', frontend: 'ui', workflow: 'ui', error: 'ui', expansion: 'ui', api: 'api' };
+
   async function runAgent(agent) {
     try {
-      const agentSlice = planSliceFor(agent);
+      const agentType = legacyAgentTypeMap[agent] || 'ui';
       const agentPayload = {
-        agent,
-        ...sharedPayload,
+        agentType,
+        featureId: null,   // legacy fan-out is not scoped to a single feature
+        context: sharedPayload.context,
+        prd: sharedPayload.prd,
+        parsedPRD: sharedPayload.parsedPRD,
+        explorationArtifact: sharedPayload.explorationArtifact,
+        roles: sharedPayload.roles,
+        testType: sharedPayload.testType,
+        projectInfo: sharedPayload.projectInfo,
         transportTimeoutMs: agentTransportTimeoutMs,
         options: {
           ...(sharedPayload.options || {}),
-          // The aggregate MCP quality gate enforces the full run minimum after
-          // every agent has landed. Per-agent calls should target their slice,
-          // not each attempt to generate the entire suite by itself.
           minGeneratedTests: perAgentMinGeneratedTests,
           maxExpansionAttempts: Number.isFinite(Number(sharedPayload.options?.maxExpansionAttempts))
             ? Number(sharedPayload.options.maxExpansionAttempts)
             : 0,
         },
       };
-      if (plan && agentSlice) {
-        agentPayload.plan = { slice: agentSlice, planVersion: 1 };
-      }
-      const payload = await client.generateTestsForAgent(agentPayload);
+      const payload = await client.generateTestsForFeature(agentPayload);
       const beforeWriteCount = files.length;
 
         // ── Token usage logging ──────────────────────────────────────────
@@ -7417,11 +7298,445 @@ async function runPhase1FanOut({
   };
 }
 
+// ── Feature-manifest helpers ─────────────────────────────────────────────────
+
 /**
- * P2-h async generation path. Enqueues one job on the webapp orchestrator
+ * Convert a feature name to a URL-safe slug (mirrors agent-dispatcher.ts).
+ */
+function featureNameToSlug(name) {
+  return (name || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'feature';
+}
+
+/**
+ * Extract exported `async function` signatures from an actions file.
+ * Produces an array of { name, params[] } objects (mirrors agent-dispatcher.ts).
+ */
+function extractActionSignatures(content) {
+  const fnRegex = /export\s+async\s+function\s+(\w+)\s*\(([^)]*)\)/g;
+  const actions = [];
+  let m;
+  while ((m = fnRegex.exec(content)) !== null) {
+    const name = m[1];
+    const rawParams = m[2].trim();
+    const params = rawParams ? rawParams.split(',').map((p) => p.trim()).filter(Boolean) : [];
+    actions.push({ name, params });
+  }
+  return actions;
+}
+
+/**
+ * Detect the auth feature in parsedPRD.
+ * First tries name-pattern match; falls back to first feature with authRequired AC.
+ * Returns the feature object or null.
+ */
+function detectAuthFeatureFromPRD(parsedPRD) {
+  if (!parsedPRD?.features?.length) return null;
+  const AUTH_NAMES = /^(auth|authentication|login|sign.?in|sign.?up|register|account)$/i;
+  for (const feature of parsedPRD.features) {
+    if (AUTH_NAMES.test((feature.name || '').trim())) return feature;
+  }
+  for (const feature of parsedPRD.features) {
+    for (const story of feature.userStories || []) {
+      for (const ac of story.acceptanceCriteria || []) {
+        if (ac.authRequired) return feature;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Build a feature-based playwright.config.ts content string.
+ *
+ * Projects:
+ *   auth-setup   → runs *\/auth-setup.ts (Playwright setup fixture — writes .healix/{role}.json)
+ *   {slug}       → runs *\/{slug}-*.spec.ts (depends on auth-setup when auth is present)
+ *   e2e          → runs *\/e2e-workflows.spec.ts (depends on all feature projects)
+ *
+ * @param {object} opts
+ * @param {{ id: string, name: string }[]} opts.features
+ * @param {string|null}  opts.authFeatureId
+ * @param {{ name?: string, role?: string }[]} opts.roles
+ * @param {'frontend'|'backend'|'both'} opts.testType
+ * @param {string} opts.baseURL
+ */
+function buildFeaturePlaywrightConfig({ features, authFeatureId, roles, testType, baseURL = 'http://localhost:3000' }) {
+  const defaultRole = (roles[0])
+    ? ((roles[0].name || roles[0].role || 'user').toLowerCase().replace(/[^a-z0-9_-]/g, ''))
+    : 'user';
+
+  const nonAuthFeatures = features.filter((f) => f.id !== authFeatureId);
+  const hasAuth = authFeatureId !== null && authFeatureId !== undefined;
+
+  const specPatternFor = (slug) => {
+    if (testType === 'frontend') return `**/${slug}-ui.spec.ts`;
+    if (testType === 'backend') return `**/${slug}-api.spec.ts`;
+    return `**/${slug}-*.spec.ts`;
+  };
+
+  const featureProjectLines = nonAuthFeatures.map((f) => {
+    const slug = featureNameToSlug(f.name);
+    const storageState = hasAuth ? `\n      use: { storageState: '.healix/${defaultRole}.json' },` : '';
+    const deps = hasAuth ? `\n      dependencies: ['auth-setup'],` : '';
+    return `    {
+      name: '${slug}',
+      testMatch: '${specPatternFor(slug)}',${deps}${storageState}
+    }`;
+  });
+
+  const allFeatureSlugs = nonAuthFeatures.map((f) => `'${featureNameToSlug(f.name)}'`).join(', ');
+
+  const authProject = hasAuth
+    ? `    {
+      name: 'auth-setup',
+      testMatch: '**/auth-setup.ts',
+    },\n`
+    : '';
+
+  const e2eProject = `    {
+      name: 'e2e',
+      testMatch: '**/e2e-workflows.spec.ts',
+      ${allFeatureSlugs ? `dependencies: [${allFeatureSlugs}],` : ''}
+    }`;
+
+  return `// playwright.config.ts — generated by Healix. Do not edit manually.
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/generated',
+  timeout: 60000,
+  fullyParallel: false,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: [
+    ['list'],
+    ['json', { outputFile: 'healix-reports/results/results.json' }],
+    ['html', { open: 'never', outputFolder: 'healix-reports/html-report' }],
+  ],
+  use: {
+    baseURL: '${baseURL}',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+  projects: [
+${authProject}${featureProjectLines.join(',\n')},
+${e2eProject},
+  ],
+});
+`;
+}
+
+/**
+ * Feature-based sync generation path.
+ *
+ * Implements the 5-step pipeline:
+ *   Step 1: Parse PRD (already done — passed in as parsedPRD)
+ *   Step 2: Auth feature (blocking, always first)
+ *   Step 3: Feature loop (sequential across features; UI + API parallel per feature per testType)
+ *   Step 4: E2E generation (after all features, with featureManifest)
+ *   Step 5: Write playwright.config.ts
+ *
+ * Returns the same shape as runPhase1FanOut:
+ *   { generated, files, provider, generationMeta }
+ */
+async function runFeatureBasedGeneration({
+  client,
+  sharedPayload,
+  parsedPRD,
+  testsDir,
+  runId,
+  statusDir,
+  config,
+  runBudget = null,
+  telemetryReporter = null,
+}) {
+  const used = seedUsedFilenamesFromDisk(testsDir);
+  const files = [];
+  const agentFailures = [];
+  const agentsCompleted = [];
+  const allTokenRuns = [];
+  let doneCount = 0;
+
+  const testType = String(sharedPayload.testType || 'both').toLowerCase();
+
+  // Helper: write tests from a generation result to disk
+  const writeTests = (tests, agentLabel) => {
+    const writtenFiles = [];
+    for (const test of (tests || [])) {
+      try {
+        const written = safeWriteGeneratedTest(testsDir, test, files.length, agentLabel, used);
+        files.push({ ...written, type: test.type || 'generated', agent: agentLabel });
+        writtenFiles.push(written);
+      } catch (writeErr) {
+        Logger.warn('PipelineWorker', `safeWriteGeneratedTest failed for ${agentLabel}`, {
+          filename: test?.filename,
+          reason: writeErr?.message,
+        });
+      }
+    }
+    return writtenFiles;
+  };
+
+  // Helper: log token usage from agentRuns[]
+  const logTokenRuns = (agentRuns, fallbackLabel) => {
+    const REAL_TOKENS_PER_DISPLAY_UNIT = 4800;
+    if (Array.isArray(agentRuns) && agentRuns.length > 0) {
+      for (const run of agentRuns) {
+        allTokenRuns.push(run);
+        const displayUnits = Math.floor((run.tokensTotal || 0) / REAL_TOKENS_PER_DISPLAY_UNIT);
+        Logger.info('PipelineWorker', `[TOKEN USAGE] agent=${run.agent || fallbackLabel} prompt=${run.tokensPrompt ?? 'n/a'} completion=${run.tokensCompletion ?? 'n/a'} total=${run.tokensTotal ?? 'n/a'} displayUnits=${displayUnits}`);
+      }
+    } else {
+      Logger.info('PipelineWorker', `[TOKEN USAGE] agent=${fallbackLabel} — no agentRuns in response`);
+    }
+  };
+
+  // Helper: call one feature agent and handle success/failure
+  const callFeatureAgent = async ({ featureId, agentType, featureSlug, featureManifest }) => {
+    const agentLabel = `${featureSlug}-${agentType}`;
+    try {
+      const agentTransportTimeoutMs = computeGenerationAgentTimeoutMs({
+        config,
+        runBudget,
+        agents: ['feature'],   // approximate — single-agent equivalent
+        concurrency: 1,
+        context: sharedPayload.context,
+        parsedPRD,
+        projectInfo: sharedPayload.projectInfo,
+      });
+      const payload = await client.generateTestsForFeature({
+        featureId: featureId || null,
+        agentType,
+        featureManifest: Array.isArray(featureManifest) && featureManifest.length > 0 ? featureManifest : undefined,
+        context: sharedPayload.context,
+        prd: sharedPayload.prd,
+        parsedPRD: sharedPayload.parsedPRD,
+        explorationArtifact: sharedPayload.explorationArtifact,
+        roles: sharedPayload.roles,
+        testType: sharedPayload.testType,
+        projectInfo: sharedPayload.projectInfo,
+        options: sharedPayload.options,
+        transportTimeoutMs: agentTransportTimeoutMs,
+      });
+
+      logTokenRuns(payload?.agentRuns, agentLabel);
+      const writtenFiles = writeTests(payload?.tests || [], agentLabel);
+      agentsCompleted.push(agentLabel);
+      doneCount += 1;
+
+      if (statusDir) {
+        try {
+          updateStatus(statusDir, 'generating_tests', {
+            runId,
+            agent: agentLabel,
+            agentsCompleted: doneCount,
+            generatedCount: files.length,
+          }, telemetryReporter);
+        } catch { /* status writes are best-effort */ }
+      }
+      return { ok: true, files: writtenFiles, payload };
+    } catch (err) {
+      agentFailures.push({
+        agent: agentLabel,
+        code: err?.code || 'AGENT_FAILED',
+        message: err?.message || String(err),
+      });
+      Logger.warn('PipelineWorker', `Feature agent failed: ${agentLabel}`, {
+        code: err?.code,
+        reason: err?.message,
+      });
+      if (statusDir) {
+        try {
+          recordRunDecision(statusDir, telemetryReporter, {
+            runId,
+            decisionType: 'generation_agent_result',
+            phase: 'generating_tests',
+            status: 'error',
+            errorCode: err?.code || 'AGENT_FAILED',
+            reason: err?.message,
+            message: `${agentLabel} generation failed`,
+            metadata: { agent: agentLabel, generatedCount: files.length },
+          });
+        } catch { /* noop */ }
+      }
+      return { ok: false, error: err };
+    }
+  };
+
+  // Detect auth feature
+  const authFeature = detectAuthFeatureFromPRD(parsedPRD);
+  const authFeatureId = authFeature ? authFeature.id : null;
+
+  if (statusDir) {
+    updateStatus(statusDir, 'generating_tests', {
+      runId,
+      message: 'Feature-based generation starting...',
+      authFeatureId,
+      totalFeatures: parsedPRD?.features?.length || 0,
+    }, telemetryReporter);
+  }
+
+  // ── Step 2: Auth feature (blocking) ────────────────────────────────────────
+  if (authFeature) {
+    const authSlug = featureNameToSlug(authFeature.name);
+    Logger.info('PipelineWorker', `[Feature Gen] Step 2 — auth agent: ${authSlug}`);
+    await callFeatureAgent({ featureId: authFeatureId, agentType: 'auth', featureSlug: authSlug });
+  }
+
+  // ── Step 3: Feature loop (sequential, UI+API parallel per feature) ─────────
+  const featureManifest = [];
+  const nonAuthFeatures = (parsedPRD?.features || []).filter((f) => f.id !== authFeatureId);
+
+  for (const feature of nonAuthFeatures) {
+    const featureSlug = featureNameToSlug(feature.name);
+    const agentTypes = testType === 'frontend' ? ['ui']
+      : testType === 'backend' ? ['api']
+      : ['ui', 'api'];
+
+    Logger.info('PipelineWorker', `[Feature Gen] Step 3 — feature: ${featureSlug} agents: [${agentTypes.join(', ')}]`);
+    if (statusDir) {
+      updateStatus(statusDir, 'generating_tests', {
+        runId,
+        message: `Generating tests for feature: ${featureSlug}`,
+        feature: featureSlug,
+      }, telemetryReporter);
+    }
+
+    // Run UI + API (or subset) in parallel for this feature
+    const results = await Promise.all(
+      agentTypes.map((agentType) => callFeatureAgent({ featureId: feature.id, agentType, featureSlug }))
+    );
+
+    // Build feature manifest entry from the UI agent's generated actions file
+    const uiIdx = agentTypes.indexOf('ui');
+    if (uiIdx >= 0 && results[uiIdx]?.ok) {
+      const uiWrittenFiles = results[uiIdx].files || [];
+      const actionsFile = uiWrittenFiles.find((f) => f.filename?.endsWith('-actions.ts'));
+      if (actionsFile) {
+        try {
+          const actionsContent = fs.readFileSync(path.join(testsDir, actionsFile.filename), 'utf-8');
+          const actions = extractActionSignatures(actionsContent);
+          featureManifest.push({
+            featureId: feature.id,
+            featureSlug,
+            featureName: feature.name,
+            actionsFile: actionsFile.filename,
+            actions,
+          });
+        } catch (readErr) {
+          Logger.warn('PipelineWorker', `Could not build feature manifest for ${featureSlug}`, {
+            filename: actionsFile?.filename,
+            reason: readErr?.message,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Step 4: E2E generation (after all features) ────────────────────────────
+  Logger.info('PipelineWorker', `[Feature Gen] Step 4 — e2e agent (featureManifest entries: ${featureManifest.length})`);
+  if (statusDir) {
+    updateStatus(statusDir, 'generating_tests', {
+      runId,
+      message: 'Running E2E agent...',
+      featureManifestCount: featureManifest.length,
+    }, telemetryReporter);
+  }
+  await callFeatureAgent({ featureId: null, agentType: 'e2e', featureSlug: 'e2e', featureManifest });
+
+  // ── Step 5: Write playwright.config.ts ────────────────────────────────────
+  const allFeatures = parsedPRD?.features || [];
+  if (allFeatures.length > 0) {
+    const configCandidates = [
+      'playwright.config.ts', 'playwright.config.js',
+      'playwright.config.mjs', 'playwright.config.cjs',
+    ];
+    const existingConfig = configCandidates.find((c) => fs.existsSync(path.join(config.projectPath, c)));
+    if (existingConfig) {
+      Logger.info('PipelineWorker', `[Feature Gen] Step 5 — existing playwright config detected (${existingConfig}), skipping dynamic generation`);
+    } else {
+      try {
+        const configContent = buildFeaturePlaywrightConfig({
+          features: allFeatures,
+          authFeatureId,
+          roles: sharedPayload.roles || [],
+          testType,
+          baseURL: sharedPayload.projectInfo?.baseURL || config.baseURL || 'http://localhost:3000',
+        });
+        const configPath = path.join(config.projectPath, 'playwright.config.ts');
+        fs.writeFileSync(configPath, configContent, 'utf-8');
+        Logger.info('PipelineWorker', '[Feature Gen] Step 5 — wrote playwright.config.ts', { configPath });
+      } catch (cfgErr) {
+        Logger.warn('PipelineWorker', '[Feature Gen] Step 5 — failed to write playwright.config.ts (non-fatal)', {
+          reason: cfgErr?.message,
+        });
+      }
+    }
+  }
+
+  // ── Aggregate token summary ────────────────────────────────────────────────
+  {
+    const REAL_TOKENS_PER_DISPLAY_UNIT = 4800;
+    let totalPrompt = 0, totalCompletion = 0, totalReal = 0;
+    for (const run of allTokenRuns) {
+      totalPrompt += run.tokensPrompt || 0;
+      totalCompletion += run.tokensCompletion || 0;
+      totalReal += run.tokensTotal || 0;
+    }
+    const totalDisplayUnits = Math.floor(totalReal / REAL_TOKENS_PER_DISPLAY_UNIT);
+    Logger.info('PipelineWorker', `[TOKEN SUMMARY] Feature-based generation complete — totalRealTokens=${totalReal} (prompt=${totalPrompt} completion=${totalCompletion}) displayUnitsConsumed=${totalDisplayUnits}`);
+  }
+
+  // Hard fail: all agents failed AND nothing on disk
+  if (files.length === 0 && agentFailures.length > 0) {
+    const firstFailure = agentFailures[0];
+    const err = new Error(
+      `All ${agentFailures.length} feature agent(s) failed` +
+      (firstFailure ? `: ${firstFailure.agent}=${firstFailure.code}` : '')
+    );
+    err.code = firstFailure?.code || 'GENERATION_FAILED';
+    err.agentFailures = agentFailures;
+    err.agentsRequested = agentsCompleted.concat(agentFailures.map((f) => f.agent));
+    err.agentsCompleted = agentsCompleted;
+    throw err;
+  }
+
+  if (files.length === 0) {
+    const err = new Error('Feature-based generation returned zero tests');
+    err.code = 'AGENTS_RETURNED_ZERO_TESTS';
+    err.agentFailures = agentFailures;
+    throw err;
+  }
+
+  installMissingDependencies(config.projectPath, testsDir);
+
+  return {
+    generated: files.length,
+    files,
+    provider: 'saas',
+    generationMeta: {
+      chunkingStrategy: 'feature_based',
+      agentsRequested: agentsCompleted.concat(agentFailures.map((f) => f.agent)),
+      agentsCompleted,
+      agentFailures,
+      partialsWrittenCount: files.length,
+      featureCount: nonAuthFeatures.length + (authFeature ? 1 : 0),
+      authFeatureId,
+      featureManifestCount: featureManifest.length,
+    },
+  };
+}
+
+/**
+ * Async generation path (Inngest). Enqueues one job on the webapp orchestrator
  * and polls for partials, writing each new test spec to disk as it arrives
- * (dedupe by filename). Falls back to the Phase-1 fan-out if the webapp
- * replies with {mode:'sync'} (i.e. the server doesn't speak async yet).
+ * (dedupe by filename). Falls back to the feature-based sync path if the webapp
+ * replies with {mode:'sync'} (i.e. the server doesn't support async yet).
+ *
+ * The Inngest orchestrator handles feature fan-out internally (auth → feature
+ * loop → e2e) using `parsedPRD.features[]` from the job payload.
  *
  * Error policy:
  *   - client.generateTestsAsync throws → propagate; outer tryGenerator handles.
@@ -7433,26 +7748,15 @@ async function runPhase1FanOut({
  */
 async function runAsyncGenerationPath({
   client,
-  agents,
   sharedPayload,
   testsDir,
   runId,
   statusDir,
   runBudget,
   telemetryReporter = null,
-  plan,
-  planMeta,
   config,
-  planSliceFor,
-  backendGenerationSkippedReason = null,
 }) {
-  // Build a whole-plan slice for the orchestrator (it fans out internally).
-  const planArg = plan
-    ? { slice: plan, planVersion: 1 }
-    : undefined;
-
   const enqueueResp = await client.generateTestsAsync({
-    agents,
     context: sharedPayload.context,
     prd: sharedPayload.prd,
     parsedPRD: sharedPayload.parsedPRD,
@@ -7460,22 +7764,12 @@ async function runAsyncGenerationPath({
     roles: sharedPayload.roles,
     projectInfo: sharedPayload.projectInfo,
     options: sharedPayload.options,
-    plan: planArg,
     idempotencyKey: runId ? `${runId}-saas-gen-v1` : undefined,
   });
 
-  // Back-compat: older webapp returned a full sync payload. Two options:
-  //   (1) write the payload's tests here inline, (2) fall through to Phase-1.
-  // (2) is simpler + keeps the sync-path invariants, so call runPhase1FanOut.
-  // Note: the sync payload itself contains pre-computed tests but those came
-  // from the webapp's legacy non-async pipeline — there's no harm writing
-  // them here directly since that's what Phase-1 would have produced. But
-  // for simplicity (and to keep a single source of truth for the sync
-  // contract), we just re-invoke the fan-out loop, which will call
-  // generateTestsForAgent the same way the non-async branch does.
-  //
-  // Exception: if the sync payload actually carries tests, prefer writing
-  // them directly — avoids a second round-trip.
+  // Back-compat: older webapp returned a full sync payload. If it carries
+  // tests, write them directly; otherwise fall back to the feature-based
+  // sync path.
   if (enqueueResp?.mode === 'sync') {
     const syncPayload = enqueueResp.payload || {};
     const syncTests = Array.isArray(syncPayload.tests) ? syncPayload.tests : null;
@@ -7529,13 +7823,10 @@ async function runAsyncGenerationPath({
         provider: 'saas',
         generationMeta: {
           chunkingStrategy: 'async_sync_fallback',
-          agentsRequested: agents,
+          agentsRequested: [],
           agentsCompleted: [],
           agentFailures: [],
           partialsWrittenCount: files.length,
-          plannedTests: plan?.totalPlannedTests ?? 0,
-          planStatus: planMeta?.status || null,
-          backendGenerationSkippedReason,
           ...(syncPayload.generationMeta || {}),
           coverageTopUps,
           coverageRetry: topUpEvent?.coverageRetry || null,
@@ -7543,28 +7834,22 @@ async function runAsyncGenerationPath({
       };
     }
 
-    // No tests in the sync payload → degrade all the way to Phase-1 fan-out.
-    return await runPhase1FanOut({
+    // No tests in the sync payload → fall back to the feature-based sync path.
+    return await runFeatureBasedGeneration({
       client,
-      agents,
       sharedPayload,
+      parsedPRD: sharedPayload.parsedPRD || null,
       testsDir,
       runId,
       statusDir,
       config,
       runBudget,
       telemetryReporter,
-      plan,
-      planMeta,
-      planSliceFor,
-      backendGenerationSkippedReason,
     });
   }
 
-  const { jobId, agentsRequested } = enqueueResp;
-  const agentsRequestedList = Array.isArray(agentsRequested) && agentsRequested.length > 0
-    ? agentsRequested
-    : agents;
+  const { jobId } = enqueueResp;
+  const agentsRequestedList = [];
 
   if (statusDir) {
     try {
@@ -7777,9 +8062,6 @@ async function runAsyncGenerationPath({
       agentsCompleted: agentsCompletedList,
       agentFailures,
       partialsWrittenCount: files.length,
-      plannedTests: plan?.totalPlannedTests ?? 0,
-      planStatus: planMeta?.status || null,
-      backendGenerationSkippedReason,
       ...(finalResp?.generationMeta || {}),
       coverageTopUps,
       coverageRetry,
@@ -10949,73 +11231,47 @@ async function runPipeline(config, runId) {
           },
         });
       } else {
-        // Either pre-auth failed for some roles OR exploration found a richer
-        // authFlow — run a fresh injection so storageStates use the best available selectors.
-        updateStatus(statusDir, 'auth_injecting', {
-          runId,
-          message: hasTrustedAuthFlow
-            ? `Re-injecting credentials with discovered authFlow for ${config.testCredentials.length} role(s)...`
-            : `Verifying credentials for ${config.testCredentials.length} role(s)...`,
-          authFlowRejected: explorationArtifact?.authFlowRejected || null,
-        }, telemetryReporter);
-        try {
-          const freshRoles = await injectCredentials({
-            projectPath: config.projectPath,
-            baseURL: config.baseURL,
-            credentials: config.testCredentials,
-            authFlow: hasTrustedAuthFlow ? explorationArtifact?.authFlow : null,
+        // In the feature-based generation model, auth is handled by the
+        // generated auth-setup.ts Playwright setup project — no separate
+        // credential injection pass here. Use pre-auth states if available;
+        // otherwise register expected storageState paths so downstream
+        // playwright config and tier-B decisions are populated correctly.
+        if (preAuthRoles.length > 0) {
+          roles = preAuthRoles;
+          Logger.info('PipelineWorker', 'Using pre-auth storageStates for role configuration (auth-setup.ts handles verification at test time)', {
+            roles: roles.map((r) => roleKeyForAuth(r)),
           });
-          const mergedAuth = mergeCredentialInjectionRoles({ freshRoles, preAuthRoles });
-          roles = mergedAuth.roles;
-          const verifiedCount = roles.filter((r) => r.loginVerified).length;
-          updateStatus(statusDir, 'auth_injected', {
-            runId,
-            message: mergedAuth.reusedPreAuthRoles.length > 0
-              ? `${verifiedCount}/${roles.length} role login(s) verified (${mergedAuth.reusedPreAuthRoles.length} reused from pre-auth after reinjection failure)`
-              : `${verifiedCount}/${roles.length} role login(s) verified`,
-            roles: summarizeAuthRoles(roles),
-            reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-            failedFreshRoles: mergedAuth.failedFreshRoles,
-            authFlowRejected: explorationArtifact?.authFlowRejected || null,
-          }, telemetryReporter);
-          recordRunDecision(statusDir, telemetryReporter, {
-            runId,
-            decisionType: 'auth_decision',
-            phase: 'auth_injected',
-            status: verifiedCount > 0 ? (mergedAuth.failedFreshRoles.length > 0 ? 'warning' : 'success') : 'error',
-            message: `${verifiedCount}/${roles.length} role login(s) verified after credential injection.`,
-            metadata: {
-              authDecision: hasTrustedAuthFlow ? 'fresh_injection_with_discovered_flow' : 'fresh_injection_without_flow',
-              totalCredentials: config.testCredentials.length,
-              verifiedCount,
-              roles: summarizeAuthRoles(roles),
-              reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-              failedFreshRoles: mergedAuth.failedFreshRoles,
-              authFlowSource: hasTrustedAuthFlow ? 'trusted_exploration' : 'heuristic_fallback',
-              authFlowRejected: explorationArtifact?.authFlowRejected || null,
-            },
+        } else {
+          // Construct expected role entries from credentials config. The
+          // generated auth-setup.ts will perform the actual login and write
+          // these storageState files before the feature test projects run.
+          roles = config.testCredentials.map((cred) => {
+            const roleLabel = normalizeRoleLabel(cred.role || cred.name || 'user');
+            const storageStatePath = path.join(config.projectPath, '.healix', `auth-state-${roleLabel}.json`);
+            return { role: roleLabel, name: roleLabel, storageStatePath, loginVerified: false };
           });
-        } catch (credErr) {
-          Logger.warn('PipelineWorker', 'Credential injection failed (best-effort)', { reason: credErr.message });
-          // Fall back to whatever pre-auth gave us rather than leaving roles empty.
-          roles = preAuthRoles.length > 0 ? preAuthRoles : [];
-          recordRunDecision(statusDir, telemetryReporter, {
-            runId,
-            decisionType: 'auth_decision',
-            phase: 'auth_injected',
-            status: roles.some(hasVerifiedStorageState) ? 'warning' : 'error',
-            errorCode: credErr?.code || 'AUTH_INJECTION_FAILED',
-            reason: credErr.message,
-            message: 'Credential injection failed; Healix will use any verified pre-auth storage states.',
-            metadata: {
-              authDecision: 'fresh_injection_failed',
-              roles: summarizeAuthRoles(roles),
-              preAuthRoleCount: preAuthRoles.length,
-              authFlowSource: hasTrustedAuthFlow ? 'trusted_exploration' : 'heuristic_fallback',
-              authFlowRejected: explorationArtifact?.authFlowRejected || null,
-            },
+          Logger.info('PipelineWorker', 'Auth deferred to generated auth-setup.ts Playwright setup project', {
+            roles: roles.map((r) => r.role),
           });
         }
+        updateStatus(statusDir, 'auth_injected', {
+          runId,
+          message: `${roles.length} role(s) configured — auth handled by generated auth-setup.ts`,
+          roles: summarizeAuthRoles(roles),
+          authFlowRejected: explorationArtifact?.authFlowRejected || null,
+        }, telemetryReporter);
+        recordRunDecision(statusDir, telemetryReporter, {
+          runId,
+          decisionType: 'auth_decision',
+          phase: 'auth_injected',
+          status: 'success',
+          message: 'Auth deferred to generated auth-setup.ts Playwright setup project.',
+          metadata: {
+            authDecision: 'deferred_to_auth_setup_ts',
+            totalCredentials: config.testCredentials.length,
+            roles: summarizeAuthRoles(roles),
+          },
+        });
       }
     }
 
@@ -11622,85 +11878,11 @@ async function runPipeline(config, runId) {
       },
     });
 
-    // Re-inject credentials just before execution so storageState tokens are
-    // always fresh. Generation can take >13 min and Supabase access tokens
-    // expire in 1h — stale tokens cause middleware to reject the session and
-    // redirect tests to /login or /signup.
-    if (Array.isArray(config.testCredentials) && config.testCredentials.length > 0) {
-      try {
-        const preAuthRoles = Array.isArray(config._preAuthRoles) ? config._preAuthRoles : [];
-        const hasTrustedAuthFlow = shouldTrustDiscoveredAuthFlow(explorationArtifact?.authFlow);
-        updateStatus(statusDir, 'auth_refreshing', {
-          runId,
-          message: `Refreshing auth tokens before execution for ${config.testCredentials.length} role(s)...`,
-          authFlowRejected: explorationArtifact?.authFlowRejected || null,
-        }, telemetryReporter);
-        const freshRoles = await injectCredentials({
-          projectPath: config.projectPath,
-          baseURL: config.baseURL,
-          credentials: config.testCredentials,
-          authFlow: hasTrustedAuthFlow ? explorationArtifact?.authFlow : null,
-        });
-        const mergedAuth = mergeCredentialInjectionRoles({
-          freshRoles,
-          preAuthRoles: roles.filter(hasVerifiedStorageState).length > 0 ? roles : preAuthRoles,
-        });
-        const verifiedFresh = freshRoles.filter(hasVerifiedStorageState);
-        const verifiedMerged = mergedAuth.roles.filter(hasVerifiedStorageState);
-        if (verifiedMerged.length > 0) {
-          roles = mergedAuth.roles;
-          // Rewrite the fixture file so it embeds the freshest storageState paths
-          // (paths don't change but this ensures the file exists post-generation).
-          ensureHealixFixtureImports({ projectPath: config.projectPath, roles: verifiedMerged });
-        }
-        Logger.info('PipelineWorker', 'Pre-execution auth refresh complete', {
-          verified: verifiedFresh.length,
-          total: freshRoles.length,
-          reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-        });
-        if (mergedAuth.reusedPreAuthRoles.length > 0) {
-          updateStatus(statusDir, 'auth_refresh_reused_preauth', {
-            runId,
-            message: `${mergedAuth.reusedPreAuthRoles.length} role(s) kept verified pre-auth storageState after refresh failed`,
-            roles: summarizeAuthRoles(roles),
-            reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-            failedFreshRoles: mergedAuth.failedFreshRoles,
-          }, telemetryReporter);
-        }
-        recordRunDecision(statusDir, telemetryReporter, {
-          runId,
-          decisionType: 'auth_decision',
-          phase: 'auth_refreshing',
-          status: verifiedMerged.length > 0 ? (mergedAuth.reusedPreAuthRoles.length > 0 ? 'warning' : 'success') : 'error',
-          message: `${verifiedMerged.length}/${mergedAuth.roles.length} role(s) have verified auth state before execution.`,
-          metadata: {
-            authDecision: 'pre_execution_refresh',
-            verifiedFreshCount: verifiedFresh.length,
-            verifiedMergedCount: verifiedMerged.length,
-            reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-            failedFreshRoles: mergedAuth.failedFreshRoles,
-            roles: summarizeAuthRoles(roles),
-            authFlowSource: hasTrustedAuthFlow ? 'trusted_exploration' : 'none',
-          },
-        });
-      } catch (refreshErr) {
-        Logger.warn('PipelineWorker', 'Pre-execution auth refresh failed — using existing storageState', {
-          reason: refreshErr.message,
-        });
-        recordRunDecision(statusDir, telemetryReporter, {
-          runId,
-          decisionType: 'auth_decision',
-          phase: 'auth_refreshing',
-          status: roles.some(hasVerifiedStorageState) ? 'warning' : 'error',
-          errorCode: refreshErr?.code || 'AUTH_REFRESH_FAILED',
-          reason: refreshErr.message,
-          message: 'Pre-execution auth refresh failed; existing storage states will be used if present.',
-          metadata: {
-            authDecision: 'pre_execution_refresh_failed',
-            roles: summarizeAuthRoles(roles),
-          },
-        });
-      }
+    // Auth state is managed by the generated auth-setup.ts Playwright setup
+    // project which runs before feature test projects at execution time.
+    // The fixture file is written if any roles have a verified storageStatePath.
+    if (Array.isArray(roles) && roles.filter(hasVerifiedStorageState).length > 0) {
+      ensureHealixFixtureImports({ projectPath: config.projectPath, roles: roles.filter(hasVerifiedStorageState) });
     }
 
     // -------------------------------------------------------

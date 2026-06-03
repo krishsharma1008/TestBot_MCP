@@ -847,9 +847,12 @@ test('Healix validation config targets generated specs without positional path a
     const singleConfig = ensureHealixValidationConfig({ projectPath, targetFilename: 'valid.spec.ts' });
     const allContent = fs.readFileSync(allConfig.configPath, 'utf-8');
     const singleContent = fs.readFileSync(singleConfig.configPath, 'utf-8');
+    // Normalise Windows backslashes (single or doubled-escaped) before asserting
+    // so the same regex works on all OSes.
+    const allContentNorm = allContent.replace(/\\+/g, '/');
 
     assert.match(allContent, /testDir:/);
-    assert.match(allContent, /tests[\\/]generated/);
+    assert.match(allContentNorm, /tests\/generated/);
     assert.match(allContent, /spec\|test/);
     assert.ok(singleContent.includes('valid\\\\.spec\\\\.ts$'));
     assert.doesNotMatch(singleContent, /tests\/generated\/valid\.spec\.ts --list/);
@@ -1180,7 +1183,8 @@ test('QA filter contracts prefer authoritative backend source over public compil
     const filter = qaContracts.filterContracts.find((contract) => contract.id === 'qac-filter-get-api-issues-q');
     assert.equal(filter?.responseField, 'title');
     assert.equal(filter?.operator, 'contains');
-    assert.equal(filter?.sourceFile, 'services/issues-java/src/main/java/io/pulseboard/issues/repo/IssueRepository.java');
+    // Normalise Windows backslashes so the assertion holds on all OSes.
+    assert.equal(filter?.sourceFile?.replace(/\\/g, '/'), 'services/issues-java/src/main/java/io/pulseboard/issues/repo/IssueRepository.java');
   });
 });
 
@@ -1571,7 +1575,7 @@ test('coverage top-up WEBAPP_UNREACHABLE preserves useful pre-topup suite', asyn
     err.code = 'WEBAPP_UNREACHABLE';
     const event = await maybeRunCoverageTopUp({
       client: {
-        async generateTestsForAgent() {
+        async generateTestsForFeature() {
           throw err;
         },
       },

@@ -6,7 +6,7 @@
  *        clones at different absolute paths (same remote URL).
  *   T2 — When the corpus contains a test whose tag matches a Tier-0 contract
  *        id, the Tier-0 emit phase prunes that contract before writing.
- *   T3 — The per-agent payload sent to generateTestsForAgent contains the
+ *   T3 — The per-feature payload sent to generateTestsForFeature contains the
  *        literal substrings `do_not_regenerate:`, the stable IDs from the
  *        corpus, and `prioritize_uncovered:` with at least one AC tag.
  *   T4 — When the corpus endpoint returns an empty seed, generation behaves
@@ -69,10 +69,10 @@ function makeFakeClient(overrides = {}) {
         ? overrides.fetchCorpusImpl(workspaceId, projectFingerprint)
         : { persistedTests: [], coveredAcTags: [], coveredEndpoints: [], lastFindingSignatures: [], contractSnapshots: [], status: 'empty' };
     },
-    async generateTestsForAgent(payload) {
-      calls.push({ method: 'generateTestsForAgent', payload });
-      return overrides.generateTestsForAgentImpl
-        ? overrides.generateTestsForAgentImpl(payload)
+    async generateTestsForFeature(payload) {
+      calls.push({ method: 'generateTestsForFeature', payload });
+      return overrides.generateTestsForFeatureImpl
+        ? overrides.generateTestsForFeatureImpl(payload)
         : { tests: [], generationMeta: {}, agentRuns: [] };
     },
   };
@@ -204,14 +204,15 @@ test('W2-T3: agent payload carries do_not_regenerate, stable IDs, and prioritize
   );
   assert.ok(guidance.prioritizeUncovered.length >= 1, 'prioritize_uncovered list is non-empty');
 
-  // Simulate the agent fan-out: stub generateTestsForAgent and assert the
-  // serialised payload contains the same literal substrings.
+  // Simulate the feature agent call: stub generateTestsForFeature and assert
+  // the serialised payload contains the same literal substrings.
   const client = makeFakeClient({
-    generateTestsForAgentImpl: async (payload) => ({ tests: [], generationMeta: {}, agentRuns: [], received: payload }),
+    generateTestsForFeatureImpl: async (payload) => ({ tests: [], generationMeta: {}, agentRuns: [], received: payload }),
   });
 
   const agentPayload = {
-    agent: 'frontend',
+    agentType: 'ui',
+    featureId: null,
     context: {},
     options: {
       corpusGuidance: guidance.corpusGuidance,
@@ -219,9 +220,9 @@ test('W2-T3: agent payload carries do_not_regenerate, stable IDs, and prioritize
       prioritizeUncovered: guidance.prioritizeUncovered,
     },
   };
-  await client.generateTestsForAgent(agentPayload);
+  await client.generateTestsForFeature(agentPayload);
   const lastCall = client.calls[client.calls.length - 1];
-  assert.equal(lastCall.method, 'generateTestsForAgent');
+  assert.equal(lastCall.method, 'generateTestsForFeature');
 
   const serialised = JSON.stringify(lastCall.payload);
   assert.ok(serialised.includes('do_not_regenerate:'), 'agent payload (JSON) contains do_not_regenerate:');

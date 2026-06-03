@@ -1,57 +1,45 @@
 /**
- * Inngest orchestrator — fans a `generation/job.requested` event out into one
- * `generation/agent.requested` event per enabled agent, waits for every agent
- * to emit `generation/agent.completed`, then finalizes the `generation_jobs`
- * row with an aggregate status (succeeded / partial / failed) and a per-agent
- * outcome breakdown stored inside `result.agentOutcomes`.
+ * Inngest orchestrator — feature-based fan-out.
  *
- * Event contract
- *  - Input:    `generation/job.requested` with `{ jobId }`.
- *  - Fan-out:  `generation/agent.requested` with `{ jobId, agent }` (one per agent).
- *  - Waits on: `generation/agent.completed` with `{ jobId, agent, ok, errorCode?, deduped? }`.
- *              (The sibling agent function emits `deduped: true` for a no-op replay
- *              of the same (jobId, agent) pair; we treat it as `ok: true` for
- *              aggregation since the work has already landed.)
- *  - Output:   `generation/job.completed` with `{ jobId, status, okCount, totalAgents }`
- *              for downstream SSE / webhook fan-in consumers (P2-j et al.).
+ * Implements the 5-step generation flow from the refactoring plan:
  *
- * Idempotency
- *  - `step.run`/`step.sendEvent` are both memoized across the outer function's
- *    retry attempts (Inngest v4 semantics), so fan-out never double-sends on
- *    the 1 retry we allow.
- *  - `mark-running` is a status-guarded UPDATE (WHERE status='queued'); if two
- *    orchestrator runs collide for the same jobId, the second sees
- *    `already_running` and still proceeds — the fan-out events and the per-
- *    agent function are themselves idempotent (via `agents_completed`
- *    membership) so re-execution is harmless.
+ *   Step 1: Parse PRD (already done by the time the job is queued)
+ *   Step 2: Auth feature — blocking, always first
+ *   Step 3: Feature loop — sequential across features; UI + API parallel within each
+ *   Step 4: E2E generation — after all features complete
+ *   Step 5: Dynamic playwright.config.ts — written by the MCP, not here
  *
- * Timeout behavior
- *  - Each per-agent `waitForEvent` has a 12-minute ceiling. If the per-agent
- *    worker exhausts its own retries and never emits `agent.completed`, we
- *    record an AGENT_TIMEOUT outcome for that slot and fold it into the
- *    aggregate status (partial unless every agent timed out, then failed).
- *
- * SDK notes (Inngest v4, pinned ^4.2.4)
- *  - `createFunction` takes `(options, handler)` — the `triggers` array lives
- *    inside `options`. The sibling agent file uses the same shape.
- *  - `step.waitForEvent` accepts a `timeout` option (required) plus an `if`
- *    CEL-ish expression to narrow the match — jobId+agent here.
- *  - `step.sendEvent` accepts an array payload for true batched fan-out; we
- *    use that instead of N separate calls so the fan-out is a single memoized
- *    step.
+ * Event contract (new shape):
+ *   Input:    generation/job.requested        { jobId }
+ *   Fan-out:  generation/feature.requested    { jobId, featureId, agentType, featureSlug }
+ *   Wait on:  generation/feature.completed    { jobId, featureId, agentType, ok, errorCode? }
+ *   Output:   generation/job.completed        { jobId, status, okCount, totalJobs }
  */
 
 import { inngest } from '@/lib/inngest/client'
 import { db } from '@/lib/db'
 import { generationJobs } from '@/lib/db/schema'
 import { and, eq, sql } from 'drizzle-orm'
+import { detectAuthFeature } from '@/lib/test-generation/agent-dispatcher'
+import type { ParsedPRD, FeatureAgentType, FeatureManifest, ActionSignature } from '@/lib/test-generation/types'
 
-interface JobRequestedEventData {
-  jobId: string
+/** Extracts exported async function signatures from an actions file's content. */
+function extractActionSignatures(content: string): ActionSignature[] {
+  const re = /export\s+async\s+function\s+(\w+)\s*\(([^)]*)\)/g
+  const sigs: ActionSignature[] = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(content)) !== null) {
+    sigs.push({ name: m[1], params: m[2].trim() })
+  }
+  return sigs
 }
 
-type AgentOutcome = {
-  agent: string
+interface JobRequestedEventData { jobId: string }
+
+type FeatureOutcome = {
+  featureId: string
+  agentType: FeatureAgentType
+  featureSlug: string
   ok: boolean
   errorCode?: string
 }
@@ -61,174 +49,224 @@ type FinalStatus = 'succeeded' | 'failed' | 'partial'
 export const generateTestsOrchestrator = inngest.createFunction(
   {
     id: 'generate-tests-orchestrator',
-    // One retry is enough: every side-effecting step is memoized, so a retry
-    // only re-runs the steps that actually failed (typically a DB blip).
     retries: 1,
-    concurrency: [
-      // Soft ceiling on in-flight orchestrators. Each orchestrator is mostly
-      // blocked on waitForEvent (cheap), but capping protects the DB from a
-      // surge of fan-out writes.
-      { limit: 50 },
-    ],
+    concurrency: [{ limit: 50 }],
     triggers: [{ event: 'generation/job.requested' }],
   },
   async ({ event, step, logger }) => {
     const { jobId } = event.data as JobRequestedEventData
 
-    // 1. Load the job row once (memoized). If it's gone, abort — nothing to do.
+    // 1. Load job row
     const job = await step.run('load-job', async () => {
-      const [row] = await db
-        .select()
-        .from(generationJobs)
-        .where(eq(generationJobs.id, jobId))
+      const [row] = await db.select().from(generationJobs).where(eq(generationJobs.id, jobId))
       if (!row) return null
-      return {
-        id: row.id,
-        userId: row.userId,
-        status: row.status,
-        agentsRequested: (row.agentsRequested ?? []) as string[],
-      }
+      return { id: row.id, userId: row.userId, status: row.status, payload: row.payload }
     })
     if (!job) {
       logger.warn({ jobId }, 'job not found, orchestrator exiting')
-      return { ok: false, reason: 'job_not_found' as const }
+      return { ok: false, reason: 'job_not_found' }
     }
 
-    // 2. Transition queued→running with a status guard so concurrent
-    //    orchestrator triggers for the same jobId can't double-transition.
-    const transition = await step.run('mark-running', async () => {
-      const result = await db
-        .update(generationJobs)
-        .set({
-          status: 'running',
-          startedAt: sql`COALESCE(started_at, now())`,
-        })
-        .where(
-          and(
-            eq(generationJobs.id, jobId),
-            eq(generationJobs.status, 'queued')
-          )
-        )
-        .returning({ id: generationJobs.id })
-      return result.length > 0 ? 'transitioned' : 'already_running'
-    })
-
-    // 3. Empty-agents guard. The API route should never produce this but if
-    //    it does, finalize immediately so the row doesn't hang in 'running'.
-    const agents = job.agentsRequested.filter(Boolean)
-    if (agents.length === 0) {
-      await step.run('finalize-empty', async () => {
-        await db
-          .update(generationJobs)
-          .set({
-            status: 'failed',
-            completedAt: new Date(),
-            error: { reason: 'no_agents_requested' },
-          })
-          .where(eq(generationJobs.id, jobId))
-      })
-      await step.sendEvent('job-done-empty', {
-        name: 'generation/job.completed',
-        data: {
-          jobId,
-          status: 'failed' as const,
-          okCount: 0,
-          totalAgents: 0,
-        },
-      })
-      logger.warn({ jobId }, 'no agents requested — job marked failed')
-      return { ok: false, reason: 'no_agents_requested' as const }
-    }
-
-    // 4. Fan-out. Inngest v4 supports an array payload on a single sendEvent
-    //    call — memoized once regardless of agent count.
-    await step.sendEvent(
-      'fan-out-agents',
-      agents.map((agent) => ({
-        name: 'generation/agent.requested',
-        data: { jobId, agent },
-      }))
-    )
-
-    // 5. Wait for each agent in parallel. `waitForEvent` returns `null` on
-    //    timeout; we fold that into an AGENT_TIMEOUT outcome below. The `if`
-    //    expression is CEL-ish — jobId is a DB-generated uuid and agent is
-    //    from our own enum, so the single-quoted interpolation is safe.
-    const completions = await Promise.all(
-      agents.map((agent) =>
-        step.waitForEvent(`wait-${agent}`, {
-          event: 'generation/agent.completed',
-          timeout: '12m',
-          if: `event.data.jobId == '${jobId}' && event.data.agent == '${agent}'`,
-        })
-      )
-    )
-
-    // 6. Aggregate. A `deduped: true` completion is treated as a success
-    //    (the work already landed for that agent on a prior orchestrator
-    //    run). A null result means waitForEvent timed out.
-    const agentOutcomes: AgentOutcome[] = agents.map((agent, i) => {
-      const ev = completions[i]
-      if (!ev) return { agent, ok: false, errorCode: 'AGENT_TIMEOUT' }
-      const data = (ev.data ?? {}) as {
-        ok?: boolean
-        errorCode?: string
-        deduped?: boolean
-      }
-      return {
-        agent,
-        ok: Boolean(data.ok),
-        ...(data.errorCode ? { errorCode: data.errorCode } : {}),
-      }
-    })
-    const okCount = agentOutcomes.filter((a) => a.ok).length
-    const finalStatus: FinalStatus =
-      okCount === agents.length
-        ? 'succeeded'
-        : okCount === 0
-          ? 'failed'
-          : 'partial'
-
-    // 7. Persist the aggregate. `jsonb_set` merges agentOutcomes into any
-    //    result.tests / result.errors the per-agent workers already wrote.
-    await step.run('finalize', async () => {
-      const outcomesJson = JSON.stringify(agentOutcomes)
+    // 2. Transition queued → running
+    await step.run('mark-running', async () => {
       await db
         .update(generationJobs)
+        .set({ status: 'running', startedAt: sql`COALESCE(started_at, now())` })
+        .where(and(eq(generationJobs.id, jobId), eq(generationJobs.status, 'queued')))
+    })
+
+    // Extract parsedPRD and testType from frozen payload
+    const payload = (job.payload || {}) as Record<string, unknown>
+    const parsedPRD = (payload.parsedPRD || null) as ParsedPRD | null
+    const testType = ((payload.testType as string) || 'both') as 'frontend' | 'backend' | 'both'
+
+    if (!parsedPRD?.features?.length) {
+      await step.run('finalize-no-prd', async () => {
+        await db.update(generationJobs)
+          .set({ status: 'failed', completedAt: new Date(), error: { reason: 'no_parsed_prd' } })
+          .where(eq(generationJobs.id, jobId))
+      })
+      logger.warn({ jobId }, 'no parsedPRD in payload — job failed')
+      return { ok: false, reason: 'no_parsed_prd' }
+    }
+
+    const featureOutcomes: FeatureOutcome[] = []
+
+    // Helper to derive slug from feature name
+    const toSlug = (name: string) =>
+      name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'feature'
+
+    // ── Step 2: Auth feature (blocking) ────────────────────────────────────
+    const authFeature = detectAuthFeature(parsedPRD)
+    if (authFeature) {
+      const authSlug = toSlug(authFeature.name)
+
+      await step.sendEvent('fan-out-auth', {
+        name: 'generation/feature.requested',
+        data: { jobId, featureId: authFeature.id, agentType: 'auth', featureSlug: authSlug },
+      })
+
+      const authCompletion = await step.waitForEvent('wait-auth', {
+        event: 'generation/feature.completed',
+        timeout: '15m',
+        if: `event.data.jobId == '${jobId}' && event.data.featureId == '${authFeature.id}' && event.data.agentType == 'auth'`,
+      })
+
+      featureOutcomes.push({
+        featureId: authFeature.id,
+        agentType: 'auth',
+        featureSlug: authSlug,
+        ok: authCompletion ? Boolean((authCompletion.data as { ok?: boolean }).ok) : false,
+        errorCode: authCompletion ? ((authCompletion.data as { errorCode?: string }).errorCode) : 'AUTH_TIMEOUT',
+      })
+      logger.info({ jobId, authFeatureId: authFeature.id }, 'auth feature completed')
+    }
+
+    // ── Step 3: Feature loop (sequential, UI+API parallel within each) ────
+    const nonAuthFeatures = parsedPRD.features.filter(
+      (f) => !authFeature || f.id !== authFeature.id
+    )
+
+    for (const feature of nonAuthFeatures) {
+      const featureSlug = toSlug(feature.name)
+
+      // Determine which agents to run based on testType
+      const agentTypes: FeatureAgentType[] =
+        testType === 'frontend' ? ['ui']
+        : testType === 'backend' ? ['api']
+        : ['ui', 'api']
+
+      // Fan out UI and/or API for this feature in parallel
+      await step.sendEvent(`fan-out-${featureSlug}`, agentTypes.map((agentType) => ({
+        name: 'generation/feature.requested',
+        data: { jobId, featureId: feature.id, agentType, featureSlug },
+      })))
+
+      // Wait for all agents for this feature before moving to the next feature
+      const completions = await Promise.all(
+        agentTypes.map((agentType) =>
+          step.waitForEvent(`wait-${featureSlug}-${agentType}`, {
+            event: 'generation/feature.completed',
+            timeout: '15m',
+            if: `event.data.jobId == '${jobId}' && event.data.featureId == '${feature.id}' && event.data.agentType == '${agentType}'`,
+          })
+        )
+      )
+
+      agentTypes.forEach((agentType, i) => {
+        const ev = completions[i]
+        featureOutcomes.push({
+          featureId: feature.id,
+          agentType,
+          featureSlug,
+          ok: ev ? Boolean((ev.data as { ok?: boolean }).ok) : false,
+          errorCode: ev ? ((ev.data as { errorCode?: string }).errorCode) : 'FEATURE_TIMEOUT',
+        })
+      })
+
+      logger.info({ jobId, featureId: feature.id, featureSlug }, 'feature agents completed')
+    }
+
+    // ── Step 3.5: Build feature manifest from accumulated *-actions.ts files ─
+    // After all feature agents complete, scan job.result.tests for *-actions.ts
+    // files written by UI agents and extract exported async function signatures.
+    // Write the resulting manifest to job.result.featureManifest so the E2E
+    // agent can compose cross-feature journeys using real action function names.
+    await step.run('build-feature-manifest', async () => {
+      const [row] = await db
+        .select({ result: generationJobs.result })
+        .from(generationJobs)
+        .where(eq(generationJobs.id, jobId))
+      if (!row) return
+
+      type GeneratedFile = { filename?: string; path?: string; content?: string }
+      const tests: GeneratedFile[] = Array.isArray((row.result as Record<string, unknown>)?.tests)
+        ? ((row.result as Record<string, unknown>).tests as GeneratedFile[])
+        : []
+
+      // Build a slug→feature lookup from the non-auth features processed in Step 3
+      const featureBySlug = new Map(
+        nonAuthFeatures.map((f) => [toSlug(f.name), f])
+      )
+
+      const featureManifest: FeatureManifest[] = []
+      for (const file of tests) {
+        const filename = file.filename || file.path || ''
+        if (!filename.endsWith('-actions.ts')) continue
+        // Derive slug from "billing-actions.ts" → "billing"
+        const slug = filename.replace(/-actions\.ts$/, '').replace(/^.*\//, '')
+        const feature = featureBySlug.get(slug)
+        if (!feature) continue
+
+        const sigs: ActionSignature[] = extractActionSignatures(file.content || '')
+        featureManifest.push({
+          featureId: feature.id,
+          featureSlug: slug,
+          featureName: feature.name,
+          actionsFile: filename,
+          actions: sigs,
+        })
+      }
+
+      if (featureManifest.length > 0) {
+        const manifestJson = JSON.stringify(featureManifest)
+        await db.execute(sql`
+          UPDATE generation_jobs
+          SET result = jsonb_set(
+            COALESCE(result, '{}'::jsonb),
+            '{featureManifest}',
+            ${manifestJson}::jsonb
+          )
+          WHERE id = ${jobId}
+        `)
+      }
+    })
+
+    // ── Step 4: E2E generation (after all features) ────────────────────────
+    await step.sendEvent('fan-out-e2e', {
+      name: 'generation/feature.requested',
+      data: { jobId, featureId: 'e2e', agentType: 'e2e', featureSlug: 'e2e' },
+    })
+
+    const e2eCompletion = await step.waitForEvent('wait-e2e', {
+      event: 'generation/feature.completed',
+      timeout: '15m',
+      if: `event.data.jobId == '${jobId}' && event.data.featureId == 'e2e' && event.data.agentType == 'e2e'`,
+    })
+
+    featureOutcomes.push({
+      featureId: 'e2e',
+      agentType: 'e2e',
+      featureSlug: 'e2e',
+      ok: e2eCompletion ? Boolean((e2eCompletion.data as { ok?: boolean }).ok) : false,
+      errorCode: e2eCompletion ? ((e2eCompletion.data as { errorCode?: string }).errorCode) : 'E2E_TIMEOUT',
+    })
+
+    // ── Step 5: Finalize ───────────────────────────────────────────────────
+    const okCount = featureOutcomes.filter((o) => o.ok).length
+    const totalJobs = featureOutcomes.length
+    const finalStatus: FinalStatus =
+      okCount === totalJobs ? 'succeeded'
+      : okCount === 0 ? 'failed'
+      : 'partial'
+
+    await step.run('finalize', async () => {
+      const outcomesJson = JSON.stringify(featureOutcomes)
+      await db.update(generationJobs)
         .set({
           status: finalStatus,
           completedAt: new Date(),
-          result: sql`jsonb_set(COALESCE(${generationJobs.result}, '{}'::jsonb), '{agentOutcomes}', ${outcomesJson}::jsonb)`,
+          result: sql`jsonb_set(COALESCE(${generationJobs.result}, '{}'::jsonb), '{featureOutcomes}', ${outcomesJson}::jsonb)`,
         })
         .where(eq(generationJobs.id, jobId))
     })
 
-    // 8. Terminal signal for future SSE / webhook consumers.
     await step.sendEvent('job-done', {
       name: 'generation/job.completed',
-      data: {
-        jobId,
-        status: finalStatus,
-        okCount,
-        totalAgents: agents.length,
-      },
+      data: { jobId, status: finalStatus, okCount, totalJobs },
     })
 
-    logger.info(
-      {
-        jobId,
-        finalStatus,
-        okCount,
-        totalAgents: agents.length,
-        transition,
-      },
-      'orchestrator finalized'
-    )
-    return {
-      ok: true as const,
-      finalStatus,
-      okCount,
-      totalAgents: agents.length,
-    }
+    logger.info({ jobId, finalStatus, okCount, totalJobs }, 'orchestrator finalized')
+    return { ok: true, finalStatus, okCount, totalJobs }
   }
 )
