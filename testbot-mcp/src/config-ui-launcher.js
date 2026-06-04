@@ -30,11 +30,31 @@ const PRD_FILE_SCHEMA = z.object({
   textContent: z.string().min(1).max(500000),
 });
 
+// One row per service in the multi-service form. `isPrimary` marks the service
+// whose URL/port the test runner (exploration, auth, Playwright) targets; the
+// others are auxiliary processes that just need to be running. host defaults
+// to 'localhost' downstream; path is the sub-directory the start command runs
+// from (e.g. 'frontend', 'apps/api') — '.' / empty means project root.
+const SERVICE_SCHEMA = z.object({
+  role: z.string().min(1).max(40).optional(),
+  host: z.string().min(1).max(255).optional(),
+  port: z.number().int().min(1).max(65535),
+  path: z.string().max(500).optional(),
+  startCommand: z.string().min(1).max(500),
+  isPrimary: z.boolean().optional(),
+  framework: z.string().max(100).optional(),
+}).passthrough();
+
 const CONFIG_UI_PAYLOAD_SCHEMA = z.object({
   testType: z.enum(['frontend', 'backend', 'both']),
   scope: z.enum(['codebase', 'diff']).optional(),
   baseURL: z.string().url(),
   startCommand: z.string().min(1).max(500),
+  // When present, services[] is the source of truth and the top-level
+  // baseURL/startCommand are echoes of the primary service. We still require
+  // the top-level fields so single-service repos and older form versions keep
+  // working without conditional code.
+  services: z.array(SERVICE_SCHEMA).max(10).optional(),
   generateTests: z.boolean(),
   openDashboard: z.boolean(),
   credentials: z.union([
@@ -145,6 +165,24 @@ class ConfigUILauncher {
       phaseMode: projectInfo.phaseMode || 'two-phase',
       serverPort: String(this.config.port),
     });
+
+    // Pre-fill the multi-service form when the detector found more than one.
+    // The form falls back to its single-card layout when this param is absent
+    // or the array has ≤1 entry — so single-service repos render unchanged.
+    if (Array.isArray(projectInfo.services) && projectInfo.services.length > 1) {
+      const slim = projectInfo.services.map((svc) => ({
+        role: svc.role || null,
+        host: svc.host || 'localhost',
+        port: svc.port || null,
+        path: svc.path || null,
+        startCommand: svc.startCommand || '',
+        framework: svc.framework || null,
+        // The detector doesn't set isPrimary today; the form picks a default
+        // (frontend / fullstack first, else first row) and the user can change it.
+        isPrimary: !!svc.isPrimary,
+      }));
+      params.set('services', JSON.stringify(slim));
+    }
 
     return `http://localhost:${this.config.port}/config-form.html?${params.toString()}`;
   }

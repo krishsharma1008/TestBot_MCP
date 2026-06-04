@@ -68,7 +68,7 @@ const {
   ensureQaContractSpec,
   auditQaContractCoverage,
 } = require('../src/qa-contracts');
-const { startSecondaryServices } = require('../src/multi-service-starter');
+const { startSecondaryServices, splitServices } = require('../src/multi-service-starter');
 const ReportGenerator = require('../src/report-generator');
 
 function withGeneratedSuite(content, fn) {
@@ -3528,4 +3528,62 @@ test('report generator only persists deterministic or classifier-confirmed app f
   } finally {
     fs.rmSync(projectPath, { recursive: true, force: true });
   }
+});
+
+test('splitServices honors explicit isPrimary flag from the UI', () => {
+  // When the user picks a backend as primary in the multi-service form, the
+  // backend must come back as primary (not the frontend, as the old hard-
+  // coded heuristic always did).
+  const services = [
+    { role: 'frontend', port: 3001, startCommand: 'cd web && npm run dev' },
+    { role: 'backend', port: 8000, startCommand: 'uvicorn app:main', isPrimary: true },
+  ];
+  const { primary, secondaries } = splitServices(services);
+  assert.equal(primary.role, 'backend');
+  assert.equal(secondaries.length, 1);
+  assert.equal(secondaries[0].role, 'frontend');
+});
+
+test('splitServices falls back to frontend when no isPrimary flag is set', () => {
+  // Detector-only runs (no UI choice) keep the historical behavior: frontend
+  // becomes primary, backend becomes secondary.
+  const services = [
+    { role: 'backend', port: 8000 },
+    { role: 'frontend', port: 3000 },
+  ];
+  const { primary } = splitServices(services);
+  assert.equal(primary.role, 'frontend');
+});
+
+test('splitServices ignores ambiguous isPrimary (>1 marked) and falls back to heuristic', () => {
+  // Defense-in-depth: if the form somehow submits two primaries, the splitter
+  // should not silently pick one — it should fall back to the role-based
+  // heuristic. The upstream validator catches this case loudly; the splitter
+  // is the second line of defense.
+  const services = [
+    { role: 'frontend', port: 3000, isPrimary: true },
+    { role: 'backend', port: 8000, isPrimary: true },
+  ];
+  const { primary } = splitServices(services);
+  assert.equal(primary.role, 'frontend'); // heuristic wins
+});
+
+test('splitServices picks fullstack over frontend when both are present', () => {
+  const services = [
+    { role: 'backend', port: 8000 },
+    { role: 'frontend', port: 3000 },
+    { role: 'fullstack', port: 4000 },
+  ];
+  const { primary, secondaries } = splitServices(services);
+  assert.equal(primary.role, 'fullstack');
+  assert.equal(secondaries.length, 2);
+});
+
+test('splitServices handles empty and single-element inputs', () => {
+  assert.deepEqual(splitServices([]), { primary: null, secondaries: [] });
+  assert.deepEqual(splitServices(undefined), { primary: null, secondaries: [] });
+  const solo = [{ role: 'frontend', port: 3000 }];
+  const { primary, secondaries } = splitServices(solo);
+  assert.equal(primary.role, 'frontend');
+  assert.equal(secondaries.length, 0);
 });
