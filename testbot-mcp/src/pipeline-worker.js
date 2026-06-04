@@ -4159,6 +4159,14 @@ function sanitizeGeneratedFilename(rawFilename, fallbackPrefix, index) {
     return defaultName;
   }
 
+  // Helper modules (actions, setup, etc.) keep their .ts extension so that spec
+  // files can import them via `./feature-actions` without a module-resolution
+  // mismatch. Only coerce ambiguous or unnamed files into the .spec.ts convention.
+  const HELPER_FILE_PATTERN = /^[\w-]+-(?:actions|setup|helpers?)\.(?:ts|js)$/i;
+  if (HELPER_FILE_PATTERN.test(base)) {
+    return base;
+  }
+
   if (!GENERATED_SPEC_FILE_PATTERN.test(base)) {
     if (/\.(ts|js)$/i.test(base)) {
       base = base.replace(/\.(ts|js)$/i, '.spec.ts');
@@ -4181,10 +4189,17 @@ function safeWriteGeneratedTest(testsDir, test, index, fallbackPrefix, usedFilen
     throw new Error(`Generated file '${filename}' exceeds size limit`);
   }
 
+  const isSpecFilename = GENERATED_SPEC_FILE_PATTERN.test(filename);
   let safeFilename = filename;
   let suffix = 1;
   while (usedFilenames.has(safeFilename.toLowerCase())) {
-    safeFilename = filename.replace(GENERATED_SPEC_FILE_PATTERN, `-${suffix}.spec.ts`);
+    if (isSpecFilename) {
+      safeFilename = filename.replace(GENERATED_SPEC_FILE_PATTERN, `-${suffix}.spec.ts`);
+    } else {
+      // For helper files (e.g. feature-actions.ts) just overwrite — a renamed
+      // actions file (feature-actions-1.ts) would break spec imports.
+      break;
+    }
     suffix += 1;
   }
   usedFilenames.add(safeFilename.toLowerCase());
@@ -7696,9 +7711,25 @@ async function runFeatureBasedGeneration({
   const authFeature = detectAuthFeatureFromPRD(parsedPRD);
   const authFeatureId = authFeature ? authFeature.id : null;
 
+  // ── Clean feature list ────────────────────────────────────────────────────
+  // parsedPRD (especially source=mixed_chunked) can contain junk entries:
+  //   • Features with no `id` field — README section headers misread as features
+  //     (e.g. "Technologies Used", "PRD").
+  //   • Duplicate ids — the chunked parser emits a consolidated feature with the
+  //     same id as a real one (e.g. two separate "F1" entries).
+  // Build the canonical feature list once here; both slug-map and the loop
+  // share it so they can never diverge.
+  const _seenIds = new Set();
+  const cleanFeatures = (parsedPRD?.features || []).filter((f) => {
+    if (!f.id) return false;             // no id → junk header artifact
+    if (_seenIds.has(f.id)) return false; // duplicate id → keep first occurrence
+    _seenIds.add(f.id);
+    return true;
+  });
+
   // Unique slug per feature — shared by the feature loop (filenames) and
   // playwright.config generation (project names + testMatch) so they never drift.
-  const featureSlugMap = buildFeatureSlugMap(parsedPRD?.features || []);
+  const featureSlugMap = buildFeatureSlugMap(cleanFeatures);
 
   if (statusDir) {
     updateStatus(statusDir, 'generating_tests', {
@@ -7724,7 +7755,8 @@ async function runFeatureBasedGeneration({
   // While F1 is being generated, F2 is already being planned.
 
   const featureManifest = [];
-  const nonAuthFeatures = (parsedPRD?.features || []).filter((f) => f.id !== authFeatureId);
+  // Use the pre-cleaned feature list (junk-filtered + deduped by id).
+  const nonAuthFeatures = cleanFeatures.filter((f) => f.id !== authFeatureId);
 
   // ── Inline async queue ──────────────────────────────────────────────────────
   class AsyncQueue {
@@ -7877,19 +7909,33 @@ async function runFeatureBasedGeneration({
   await callFeatureAgent({ featureId: null, agentType: 'e2e', featureSlug: 'e2e', featureManifest });
 
   // ── Step 5: Write playwright.config.ts ────────────────────────────────────
-  const allFeatures = parsedPRD?.features || [];
-  if (allFeatures.length > 0) {
+  if (cleanFeatures.length > 0) {
     const configCandidates = [
       'playwright.config.ts', 'playwright.config.js',
       'playwright.config.mjs', 'playwright.config.cjs',
     ];
-    const existingConfig = configCandidates.find((c) => fs.existsSync(path.join(config.projectPath, c)));
-    if (existingConfig) {
-      Logger.info('PipelineWorker', `[Feature Gen] Step 5 — existing playwright config detected (${existingConfig}), skipping dynamic generation`);
-    } else {
+    const existingConfigName = configCandidates.find((c) => fs.existsSync(path.join(config.projectPath, c)));
+
+    // Always regenerate if the file was previously written by Healix (marker comment
+    // on the first line). Skip only if the user owns a hand-written config.
+    let shouldWrite = !existingConfigName;
+    if (existingConfigName) {
+      try {
+        const existingContent = fs.readFileSync(path.join(config.projectPath, existingConfigName), 'utf-8');
+        const isHealixGenerated = existingContent.trimStart().startsWith('// playwright.config');
+        if (isHealixGenerated) {
+          shouldWrite = true;
+          Logger.info('PipelineWorker', `[Feature Gen] Step 5 — overwriting Healix-generated ${existingConfigName} with clean config`);
+        } else {
+          Logger.info('PipelineWorker', `[Feature Gen] Step 5 — user-owned ${existingConfigName} detected, skipping dynamic generation`);
+        }
+      } catch { /* treat as user-owned on read error */ }
+    }
+
+    if (shouldWrite) {
       try {
         const configContent = buildFeaturePlaywrightConfig({
-          features: allFeatures,
+          features: cleanFeatures,
           authFeatureId,
           roles: sharedPayload.roles || [],
           testType,

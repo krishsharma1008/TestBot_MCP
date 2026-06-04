@@ -1775,7 +1775,12 @@ Return JSON array only.`
     schemaResult.data.forEach((file, index) => {
       const filename = this.sanitizeFilename(file.filename, prefix, index)
       const normalizedContent = this.normalizeGeneratedContent(file.content)
-      const qualityCheck = this.validateGeneratedContent(normalizedContent, prefix, generationContext)
+      // Helper/actions files have no test() blocks by design — only run spec-quality
+      // checks on actual spec files so actions files aren't silently dropped.
+      const isSpecFile = /\.spec\.ts$/i.test(filename)
+      const qualityCheck = isSpecFile
+        ? this.validateGeneratedContent(normalizedContent, prefix, generationContext)
+        : { valid: true, errors: [] }
       const syntaxCheck = this.validateTypeScriptSyntax(normalizedContent, filename)
 
       if (!qualityCheck.valid || !syntaxCheck.valid) {
@@ -1941,7 +1946,10 @@ Return JSON array only.`
 
     if (!candidate) return fallbackName
 
-    if (!candidate.endsWith('.spec.ts')) {
+    // Helper modules (actions, setup, etc.) keep their original .ts extension so
+    // spec files can resolve `import { ... } from './feature-actions'` correctly.
+    const HELPER_FILE_PATTERN = /^[\w-]+-(?:actions|setup|helpers?)\.(?:ts|js)$/i
+    if (!candidate.endsWith('.spec.ts') && !HELPER_FILE_PATTERN.test(candidate)) {
       if (candidate.endsWith('.ts') || candidate.endsWith('.js')) {
         candidate = candidate.replace(/\.(ts|js)$/i, '.spec.ts')
       } else {

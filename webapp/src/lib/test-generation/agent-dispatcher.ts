@@ -27,6 +27,13 @@ import type {
   TestCaseSpec,
 } from './types'
 
+/** Stub type kept for backward compatibility with planner-agent.ts. */
+export interface AgentPlan {
+  agents: import('./types').AgentName[]
+  reason?: string
+  apiOnly?: boolean
+}
+
 export interface DispatchParams extends GenerateTestsParams {
   generatorConfig?: OpenAITestGeneratorConfig
   onAgentComplete?: AgentCompleteHook
@@ -174,6 +181,57 @@ export function buildFeatureManifestEntry(
 /**
  * Generate a dynamic playwright.config.ts from the feature list and auth roles.
  */
+/**
+ * Backward-compatible multi-agent dispatch for dashboard retries.
+ *
+ * The old API accepted an `agentsAllowlist` of legacy agent names ('smoke',
+ * 'frontend', 'api', etc.). The new feature-based API uses 'ui'/'api'/'e2e'.
+ * This wrapper maps the old names and fans out to multiple `dispatchFeature`
+ * calls, accumulating their results into the shape the retry route expects.
+ */
+export async function dispatchAgents(
+  params: DispatchParams & { agentsAllowlist?: Set<string> }
+): Promise<{ files: GeneratedTestFile[]; summary: DispatchResult['summary'] }> {
+  const LEGACY_TO_FEATURE: Record<string, FeatureAgentType> = {
+    smoke: 'ui',
+    frontend: 'ui',
+    workflow: 'e2e',
+    error: 'ui',
+    expansion: 'ui',
+    api: 'api',
+    ui: 'ui',
+    e2e: 'e2e',
+    auth: 'auth',
+  }
+
+  const allowlist = params.agentsAllowlist
+  const agentTypes: FeatureAgentType[] = allowlist && allowlist.size > 0
+    ? [...new Set([...allowlist].map((a) => LEGACY_TO_FEATURE[a] ?? 'ui'))]
+    : ['ui']
+
+  const allFiles: GeneratedTestFile[] = []
+  let lastSummary: DispatchResult['summary'] | null = null
+
+  for (const agentType of agentTypes) {
+    const result = await dispatchFeature({ ...params, agentType, featureId: null })
+    allFiles.push(...result.files)
+    lastSummary = result.summary
+  }
+
+  return {
+    files: allFiles,
+    summary: lastSummary ?? {
+      totalFiles: 0,
+      files: [],
+      generationMeta: null,
+      generationQuality: null,
+      tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, modelUsed: null },
+      byType: {},
+      agentRuns: [],
+    },
+  }
+}
+
 export function generatePlaywrightConfig({
   features,
   authFeatureId,
