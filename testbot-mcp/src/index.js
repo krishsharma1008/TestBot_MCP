@@ -47,11 +47,25 @@ const PRD_FILE_SCHEMA = z.object({
   textContent: z.string().min(1).max(500000),
 });
 
+// See config-ui-launcher.js / SERVICE_SCHEMA for the canonical shape — kept in
+// sync here because the worker validates the submission a second time before
+// the pipeline takes over. Keep both schemas aligned when extending fields.
+const UI_SERVICE_SCHEMA = z.object({
+  role: z.string().min(1).max(40).optional(),
+  host: z.string().min(1).max(255).optional(),
+  port: z.number().int().min(1).max(65535),
+  path: z.string().max(500).optional(),
+  startCommand: z.string().min(1).max(500),
+  isPrimary: z.boolean().optional(),
+  framework: z.string().max(100).optional(),
+}).passthrough();
+
 const UI_SUBMISSION_SCHEMA = z.object({
   testType: z.enum(['frontend', 'backend', 'both']),
   scope: z.enum(['codebase', 'diff']).optional(),
   baseURL: z.string().url(),
   startCommand: z.string().min(1).max(500),
+  services: z.array(UI_SERVICE_SCHEMA).max(10).optional(),
   generateTests: z.preprocess((v) => typeof v === 'string' ? v === 'true' : v, z.boolean()),
   openDashboard: z.preprocess((v) => typeof v === 'string' ? v === 'true' : v, z.boolean()),
   credentials: z.union([
@@ -381,6 +395,102 @@ class HealixMCPServer {
     return { startCommand: cmd, port: finalPort, baseURL: finalBaseURL, appliedFixes };
   }
 
+  /**
+   * Pick the primary service from a UI submission's services[] array.
+   *
+   * Precedence matches multi-service-starter.splitServices:
+   *   1. Exactly one service with isPrimary: true
+   *   2. First fullstack service
+   *   3. First frontend service
+   *   4. services[0]
+   *
+   * Returns null when no usable services array is present, so callers can
+   * fall through to the legacy flat startCommand/baseURL path.
+   *
+   * The returned baseURL is reconstructed from host+port (the form sends those
+   * fields separately so the user can edit them per row). cwd is computed from
+   * the project root + the service's sub-path for use by autoCorrectPortConfig.
+   */
+  resolveSubmittedPrimary(validatedConfig, projectPath) {
+    const services = Array.isArray(validatedConfig?.services) ? validatedConfig.services : null;
+    if (!services || services.length === 0) return null;
+
+    const explicit = services.filter((s) => s && s.isPrimary === true);
+    let primary = null;
+    if (explicit.length === 1) {
+      primary = explicit[0];
+    } else {
+      primary = services.find((s) => s?.role === 'fullstack')
+        || services.find((s) => s?.role === 'frontend')
+        || services[0];
+    }
+    if (!primary) return null;
+
+    const host = primary.host || 'localhost';
+    const port = primary.port;
+    const baseURL = port ? `http://${host}:${port}` : null;
+    return {
+      startCommand: primary.startCommand,
+      baseURL,
+      port,
+      cwd: primary.path && primary.path !== '.' && projectPath
+        ? path.join(projectPath, primary.path)
+        : null,
+    };
+  }
+
+  /**
+   * Merge a submitted services[] array with the auto-corrected primary so the
+   * pipeline sees a single consistent view: the primary entry carries the
+   * corrected startCommand/baseURL/port, secondaries are passed through, and
+   * exactly one entry has isPrimary: true.
+   *
+   * When no services[] is submitted, returns detectedServices unchanged — the
+   * single-service path is unaffected.
+   */
+  mergeSubmittedServices({ submittedServices, detectedServices, correctedPrimary }) {
+    if (!Array.isArray(submittedServices) || submittedServices.length === 0) {
+      return Array.isArray(detectedServices) ? detectedServices : undefined;
+    }
+
+    // Identify which row is primary using the same precedence as
+    // resolveSubmittedPrimary. We materialize isPrimary on the output rows so
+    // the worker's splitServices doesn't have to re-derive it.
+    const explicit = submittedServices.filter((s) => s && s.isPrimary === true);
+    let primaryIdx = -1;
+    if (explicit.length === 1) {
+      primaryIdx = submittedServices.indexOf(explicit[0]);
+    } else {
+      primaryIdx = submittedServices.findIndex((s) => s?.role === 'fullstack');
+      if (primaryIdx === -1) primaryIdx = submittedServices.findIndex((s) => s?.role === 'frontend');
+      if (primaryIdx === -1) primaryIdx = 0;
+    }
+
+    return submittedServices.map((svc, idx) => {
+      const isPrimary = idx === primaryIdx;
+      if (!isPrimary) {
+        // Secondaries: preserve user-edited values verbatim. Default host to
+        // localhost so downstream readiness probes don't need to special-case
+        // an undefined host.
+        return {
+          ...svc,
+          host: svc.host || 'localhost',
+          isPrimary: false,
+        };
+      }
+      // Primary: overwrite with autoCorrectPortConfig output so the same
+      // command/port/URL is used everywhere downstream.
+      return {
+        ...svc,
+        host: svc.host || 'localhost',
+        port: correctedPrimary?.port || svc.port,
+        startCommand: correctedPrimary?.startCommand || svc.startCommand,
+        baseURL: correctedPrimary?.baseURL || (svc.port ? `http://${svc.host || 'localhost'}:${svc.port}` : undefined),
+        isPrimary: true,
+      };
+    });
+  }
+
   persistUploadedPrd(statusDir, prdPayload) {
     if (!prdPayload?.textContent) {
       return undefined;
@@ -696,16 +806,27 @@ class HealixMCPServer {
       const prdFiles = this.persistUploadedPrdFiles(statusDir, validatedConfig.prdFiles);
       const normalizedCredentials = this.normalizeCredentials(validatedConfig.credentials);
 
+      // When the multi-service form submits a services[] array, the primary
+      // service's startCommand/baseURL/port are the authoritative inputs to
+      // autoCorrectPortConfig (and the rest of the pipeline, which still reads
+      // the flat top-level fields). Choose the primary using the same rules as
+      // multi-service-starter.splitServices so behavior is consistent.
+      const primaryFromSubmission = this.resolveSubmittedPrimary(validatedConfig, baseConfig.projectPath);
+      const submittedStartCommand = primaryFromSubmission?.startCommand || validatedConfig.startCommand;
+      const submittedBaseURL = primaryFromSubmission?.baseURL || validatedConfig.baseURL;
+      const submittedPort = primaryFromSubmission?.port
+        ?? this.extractPortFromBaseURL(validatedConfig.baseURL, baseConfig.port);
+
       // Auto-correct port/startCommand alignment BEFORE the pipeline starts.
       // Without this, a Vite project with submitted port 8000 + startCommand
       // "npm run dev" runs the dev server on Vite's default 5173, leaves 8000
       // empty, and every Playwright test fails with ECONNREFUSED or invalid
       // URL. See autoCorrectPortConfig for the framework-aware logic.
       const corrected = this.autoCorrectPortConfig({
-        projectPath: baseConfig.projectPath,
-        startCommand: validatedConfig.startCommand,
-        port: this.extractPortFromBaseURL(validatedConfig.baseURL, baseConfig.port),
-        baseURL: validatedConfig.baseURL,
+        projectPath: primaryFromSubmission?.cwd || baseConfig.projectPath,
+        startCommand: submittedStartCommand,
+        port: submittedPort,
+        baseURL: submittedBaseURL,
       });
       if (corrected.appliedFixes && corrected.appliedFixes.length > 0) {
         for (const fix of corrected.appliedFixes) {
@@ -721,6 +842,16 @@ class HealixMCPServer {
         ...(corrected.appliedFixes || []),
       ];
 
+      // When the form supplied services[], the user-edited list overrides the
+      // detector's. We also rewrite the primary entry's startCommand/baseURL/
+      // port with the autoCorrectPortConfig output so downstream code sees one
+      // consistent view. Secondaries pass through untouched.
+      const mergedServices = this.mergeSubmittedServices({
+        submittedServices: validatedConfig.services,
+        detectedServices: baseConfig.services,
+        correctedPrimary: corrected,
+      });
+
       const finalConfig = {
         ...baseConfig,
         testType: validatedConfig.testType,
@@ -729,6 +860,7 @@ class HealixMCPServer {
         startCommand: corrected.startCommand,
         baseURL: corrected.baseURL,
         port: corrected.port,
+        services: mergedServices,
         configAutoFixes: allAutoFixes,
         prdFile: prdFile || (prdFiles.length > 0 ? prdFiles[0] : undefined),
         prdFiles: prdFiles.length > 0 ? prdFiles : (prdFile ? [prdFile] : []),
@@ -1847,6 +1979,13 @@ Return the JSON structure above based on what you find in the codebase.
           baseURL: baseConfig.baseURL,
           port: String(baseConfig.port),
           startCommand: baseConfig.startCommand,
+          // Multi-service repos (frontend+backend monorepos) surface every
+          // detected service so the form can render one card per service.
+          // Single-service repos pass undefined and the form keeps its
+          // existing one-card layout.
+          services: Array.isArray(baseConfig.services) && baseConfig.services.length > 1
+            ? baseConfig.services
+            : undefined,
           testType: baseConfig.testType,
           generateTests: baseConfig.generateTests,
           openDashboard: baseConfig.openDashboard,

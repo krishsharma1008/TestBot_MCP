@@ -50,6 +50,17 @@ const DEFAULT_USERNAME_SELECTORS = [
   'input[id*="user" i]',
   'input[autocomplete="username"]',
   'input[autocomplete="email"]',
+  'input[placeholder*="email" i]',
+  'input[placeholder*="user" i]',
+  // Label-bound inputs (no name/id linkage). Playwright resolves the input
+  // following a matching <label> even when htmlFor is missing.
+  'form :text("Username") >> .. >> input:not([type="password"]):not([type="hidden"]):not([type="submit"])',
+  'form :text("Email") >> .. >> input:not([type="password"]):not([type="hidden"]):not([type="submit"])',
+  // Last-resort positional: first non-password text input inside a form that
+  // also contains a password field — covers React forms that bind via state
+  // alone (no name, no id) like the DevAPI Hub demo login.
+  'form:has(input[type="password"]) input[type="text"]',
+  'form:has(input[type="password"]) input:not([type])',
   'input[type="text"]',
 ];
 const DEFAULT_PASSWORD_SELECTORS = [
@@ -111,12 +122,17 @@ function buildLoginCandidates(baseURL, authFlow = null) {
 
   const cleanAuthFlow = sanitizeAuthFlow(authFlow);
 
+  // The discovered loginUrl is our best guess, so it goes first — but it can be
+  // wrong (e.g. a redirect target that 404s, or a stale exploration artifact).
+  // Always append the common paths as fallbacks so a bad guess doesn't strand
+  // the whole role at one URL. driveLogin validates each candidate has a real
+  // credential form before attempting, so trying extras is cheap and safe.
   if (cleanAuthFlow?.loginUrl) {
     pushUrl(cleanAuthFlow.loginUrl);
   } else {
     pushUrl(baseURL);
-    for (const loginPath of COMMON_LOGIN_PATHS) pushUrl(loginPath);
   }
+  for (const loginPath of COMMON_LOGIN_PATHS) pushUrl(loginPath);
 
   return unique(candidates);
 }
@@ -215,6 +231,34 @@ async function isAnyLocatorVisible(page, locators = [], timeout = 500) {
   return { visible: false, selector: null };
 }
 
+/**
+ * Cheaply decide whether the current page actually renders a login form, so we
+ * can skip 404s / wrong-route shells instead of mislabelling them as "invalid
+ * credentials". A real login page has a visible password field; two-step
+ * (email-first) logins show only the username field initially, so accept that
+ * too. Uses count()+isVisible() (both instant) and polls for late hydration —
+ * it never waits the full per-selector timeout, so an empty page resolves fast.
+ */
+async function pageHasCredentialForm(page, userSelectors = [], passSelectors = [], settleMs = 2500) {
+  const deadline = Date.now() + settleMs;
+  const pass = unique(passSelectors);
+  const user = unique(userSelectors);
+  do {
+    for (const selector of [...pass, ...user]) {
+      try {
+        const locator = page.locator(selector).first();
+        if ((await locator.count().catch(() => 0)) === 0) continue;
+        if (await locator.isVisible().catch(() => false)) {
+          return { ok: true, via: pass.includes(selector) ? 'password' : 'username', selector };
+        }
+      } catch { /* try next selector */ }
+    }
+    if (Date.now() >= deadline) break;
+    await page.waitForTimeout(250).catch(() => null);
+  } while (Date.now() < deadline);
+  return { ok: false };
+}
+
 function buildSuccessLocators(authFlow = null, credentials = {}) {
   const locators = [
     authFlow?.successIndicator,
@@ -236,17 +280,43 @@ function selectorCandidates(primary, defaults = []) {
 async function fillFirstVisible(page, selectors = [], value, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
+  const deferred = [];
+  // First pass: fast-fail any selector that has zero matches in the current DOM.
+  // Without this probe, each non-matching CSS selector burns ~4s waiting for
+  // visible, which exhausts the budget before later selectors get a turn —
+  // a common failure mode on apps whose inputs lack name/type="email" attrs.
   for (const selector of unique(selectors)) {
+    if (Date.now() >= deadline) break;
     const remaining = Math.max(500, deadline - Date.now());
+    const locator = page.locator(selector).first();
+    let count = 0;
+    try { count = await locator.count(); } catch { count = 0; }
+    if (count === 0) {
+      // Element doesn't exist yet; defer to second pass in case it hydrates.
+      deferred.push(selector);
+      continue;
+    }
     try {
-      const locator = page.locator(selector).first();
       await locator.waitFor({ state: 'visible', timeout: Math.min(remaining, 4_000) });
       await locator.fill(value, { timeout: Math.min(Math.max(500, deadline - Date.now()), 5_000) });
       return { ok: true, selector };
     } catch (err) {
       lastError = err;
     }
+  }
+  // Second pass: give deferred (not-yet-present) selectors a shorter wait each
+  // so a late-hydrating field still has a chance, without monopolising budget.
+  for (const selector of deferred) {
     if (Date.now() >= deadline) break;
+    const remaining = Math.max(500, deadline - Date.now());
+    try {
+      const locator = page.locator(selector).first();
+      await locator.waitFor({ state: 'visible', timeout: Math.min(remaining, 2_000) });
+      await locator.fill(value, { timeout: Math.min(Math.max(500, deadline - Date.now()), 5_000) });
+      return { ok: true, selector };
+    } catch (err) {
+      lastError = err;
+    }
   }
   return {
     ok: false,
@@ -369,7 +439,13 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
       DEFAULT_PASSWORD_SELECTORS,
     );
     const candidates = buildLoginCandidates(baseURL, authFlow);
+    const discoveredLoginPath = (() => {
+      try { return effectiveAuthFlow?.loginUrl ? new URL(effectiveAuthFlow.loginUrl, baseURL).pathname : null; }
+      catch { return null; }
+    })();
     const attempted = [];
+    const noFormPaths = [];
+    let sawLoginForm = false;
     let lastError = null;
 
     for (const loginUrl of candidates) {
@@ -385,12 +461,35 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
         // "/" candidate misclassifies successful login redirects back to "/".
         const loginPathname = (() => { try { return new URL(page.url()).pathname; } catch { return candidatePathname; } })();
 
-        // During discovery, do not spend 15s on a public home page that has no login form.
-        const fieldTimeout = effectiveAuthFlow?.loginUrl ? 15_000 : 4_000;
+        // Gate: confirm a credential form actually rendered here before spending
+        // the fill/submit budget — and before a 404/wrong-route shell gets
+        // mislabelled downstream as "Invalid credentials". The discovered
+        // loginUrl is our best guess so it gets a longer settle window; cheap
+        // fallback probes get a short one. A wrong guess (e.g. /login → 404)
+        // now falls through to /signin instead of failing the whole role.
+        const isDiscovered = discoveredLoginPath && loginPathname === discoveredLoginPath;
+        const formGate = await pageHasCredentialForm(
+          page,
+          userFieldCandidates,
+          passFieldCandidates,
+          isDiscovered ? 6_000 : 2_500,
+        );
+        if (!formGate.ok) {
+          noFormPaths.push(loginPathname);
+          lastError = new Error(`no credential form rendered at ${loginPathname}`);
+          continue;
+        }
+
+        // A credential form is present; give the fields a real fill window.
+        const fieldTimeout = isDiscovered ? 15_000 : 8_000;
         const usernameFill = await fillFirstVisible(page, userFieldCandidates, credentials.username, fieldTimeout);
         if (!usernameFill.ok) throw new Error(usernameFill.reason);
         const passwordFill = await fillFirstVisible(page, passFieldCandidates, credentials.password, 10_000);
         if (!passwordFill.ok) throw new Error(passwordFill.reason);
+        // Both credential fields filled — this is a genuine login form. Record
+        // it so a later "no form found anywhere" verdict can't be reported when
+        // the real issue was a credential rejection on a confirmed form.
+        sawLoginForm = true;
 
         // Wait for SPA navigation to complete. Supabase fires router.replace() in the
         // .then() of signInWithPassword — this is async and fires AFTER the API response,
@@ -450,11 +549,24 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
     }
 
     const attemptedText = unique(attempted).join(', ');
+    // Distinguish "we never found a login form" (wrong route / all 404s) from
+    // "a real form rejected the credentials". The former is a discovery problem,
+    // not a credentials problem — surfacing it as "Invalid credentials" sent us
+    // chasing valid passwords on a previous run.
+    if (!sawLoginForm) {
+      const missedText = unique(noFormPaths).join(', ') || attemptedText;
+      return {
+        ok: false,
+        noLoginForm: true,
+        reason: `No login form found at any candidate route (tried ${missedText}). `
+          + `The app's sign-in route likely differs from the discovered/guessed path — verify the actual login URL.`,
+      };
+    }
     return {
       ok: false,
       reason: lastError
         ? `Login driver error after trying ${attemptedText}: ${lastError.message}`
-        : `No login form found after trying ${attemptedText}`,
+        : `Login did not succeed after trying ${attemptedText}`,
     };
   } catch (err) {
     return { ok: false, reason: `Login driver error: ${err.message}` };
@@ -498,8 +610,14 @@ module.exports = {
   authDirFor,
   stateFileFor,
   buildLoginCandidates,
+  pageHasCredentialForm,
   normalizeRoleLabel,
   summarizeAuthStateEvidence,
   shouldAcceptLoginVerification,
   buildSuccessLocators,
+  // Exposed for unit tests: selector fallback list + the matcher that decides
+  // which login field to fill.
+  fillFirstVisible,
+  DEFAULT_USERNAME_SELECTORS,
+  DEFAULT_PASSWORD_SELECTORS,
 };
