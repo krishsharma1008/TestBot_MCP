@@ -7308,6 +7308,121 @@ function featureNameToSlug(name) {
 }
 
 /**
+ * Build a `featureId → unique slug` map for a parsed PRD. Slugs are derived from
+ * the feature name; collisions (two features that slugify identically) get a
+ * numeric suffix so Playwright project names and generated filenames stay
+ * unique. Used by both the feature loop and playwright.config generation so the
+ * slug used for `testMatch` always equals the slug used in emitted filenames.
+ */
+function buildFeatureSlugMap(features = []) {
+  const map = new Map();
+  const seen = new Map(); // baseSlug → count
+  for (const f of features) {
+    const base = featureNameToSlug(f.name);
+    const n = (seen.get(base) || 0) + 1;
+    seen.set(base, n);
+    map.set(f.id, n === 1 ? base : `${base}-${n}`);
+  }
+  return map;
+}
+
+// ── test-plan.md formatting (shared by sync producer-consumer + async path) ──
+
+function buildTestPlanHeader(baseURL) {
+  return `# Healix Test Plan\nGenerated: ${new Date().toISOString()}\nTarget: ${baseURL || 'http://localhost:3000'}\n`;
+}
+
+function buildFeaturePlanSection(feature, specs) {
+  const uiSpecs = (specs || []).filter((s) => s.agentType === 'ui');
+  const apiSpecs = (specs || []).filter((s) => s.agentType === 'api');
+  const lines = [`\n## Feature: ${feature.name} (${feature.id})\n`];
+
+  if (uiSpecs.length > 0) {
+    lines.push('### UI Tests\n');
+    lines.push('| ID | Title | Kind | AC | Route |');
+    lines.push('|----|-------|------|----|-------|');
+    for (const s of uiSpecs) {
+      lines.push(`| ${s.id} | ${s.title} | ${s.kind} | ${s.acId} | ${s.targetRoute || '-'} |`);
+    }
+    lines.push('');
+  }
+
+  if (apiSpecs.length > 0) {
+    lines.push('### API Tests\n');
+    lines.push('| ID | Title | Kind | AC | Endpoint |');
+    lines.push('|----|-------|------|----|----------|');
+    for (const s of apiSpecs) {
+      lines.push(`| ${s.id} | ${s.title} | ${s.kind} | ${s.acId} | ${s.targetEndpoint || '-'} |`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Run the scenario planner across the given features and write
+ * `.healix/test-plan.md`. Returns `FeatureTestPlan[]` for the async job payload.
+ *
+ * Planning failure for a single feature degrades to empty specs (the generator
+ * then falls back to its non-spec prompt) — it never throws, so a planner outage
+ * cannot block generation. Used by the async path; the sync producer-consumer
+ * keeps its own incremental loop but shares the markdown formatters above.
+ */
+async function planFeaturesForRun({ client, sharedPayload, nonAuthFeatures, projectPath, concurrent = true }) {
+  const testPlanFile = path.join(projectPath, '.healix', 'test-plan.md');
+  try {
+    fs.mkdirSync(path.dirname(testPlanFile), { recursive: true });
+    fs.writeFileSync(testPlanFile, buildTestPlanHeader(sharedPayload.projectInfo?.baseURL), 'utf-8');
+  } catch (err) {
+    Logger.warn('PipelineWorker', '[test-plan.md] could not initialise (async)', { reason: err?.message });
+  }
+
+  const planOne = async (feature) => {
+    let specs = [];
+    try {
+      const planResult = await client.planFeatureTestCases({
+        feature,
+        explorationArtifact: sharedPayload.explorationArtifact,
+        context: sharedPayload.context,
+        testType: sharedPayload.testType,
+        prd: sharedPayload.prd,
+        projectInfo: sharedPayload.projectInfo,
+      });
+      specs = Array.isArray(planResult?.specs) ? planResult.specs : [];
+      Logger.info('PipelineWorker', `[Feature Gen][async] Planned ${specs.length} specs for ${feature.id}`);
+    } catch (planErr) {
+      Logger.warn('PipelineWorker', `[Feature Gen][async] Planning failed for ${feature.id}, proceeding without specs`, { reason: planErr?.message });
+    }
+    return { feature, specs };
+  };
+
+  let planned;
+  if (concurrent) {
+    planned = await Promise.all(nonAuthFeatures.map(planOne));
+  } else {
+    planned = [];
+    for (const feature of nonAuthFeatures) planned.push(await planOne(feature));
+  }
+
+  // Append sections in feature order (Promise.all preserves input order).
+  for (const { feature, specs } of planned) {
+    try {
+      fs.appendFileSync(testPlanFile, buildFeaturePlanSection(feature, specs), 'utf-8');
+    } catch (err) {
+      Logger.warn('PipelineWorker', '[test-plan.md] could not append feature plan (async)', { feature: feature.id, reason: err?.message });
+    }
+  }
+
+  return planned.map(({ feature, specs }) => ({
+    featureId: feature.id,
+    featureName: feature.name,
+    plannedAt: new Date().toISOString(),
+    specs,
+  }));
+}
+
+/**
  * Extract exported `async function` signatures from an actions file.
  * Produces an array of { name, params[] } objects (mirrors agent-dispatcher.ts).
  */
@@ -7331,7 +7446,10 @@ function extractActionSignatures(content) {
  */
 function detectAuthFeatureFromPRD(parsedPRD) {
   if (!parsedPRD?.features?.length) return null;
-  const AUTH_NAMES = /^(auth|authentication|login|sign.?in|sign.?up|register|account)$/i;
+  // Word-boundary substring match (kept in sync with detectAuthFeature in
+  // webapp agent-dispatcher.ts) so multi-word names like "User Authentication"
+  // are detected. Boundaries prevent false positives like "Author".
+  const AUTH_NAMES = /\b(auth|authentication|login|log[\s-]?in|sign[\s-]?in|sign[\s-]?up|sign[\s-]?on|register|registration|account|sso|identity)\b/i;
   for (const feature of parsedPRD.features) {
     if (AUTH_NAMES.test((feature.name || '').trim())) return feature;
   }
@@ -7360,13 +7478,18 @@ function detectAuthFeatureFromPRD(parsedPRD) {
  * @param {'frontend'|'backend'|'both'} opts.testType
  * @param {string} opts.baseURL
  */
-function buildFeaturePlaywrightConfig({ features, authFeatureId, roles, testType, baseURL = 'http://localhost:3000' }) {
+function buildFeaturePlaywrightConfig({ features, authFeatureId, roles, testType, slugMap, baseURL = 'http://localhost:3000' }) {
   const defaultRole = (roles[0])
     ? ((roles[0].name || roles[0].role || 'user').toLowerCase().replace(/[^a-z0-9_-]/g, ''))
     : 'user';
 
   const nonAuthFeatures = features.filter((f) => f.id !== authFeatureId);
   const hasAuth = authFeatureId !== null && authFeatureId !== undefined;
+
+  // Resolve a feature's slug from the shared map (deduped) when provided, so
+  // project names + testMatch match the filenames the generator emitted. Falls
+  // back to name derivation for callers that don't pass a map.
+  const slugFor = (f) => (slugMap && slugMap.get(f.id)) || featureNameToSlug(f.name);
 
   const specPatternFor = (slug) => {
     if (testType === 'frontend') return `**/${slug}-ui.spec.ts`;
@@ -7375,7 +7498,7 @@ function buildFeaturePlaywrightConfig({ features, authFeatureId, roles, testType
   };
 
   const featureProjectLines = nonAuthFeatures.map((f) => {
-    const slug = featureNameToSlug(f.name);
+    const slug = slugFor(f);
     const storageState = hasAuth ? `\n      use: { storageState: '.healix/${defaultRole}.json' },` : '';
     const deps = hasAuth ? `\n      dependencies: ['auth-setup'],` : '';
     return `    {
@@ -7384,7 +7507,7 @@ function buildFeaturePlaywrightConfig({ features, authFeatureId, roles, testType
     }`;
   });
 
-  const allFeatureSlugs = nonAuthFeatures.map((f) => `'${featureNameToSlug(f.name)}'`).join(', ');
+  const allFeatureSlugs = nonAuthFeatures.map((f) => `'${slugFor(f)}'`).join(', ');
 
   const authProject = hasAuth
     ? `    {
@@ -7508,6 +7631,9 @@ async function runFeatureBasedGeneration({
       });
       const payload = await client.generateTestsForFeature({
         featureId: featureId || null,
+        // Auth/e2e use fixed file prefixes; only feature agents need the slug to
+        // keep generated filenames in sync with the deduped config testMatch.
+        featureSlug: (agentType === 'ui' || agentType === 'api') ? featureSlug : undefined,
         agentType,
         featureManifest: Array.isArray(featureManifest) && featureManifest.length > 0 ? featureManifest : undefined,
         specs: Array.isArray(specs) && specs.length > 0 ? specs : undefined,
@@ -7570,6 +7696,10 @@ async function runFeatureBasedGeneration({
   const authFeature = detectAuthFeatureFromPRD(parsedPRD);
   const authFeatureId = authFeature ? authFeature.id : null;
 
+  // Unique slug per feature — shared by the feature loop (filenames) and
+  // playwright.config generation (project names + testMatch) so they never drift.
+  const featureSlugMap = buildFeatureSlugMap(parsedPRD?.features || []);
+
   if (statusDir) {
     updateStatus(statusDir, 'generating_tests', {
       runId,
@@ -7627,8 +7757,7 @@ async function runFeatureBasedGeneration({
   function initTestPlanFile() {
     try {
       fs.mkdirSync(path.dirname(testPlanFile), { recursive: true });
-      const header = `# Healix Test Plan\nGenerated: ${new Date().toISOString()}\nTarget: ${sharedPayload.projectInfo?.baseURL || 'http://localhost:3000'}\n`;
-      fs.writeFileSync(testPlanFile, header, 'utf-8');
+      fs.writeFileSync(testPlanFile, buildTestPlanHeader(sharedPayload.projectInfo?.baseURL), 'utf-8');
     } catch (err) {
       Logger.warn('PipelineWorker', '[test-plan.md] could not initialise', { reason: err?.message });
     }
@@ -7636,31 +7765,7 @@ async function runFeatureBasedGeneration({
 
   function appendFeaturePlan(feature, specs) {
     try {
-      const uiSpecs = specs.filter((s) => s.agentType === 'ui');
-      const apiSpecs = specs.filter((s) => s.agentType === 'api');
-      const lines = [`\n## Feature: ${feature.name} (${feature.id})\n`];
-
-      if (uiSpecs.length > 0) {
-        lines.push('### UI Tests\n');
-        lines.push('| ID | Title | Kind | AC | Route |');
-        lines.push('|----|-------|------|----|-------|');
-        for (const s of uiSpecs) {
-          lines.push(`| ${s.id} | ${s.title} | ${s.kind} | ${s.acId} | ${s.targetRoute || '-'} |`);
-        }
-        lines.push('');
-      }
-
-      if (apiSpecs.length > 0) {
-        lines.push('### API Tests\n');
-        lines.push('| ID | Title | Kind | AC | Endpoint |');
-        lines.push('|----|-------|------|----|----------|');
-        for (const s of apiSpecs) {
-          lines.push(`| ${s.id} | ${s.title} | ${s.kind} | ${s.acId} | ${s.targetEndpoint || '-'} |`);
-        }
-        lines.push('');
-      }
-
-      fs.appendFileSync(testPlanFile, lines.join('\n'), 'utf-8');
+      fs.appendFileSync(testPlanFile, buildFeaturePlanSection(feature, specs), 'utf-8');
     } catch (err) {
       Logger.warn('PipelineWorker', '[test-plan.md] could not append feature plan', { feature: feature.id, reason: err?.message });
     }
@@ -7701,7 +7806,7 @@ async function runFeatureBasedGeneration({
       if (!item) break;
 
       const { feature, specs } = item;
-      const featureSlug = featureNameToSlug(feature.name);
+      const featureSlug = featureSlugMap.get(feature.id) || featureNameToSlug(feature.name);
       const agentTypes = testType === 'frontend' ? ['ui']
         : testType === 'backend' ? ['api']
         : ['ui', 'api'];
@@ -7788,6 +7893,7 @@ async function runFeatureBasedGeneration({
           authFeatureId,
           roles: sharedPayload.roles || [],
           testType,
+          slugMap: featureSlugMap,
           baseURL: sharedPayload.projectInfo?.baseURL || config.baseURL || 'http://localhost:3000',
         });
         const configPath = path.join(config.projectPath, 'playwright.config.ts');
@@ -7881,6 +7987,32 @@ async function runAsyncGenerationPath({
   telemetryReporter = null,
   config,
 }) {
+  // ── Phase 1: scenario planning (parity with the sync producer-consumer) ─────
+  // The Inngest orchestrator fans out feature agents from the frozen job
+  // payload, so the planner must run here (before enqueue) and ride along as
+  // `featurePlans`. Without this the async path silently skips two-phase
+  // generation, never writes test-plan.md, and never populates spec validation.
+  let featurePlans = [];
+  try {
+    const parsedPRD = sharedPayload.parsedPRD;
+    if (parsedPRD?.features?.length) {
+      const authFeature = detectAuthFeatureFromPRD(parsedPRD);
+      const authFeatureId = authFeature ? authFeature.id : null;
+      const nonAuthFeatures = parsedPRD.features.filter((f) => f.id !== authFeatureId);
+      featurePlans = await planFeaturesForRun({
+        client,
+        sharedPayload,
+        nonAuthFeatures,
+        projectPath: config.projectPath,
+        concurrent: true,   // no producer-consumer overlap async — plan in parallel
+      });
+      Logger.info('PipelineWorker', `[Feature Gen][async] Planned ${featurePlans.length} feature(s); enqueueing job`);
+    }
+  } catch (planErr) {
+    Logger.warn('PipelineWorker', '[Feature Gen][async] Planning phase failed; enqueueing without specs', { reason: planErr?.message });
+    featurePlans = [];
+  }
+
   const enqueueResp = await client.generateTestsAsync({
     context: sharedPayload.context,
     prd: sharedPayload.prd,
@@ -7889,6 +8021,7 @@ async function runAsyncGenerationPath({
     roles: sharedPayload.roles,
     projectInfo: sharedPayload.projectInfo,
     options: sharedPayload.options,
+    featurePlans,
     idempotencyKey: runId ? `${runId}-saas-gen-v1` : undefined,
   });
 

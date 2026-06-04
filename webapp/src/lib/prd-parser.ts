@@ -1,11 +1,12 @@
 /**
  * Structured PRD parser — converts free-form PRD text into a `ParsedPRD`
- * with features → user stories → acceptance criteria. Each AC is tagged
- * with `id` (e.g. "F1.S1.AC1"), `kind` (positive/negative/boundary),
- * `authRequired`, and a `roleHint` when the AC is role-scoped.
+ * with features → user stories → acceptance criteria. Each AC is a pure
+ * requirement statement tagged with `id` (e.g. "F1.S1.AC1"), `authRequired`,
+ * and a `roleHint` when the AC is role-scoped. The positive/negative/boundary
+ * `kind` now lives on the generated test case (see TestCaseKind), not the AC.
  *
  * The returned structure is the input to `openai-generator.ts`, where each
- * AC produces one `test(...)` block tagged `[REQ:F1.S1.AC1]`.
+ * AC produces one or more `test(...)` blocks tagged `[REQ:F1.S1.AC1][kind]`.
  */
 
 import { createHash } from 'crypto'

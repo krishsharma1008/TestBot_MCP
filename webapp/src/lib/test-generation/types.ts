@@ -616,6 +616,7 @@ export interface GenerateTestsParams {
   onAgentComplete?: AgentCompleteHook
   // Feature-based generation params (new model)
   featureId?: string | null          // PRDFeature.id — e.g. "F1". Null = all features (legacy)
+  featureSlug?: string               // pre-resolved unique slug; overrides name-derived slug so generated filenames match playwright.config testMatch
   agentType?: FeatureAgentType       // which agent to run for this feature
   featureManifest?: FeatureManifest[] // passed to e2e agent only
   specs?: TestCaseSpec[]             // pre-planned test cases from scenario planner

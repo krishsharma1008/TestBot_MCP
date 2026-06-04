@@ -29,7 +29,9 @@ function extractActionSignatures(content: string): ActionSignature[] {
   const sigs: ActionSignature[] = []
   let m: RegExpExecArray | null
   while ((m = re.exec(content)) !== null) {
-    sigs.push({ name: m[1], params: m[2].trim() })
+    const rawParams = m[2].trim()
+    const params = rawParams ? rawParams.split(',').map((p) => p.trim()).filter(Boolean) : []
+    sigs.push({ name: m[1], params })
   }
   return sigs
 }
@@ -96,10 +98,25 @@ export const generateTestsOrchestrator = inngest.createFunction(
     const toSlug = (name: string) =>
       name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'feature'
 
+    // Unique slug per feature (collision-safe), keyed by feature id. Kept in
+    // lockstep with the MCP's buildFeatureSlugMap so generated filenames and any
+    // downstream playwright.config testMatch never collide on duplicate names.
+    const slugByFeatureId = new Map<string, string>()
+    {
+      const seen = new Map<string, number>()
+      for (const f of parsedPRD.features) {
+        const base = toSlug(f.name)
+        const n = (seen.get(base) || 0) + 1
+        seen.set(base, n)
+        slugByFeatureId.set(f.id, n === 1 ? base : `${base}-${n}`)
+      }
+    }
+    const slugFor = (f: { id: string; name: string }) => slugByFeatureId.get(f.id) || toSlug(f.name)
+
     // ── Step 2: Auth feature (blocking) ────────────────────────────────────
     const authFeature = detectAuthFeature(parsedPRD)
     if (authFeature) {
-      const authSlug = toSlug(authFeature.name)
+      const authSlug = slugFor(authFeature)
 
       await step.sendEvent('fan-out-auth', {
         name: 'generation/feature.requested',
@@ -128,7 +145,7 @@ export const generateTestsOrchestrator = inngest.createFunction(
     )
 
     for (const feature of nonAuthFeatures) {
-      const featureSlug = toSlug(feature.name)
+      const featureSlug = slugFor(feature)
 
       // Determine which agents to run based on testType
       const agentTypes: FeatureAgentType[] =
@@ -186,7 +203,7 @@ export const generateTestsOrchestrator = inngest.createFunction(
 
       // Build a slug→feature lookup from the non-auth features processed in Step 3
       const featureBySlug = new Map(
-        nonAuthFeatures.map((f) => [toSlug(f.name), f])
+        nonAuthFeatures.map((f) => [slugFor(f), f])
       )
 
       const featureManifest: FeatureManifest[] = []

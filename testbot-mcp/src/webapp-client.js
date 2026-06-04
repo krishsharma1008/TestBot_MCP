@@ -283,6 +283,7 @@ class WebappClient {
    */
   async generateTestsForFeature({
     featureId,
+    featureSlug,
     agentType,
     featureManifest,
     specs,
@@ -313,6 +314,7 @@ class WebappClient {
       api_key: this.apiKey,
       agentType,
       featureId: featureId || null,
+      featureSlug: featureSlug || undefined,
       context: context || {},
       prd: prd || '',
       parsedPRD: parsedPRD || null,
@@ -519,7 +521,7 @@ class WebappClient {
    *   - non-2xx → throw with the usual err.code shape.
    *   - AbortError → throw with err.code === 'WEBAPP_TIMEOUT'.
    */
-  async generateTestsAsync({ context, prd, parsedPRD, explorationArtifact, roles, projectInfo, options, idempotencyKey } = {}) {
+  async generateTestsAsync({ context, prd, parsedPRD, explorationArtifact, roles, projectInfo, options, featurePlans, idempotencyKey } = {}) {
     this._assertKey('/api/generate-tests');
     const path = '/api/generate-tests';
     const url = `${this.dashboardUrl}${path}`;
@@ -536,6 +538,9 @@ class WebappClient {
       roles: roles || [],
       projectInfo: projectInfo || {},
       options: options || {},
+      // Per-feature scenario plans (FeatureTestPlan[]) produced before enqueue.
+      // The Inngest agent selects its feature's specs from this array.
+      featurePlans: Array.isArray(featurePlans) ? featurePlans : [],
     };
 
     const headers = {

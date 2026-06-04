@@ -80,6 +80,7 @@ export async function dispatchFeature(params: DispatchParams): Promise<DispatchR
     onAgentComplete: params.onAgentComplete,
     agentType,
     featureId,
+    featureSlug: params.featureSlug,
     featureManifest: params.featureManifest,
     specs: params.specs,
   })
@@ -114,7 +115,10 @@ export function detectAuthFeature(
 ): PRDFeature | null {
   if (!parsedPRD?.features?.length) return null
 
-  const AUTH_NAMES = /^(auth|authentication|login|sign.?in|sign.?up|register|account)$/i
+  // Word-boundary substring match so multi-word names like "User Authentication"
+  // or "Login & Registration" are detected. Boundaries on both sides prevent
+  // false positives inside other words (e.g. "Author" does not match \bauth\b).
+  const AUTH_NAMES = /\b(auth|authentication|login|log[\s-]?in|sign[\s-]?in|sign[\s-]?up|sign[\s-]?on|register|registration|account|sso|identity)\b/i
 
   // First pass: name match
   for (const feature of parsedPRD.features) {

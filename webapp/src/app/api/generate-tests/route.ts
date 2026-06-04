@@ -134,6 +134,12 @@ export async function POST(request: NextRequest) {
       ? ((body as { featureId: string }).featureId || null)
       : null
 
+    // 6b-i. featureSlug — pre-resolved unique slug from the MCP; keeps generated
+    // filenames in sync with the playwright.config testMatch patterns.
+    const featureSlug = typeof (body as { featureSlug?: unknown }).featureSlug === 'string'
+      ? ((body as { featureSlug: string }).featureSlug || undefined)
+      : undefined
+
     // 6c. featureManifest — passed to e2e agent only
     const featureManifest = Array.isArray((body as { featureManifest?: unknown }).featureManifest)
       ? ((body as { featureManifest: FeatureManifest[] }).featureManifest)
@@ -276,6 +282,7 @@ export async function POST(request: NextRequest) {
       options: genOptions,
       agentType,
       featureId,
+      featureSlug,
       featureManifest,
       specs,
       abortSignal: generationAbort.signal,

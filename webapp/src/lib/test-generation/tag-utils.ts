@@ -1,6 +1,30 @@
 import type { FeatureAgentType } from './types'
 
 /**
+ * Maps legacy 5-agent fallback type labels to the new feature-agent taxonomy so
+ * tests emitted by `generateFallbackSuite` (typed 'smoke'/'frontend'/'error'/
+ * 'workflow'/'expansion') still receive the correct execution-tier and
+ * agent-type tags. Without this, fallback smoke tests fall through to
+ * `@regression` only and are missed by `--grep @smoke`.
+ *
+ * Unknown/generic types (e.g. 'generated') are passed through unchanged so they
+ * keep their prior behaviour (no @ui/@api, @regression baseline only).
+ */
+const LEGACY_AGENT_TYPE_MAP: Record<string, FeatureAgentType> = {
+  smoke: 'ui',
+  frontend: 'ui',
+  error: 'ui',
+  expansion: 'ui',
+  workflow: 'e2e',
+}
+
+export function normalizeAgentTypeForTags(agentType: string): FeatureAgentType | string {
+  const t = (agentType || '').toLowerCase()
+  if (t === 'ui' || t === 'api' || t === 'auth' || t === 'e2e') return t
+  return LEGACY_AGENT_TYPE_MAP[t] ?? t
+}
+
+/**
  * Derives execution-tier tags based on agent type and AC kind.
  *
  * Execution tiers:

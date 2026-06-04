@@ -21,7 +21,13 @@ import type {
   CapturedContext,
   ApiEndpoint,
   ProjectInfo,
+  OpenAIUsage,
 } from './types'
+
+const EMPTY_USAGE: OpenAIUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+
+/** FeatureTestPlan plus the token usage the planner LLM call consumed. */
+export type FeatureTestPlanResult = FeatureTestPlan & { usage: OpenAIUsage }
 
 // ── Zod schema for LLM response validation ────────────────────────────────────
 
@@ -55,7 +61,7 @@ export interface ScenarioPlannerInput {
 export async function planFeatureTestCases(
   input: ScenarioPlannerInput,
   openaiApiKey: string
-): Promise<FeatureTestPlan> {
+): Promise<FeatureTestPlanResult> {
   const { feature, explorationArtifact, context, testType, prd, projectInfo } = input
 
   const client = new OpenAIClient({
@@ -69,12 +75,15 @@ export async function planFeatureTestCases(
   const userPrompt = buildUserPrompt({ feature, explorationArtifact, context, testType, prd, projectInfo })
 
   let specs: TestCaseSpec[] = []
+  let usage: OpenAIUsage = EMPTY_USAGE
 
   try {
     const result = await client.callOpenAI([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ])
+
+    usage = result.usage ?? EMPTY_USAGE
 
     const raw = extractJsonArray(result.text)
     const parsed = ScenarioPlanResponseSchema.safeParse(raw)
@@ -102,6 +111,7 @@ export async function planFeatureTestCases(
     featureName: feature.name,
     plannedAt: new Date().toISOString(),
     specs,
+    usage,
   }
 }
 

@@ -92,16 +92,19 @@ export async function POST(request: NextRequest) {
     )
     const latencyMs = Date.now() - t0
 
-    // Token accounting — planner uses a fixed estimate since we don't get exact
-    // token counts back from the scenario planner's raw callOpenAI
-    const estimatedTokens = 1500
+    // Token accounting — use the real usage returned by the planner LLM call.
+    // Fall back to a small floor when usage is unavailable (e.g. the LLM call
+    // threw and we returned an empty plan) so accounting never records zero/NaN.
+    const tokensInput = plan.usage.promptTokens > 0 ? plan.usage.promptTokens : 800
+    const tokensOutput = plan.usage.completionTokens > 0 ? plan.usage.completionTokens : 300
+    const tokensTotal = plan.usage.totalTokens > 0 ? plan.usage.totalTokens : tokensInput + tokensOutput
     await recordTokenUsage({
       userId,
       endpoint: ENDPOINT,
       agent: 'scenario-planner',
       model: resolveModel(null),
-      tokensInput: estimatedTokens,
-      tokensOutput: Math.round(estimatedTokens * 0.4),
+      tokensInput,
+      tokensOutput,
       referenceType: 'test_run',
       referenceId: request.headers.get('x-healix-run-id') ?? null,
     }).catch(() => {})
@@ -113,9 +116,9 @@ export async function POST(request: NextRequest) {
       agent: 'scenario-planner',
       latencyMs,
       modelUsed: resolveModel(null),
-      tokensPrompt: estimatedTokens,
-      tokensCompletion: Math.round(estimatedTokens * 0.4),
-      tokensTotal: Math.round(estimatedTokens * 1.4),
+      tokensPrompt: tokensInput,
+      tokensCompletion: tokensOutput,
+      tokensTotal,
       success: true,
       errorCode: null,
     }).catch(() => {})

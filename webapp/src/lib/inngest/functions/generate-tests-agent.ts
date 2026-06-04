@@ -21,7 +21,7 @@ import { db } from '@/lib/db'
 import { generationJobs } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { dispatchFeature } from '@/lib/test-generation/agent-dispatcher'
-import type { FeatureAgentType, GenerateTestsParams, AgentRunRecord, FeatureManifest, TestCaseSpec } from '@/lib/test-generation/types'
+import type { FeatureAgentType, GenerateTestsParams, AgentRunRecord, FeatureManifest, TestCaseSpec, FeatureTestPlan } from '@/lib/test-generation/types'
 import { recordTokenUsage } from '@/lib/tokens'
 import { resolveModel } from '@/lib/pricing'
 import { profiles } from '@/lib/db/schema'
@@ -97,15 +97,28 @@ export const generateTestsAgent = inngest.createFunction(
             : []
         }
 
-        // Specs stored in job payload by the MCP scenario planner step
-        const specs = Array.isArray((payload as Record<string, unknown>).specs)
-          ? ((payload as Record<string, unknown>).specs as TestCaseSpec[])
-          : undefined
+        // Per-feature specs from the MCP scenario planner. The MCP plans every
+        // non-auth feature before enqueue and stores the results as
+        // `featurePlans: FeatureTestPlan[]` in the job payload. Select this
+        // feature's slice; auth/e2e have no plan entry (→ undefined → non-spec
+        // prompt). Falls back to a flat `payload.specs` for back-compat.
+        const payloadObj = payload as Record<string, unknown>
+        const featurePlans = Array.isArray(payloadObj.featurePlans)
+          ? (payloadObj.featurePlans as FeatureTestPlan[])
+          : []
+        const planForFeature =
+          featureId === 'e2e' ? undefined : featurePlans.find((p) => p.featureId === featureId)
+        const specs: TestCaseSpec[] | undefined =
+          planForFeature?.specs ??
+          (Array.isArray(payloadObj.specs) ? (payloadObj.specs as TestCaseSpec[]) : undefined)
 
         const dispatchResult = await dispatchFeature({
           ...payload,
           agentType,
           featureId: featureId === 'e2e' ? null : featureId,
+          // Slug resolved by the orchestrator (collision-safe); only feature
+          // agents use it for filenames (auth/e2e use fixed prefixes).
+          featureSlug: (agentType === 'ui' || agentType === 'api') ? featureSlug : undefined,
           featureManifest,
           specs,
           abortSignal: generationAbort.signal,

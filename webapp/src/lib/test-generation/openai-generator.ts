@@ -33,7 +33,7 @@ import type {
   FeatureManifest,
   TestCaseSpec,
 } from './types'
-import { tagTestContent } from './tag-utils'
+import { tagTestContent, normalizeAgentTypeForTags } from './tag-utils'
 import { validateSpecCoverage } from './spec-validator'
 
 const TEST_CASE_KINDS: TestCaseKind[] = ['positive', 'negative', 'boundary']
@@ -132,6 +132,10 @@ export class OpenAITestGenerator {
   // Feature-based generation: the PRDFeature currently being generated (ui/api agents).
   // Null for agents that span all features (auth, e2e).
   private activeFeature: PRDFeature | null = null
+  // Pre-resolved unique slug for the active feature (deduped by the caller).
+  // When set it overrides the name-derived slug so generated filenames match
+  // the playwright.config testMatch patterns.
+  private activeFeatureSlug: string | null = null
   // Feature manifest passed to the e2e agent so it knows which action functions
   // are available from sibling *-actions.ts files.
   private featureManifest: FeatureManifest[] = []
@@ -237,6 +241,10 @@ export class OpenAITestGenerator {
     this.roles = roles
     this.agentRuns = []
     this.activeFeature = resolvedFeature
+    this.activeFeatureSlug =
+      typeof params.featureSlug === 'string' && params.featureSlug.trim()
+        ? params.featureSlug.trim()
+        : null
     this.featureManifest = Array.isArray(params.featureManifest) ? params.featureManifest : []
     this.onAgentComplete = typeof params.onAgentComplete === 'function' ? params.onAgentComplete : null
 
@@ -406,6 +414,7 @@ export class OpenAITestGenerator {
 
   /** Returns a URL-safe slug from the active feature name, e.g. "billing" or "user-profile". */
   private getFeatureSlug(): string {
+    if (this.activeFeatureSlug) return this.activeFeatureSlug
     if (!this.activeFeature) return 'feature'
     return (
       this.activeFeature.name
@@ -2675,14 +2684,23 @@ Return JSON array only.`
     let content = this.normalizeGeneratedContent(test.content || '')
 
     const agentType = String(test.type || 'generated')
-    content = tagTestContent(content, agentType)
+    content = tagTestContent(content, normalizeAgentTypeForTags(agentType))
 
-    const hasPwImport = content.includes("from '@playwright/test'")
-    const hasFixtureImport = content.includes("from './__healix-fixture'")
-    if (hasPwImport) {
-      content = content.replace(/from\s+(['"])@playwright\/test\1/g, "from './__healix-fixture'")
-    } else if (!hasFixtureImport) {
-      content = `import { test, expect } from './__healix-fixture';\n\n${content}`
+    // Only spec files import test/expect from the Healix fixture. Action modules
+    // (e.g. `{feature}-actions.ts`) legitimately import the `Page` *type* from
+    // '@playwright/test' and have no test() blocks — rewriting that import to the
+    // fixture (which only exports { test, expect, request }) would break them, and
+    // prepending a fixture import is meaningless for a non-spec file.
+    const isSpecFile =
+      /\.spec\.ts$/i.test(safeFilename) || /(?<![.\w])test(?:\.\w+)?\s*\(/.test(content)
+    if (isSpecFile) {
+      const hasPwImport = content.includes("from '@playwright/test'")
+      const hasFixtureImport = content.includes("from './__healix-fixture'")
+      if (hasPwImport) {
+        content = content.replace(/from\s+(['"])@playwright\/test\1/g, "from './__healix-fixture'")
+      } else if (!hasFixtureImport) {
+        content = `import { test, expect } from './__healix-fixture';\n\n${content}`
+      }
     }
 
     this.generatedFiles.push({
