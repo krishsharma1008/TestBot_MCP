@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { TestRun, TestFailure, FailureVerdict, QaFinding, FindingSummary } from '@/lib/types/database';
+import type { TestRun, TestFailure, FailureVerdict, QaFinding, FindingSummary, ExplorationMeta } from '@/lib/types/database';
+import { explorationSourceLabel } from '@/lib/utils/exploration-source-label';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -460,6 +461,43 @@ function KpiCard({ label, value, sub, color, delay, loading }: {
         <span className={`text-3xl font-bold ${color}`}>{displayed}{sub}</span>
       )}
     </motion.div>
+  );
+}
+
+function ExplorationSummaryBar({ meta }: { meta: ExplorationMeta }) {
+  const routeCount = meta.explorationPhaseRouteCount ?? null;
+  const source = meta.explorationPhaseSource ?? null;
+  const added = meta.staticRoutesAdded ?? 0;
+  if (routeCount == null && source == null) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-[#8BA4C8]">
+      <span className="flex items-center gap-1.5">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#60A5FA] flex-shrink-0">
+          <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
+        </svg>
+        {routeCount != null ? (
+          <span><span className="text-[#D8E8FF] font-semibold">{routeCount}</span> routes explored</span>
+        ) : (
+          <span className="text-[#4A6280]">routes unknown</span>
+        )}
+      </span>
+      {added > 0 && (
+        <span className="group relative flex items-center gap-1">
+          <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-medium cursor-default">
+            +{added} from static analysis
+          </span>
+          <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-64 rounded-lg bg-[#0D1B2E] border border-white/10 px-3 py-2 text-[11px] text-[#BFD4F2] leading-relaxed shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            {added} route{added === 1 ? '' : 's'} were found in your source files but not visited by the browser during exploration. They have been added to the test surface with selector hints from your code.
+          </span>
+        </span>
+      )}
+      {source && (
+        <span className="flex items-center gap-1 text-[#4A6280]">
+          <span>·</span>
+          <span>Source: <span className="text-[#8BA4C8]">{explorationSourceLabel(source)}</span></span>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -4393,6 +4431,10 @@ export default function TestRunDetailPage() {
         <KpiCard label="Skipped" value={skippedTests} color="text-amber-400" delay={240} loading={isRunningPhase && !hasLiveStats} />
         <KpiCard label="Pass Rate" value={passRate} sub="%" color={passRate >= 70 ? 'text-emerald-400' : passRate >= 40 ? 'text-amber-400' : 'text-red-400'} delay={320} loading={isRunningPhase && !hasLiveStats} />
       </div>
+
+      {testRun.exploration_meta && (
+        <ExplorationSummaryBar meta={testRun.exploration_meta} />
+      )}
 
       {/* Tier pills (Phase D) — Tier A/B/C segmentation from MCP. Only shown
           when the run reported a tier breakdown. */}

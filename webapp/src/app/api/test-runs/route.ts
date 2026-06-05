@@ -109,6 +109,9 @@ export async function GET(request: NextRequest) {
         createdAt: testRuns.createdAt,
         updatedAt: testRuns.updatedAt,
         runIdFromReport: sql<string | null>`${testRuns.reportJson}->'metadata'->>'runId'`,
+        explorationRouteCount: sql<number | null>`CAST(${testRuns.reportJson}->'metadata'->>'explorationPhaseRouteCount' AS INTEGER)`,
+        explorationSource: sql<string | null>`${testRuns.reportJson}->'metadata'->>'explorationPhaseSource'`,
+        staticRoutesAdded: sql<number | null>`CAST(${testRuns.reportJson}->'metadata'->>'staticRoutesAdded' AS INTEGER)`,
       })
       .from(testRuns)
       .where(whereClause)
@@ -140,6 +143,13 @@ export async function GET(request: NextRequest) {
       current_phase: null,
       error_code: null,
       is_live: false,
+      exploration_meta: (row.explorationRouteCount != null || row.explorationSource != null)
+        ? {
+            explorationPhaseRouteCount: row.explorationRouteCount ?? null,
+            explorationPhaseSource: row.explorationSource ?? null,
+            staticRoutesAdded: row.staticRoutesAdded ?? null,
+          }
+        : null,
     }))
 
     // Decorate each run with contributor identity so the table can show "who

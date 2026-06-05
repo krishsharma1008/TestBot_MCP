@@ -10878,6 +10878,8 @@ async function runPipeline(config, runId) {
   let requirementsCoverage = null;
   let phaseResults = null;
   let routeAccessSummary = null;
+  let explorationSource = null;
+  let staticRoutesAdded = 0;
   const aiOnlyEnforced = strictAIEnabled(config);
   let workspaceState = null; // populated by pre-flight if shared workspace found
 
@@ -11502,7 +11504,7 @@ async function runPipeline(config, runId) {
           prdFeatures,
         });
         explorationArtifact = result.artifact;
-        let explorationSource = result.source;
+        explorationSource = result.source;
         let explorationReason = result.reason || null;
 
         // Always supplement the live artifact with static context — static
@@ -11520,7 +11522,7 @@ async function runPipeline(config, runId) {
           }
           explorationArtifact = synthesizeExplorationArtifactFromContext(codebaseContext, explorationArtifact);
         }
-        const staticRoutesAdded = (explorationArtifact?.routes || []).length - routeCountBeforeStaticMerge;
+        staticRoutesAdded = (explorationArtifact?.routes || []).length - routeCountBeforeStaticMerge;
         if (staticRoutesAdded > 0) {
           Logger.info('PipelineWorker', `Static context merge added ${staticRoutesAdded} route(s) to exploration artifact`);
         }
@@ -11550,6 +11552,8 @@ async function runPipeline(config, runId) {
         if (Array.isArray(codebaseContext?.pages) && codebaseContext.pages.length > 0) {
           explorationArtifact = synthesizeExplorationArtifactFromContext(codebaseContext, explorationArtifact);
           routeAccessSummary = buildRouteAccessSummary(explorationArtifact);
+          explorationSource = 'failed+static-context';
+          staticRoutesAdded = (explorationArtifact?.routes || []).length;
           updateStatus(statusDir, 'explored', {
             runId,
             message: `Exploration failed; using static code context (${explErr.message})`,
@@ -12491,6 +12495,8 @@ async function runPipeline(config, runId) {
         generationQuality,
         requirementsCoverage,
         routeAccessSummary,
+        explorationSource,
+        staticRoutesAdded,
         phaseResults,
         tierResults,
         fallbackUsed,

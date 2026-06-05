@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import type { TestRun } from '@/lib/types/database';
+import { explorationSourceLabel } from '@/lib/utils/exploration-source-label';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 const ACTIVE_REFRESH_INTERVAL_MS = 10000;
@@ -88,6 +89,7 @@ function SkeletonRow() {
       <td className="px-6 py-4"><div className="h-4 w-52 bg-white/5 rounded animate-pulse" /></td>
       <td className="px-4 py-4"><div className="h-4 w-20 bg-white/5 rounded animate-pulse" /></td>
       <td className="px-4 py-4"><div className="h-5 w-16 bg-white/5 rounded-full animate-pulse" /></td>
+      <td className="px-4 py-4"><div className="h-4 w-10 bg-white/5 rounded animate-pulse" /></td>
       <td className="px-4 py-4"><div className="h-4 w-32 bg-white/5 rounded animate-pulse" /></td>
     </tr>
   );
@@ -504,6 +506,7 @@ export default function AllTestsPage() {
                   <th className="text-left px-6 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Name</th>
                   <th className="text-left px-4 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Tests Passed</th>
                   <th className="text-left px-4 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Routes</th>
                   <th className="text-left px-4 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Created</th>
                 </tr>
               </thead>
@@ -544,6 +547,7 @@ export default function AllTestsPage() {
                   <th className="text-left px-6 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Name</th>
                   <th className="text-left px-4 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Tests Passed</th>
                   <th className="text-left px-4 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Routes</th>
                   <th className="text-left px-4 py-3 text-[#4A6280] text-xs font-semibold uppercase tracking-wider">Created</th>
                 </tr>
               </thead>
@@ -585,6 +589,9 @@ export default function AllTestsPage() {
                               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadgeClass(group.latestStatus)}`}>
                                 {statusLabel(group.latestStatus)}
                               </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span className="text-[#4A6280] text-xs font-mono">—</span>
                             </td>
                             <td className="px-4 py-3.5">
                               <span className="text-[#4A6280] text-xs font-mono whitespace-nowrap">{formatDateTime(group.latestDate)}</span>
@@ -631,6 +638,20 @@ export default function AllTestsPage() {
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadgeClass(test.status)}`}>
                                   {statusLabel(test.status)}
                                 </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {test.exploration_meta?.explorationPhaseRouteCount != null ? (
+                                  <span className="group relative inline-flex items-center gap-1 text-[#8BA4C8] text-xs font-mono tabular-nums cursor-default">
+                                    {test.exploration_meta.explorationPhaseRouteCount}
+                                    {test.exploration_meta.explorationPhaseSource && (
+                                      <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-44 rounded-lg bg-[#0D1B2E] border border-white/10 px-2.5 py-1.5 text-[10px] text-[#BFD4F2] leading-relaxed shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">
+                                        {explorationSourceLabel(test.exploration_meta.explorationPhaseSource)}
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="text-[#4A6280] text-xs font-mono">—</span>
+                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <span className="text-[#4A6280] text-xs font-mono whitespace-nowrap">{formatDateTime(test.created_at)}</span>
@@ -685,6 +706,20 @@ export default function AllTestsPage() {
                           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadgeClass(test.status)}`}>
                             {statusLabel(test.status)}
                           </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          {test.exploration_meta?.explorationPhaseRouteCount != null ? (
+                            <span className="group relative inline-flex items-center gap-1 text-[#8BA4C8] text-xs font-mono tabular-nums cursor-default">
+                              {test.exploration_meta.explorationPhaseRouteCount}
+                              {test.exploration_meta.explorationPhaseSource && (
+                                <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-44 rounded-lg bg-[#0D1B2E] border border-white/10 px-2.5 py-1.5 text-[10px] text-[#BFD4F2] leading-relaxed shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">
+                                  {explorationSourceLabel(test.exploration_meta.explorationPhaseSource)}
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-[#4A6280] text-xs font-mono">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-4">
                           <span className="text-[#4A6280] text-xs font-mono whitespace-nowrap">{formatDateTime(test.created_at)}</span>

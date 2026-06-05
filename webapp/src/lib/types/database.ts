@@ -140,6 +140,7 @@ export interface TestRun {
   is_live?: boolean
   contributor_email?: string | null
   contributor_name?: string | null
+  exploration_meta?: ExplorationMeta | null
 }
 
 export interface ImportSession {
@@ -182,6 +183,12 @@ export interface GeneratedGroovyFile {
   status: 'generated' | 'failed'
   error_message: string | null
   created_at: string
+}
+
+export interface ExplorationMeta {
+  explorationPhaseRouteCount?: number | null
+  explorationPhaseSource?: string | null
+  staticRoutesAdded?: number | null
 }
 
 export interface MCPTelemetryEvent {

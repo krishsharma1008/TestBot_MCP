@@ -1102,7 +1102,7 @@ ${this.buildOutputFormatSection('e2e-workflows.spec.ts')}`
       }
       : null
 
-    const observedRoutes = (this.explorationArtifact?.routes || []).slice(0, 20).map((route) => ({
+    const observedRoutes = (this.explorationArtifact?.routes || []).slice(0, 60).map((route) => ({
       path: route.path,
       requiresAuth: route.requiresAuth === true ? true : (route.requiresAuth === false ? false : null),
       sourceFiles: pages
@@ -1448,7 +1448,7 @@ Return only the JSON array of generated files.`
 
     if (routes.length > 0) {
       lines.push('routes:')
-      for (const r of routes.slice(0, 20)) {
+      for (const r of routes.slice(0, 60)) {
         const authTag = r.requiresAuth ? ' (auth)' : ''
         const idTag = UUID_RE.test(r.path) ? ' [snapshot-id]' : ''
         lines.push(`- ${r.path}${authTag}${idTag}`)
