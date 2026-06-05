@@ -368,7 +368,7 @@ class ConfigUILauncher {
         // check whether a port is already occupied on localhost before the user
         // submits. Returns { port, inUse } so the form can show a live badge.
         if (pathname === '/api/probe-port' && req.method === 'GET') {
-          const qs = new URLSearchParams(url.split('?')[1] || '');
+          const qs = new URLSearchParams(parsedUrl.search);
           const probePort = parseInt(qs.get('port') || '0', 10);
           if (!probePort || probePort < 1 || probePort > 65535) {
             res.writeHead(400, { 'Content-Type': 'application/json' });

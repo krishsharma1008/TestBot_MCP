@@ -34,7 +34,7 @@ const DashboardLauncher = require('./dashboard-launcher');
 const AIAnalyzer = require('./ai-providers/index');
 const WebappClient = require('./webapp-client');
 const QACorpusWriter = require('./qa-corpus-writer');
-const { startSecondaryServices, stopSecondaryServices, probeHttpReady, waitForServiceReady, splitServices, spawnService } = require('./multi-service-starter');
+const { startSecondaryServices, stopSecondaryServices, probeHttpReady, waitForServiceReady, splitServices, spawnService, normalizeCommandForPlatform } = require('./multi-service-starter');
 const { runExplorationPhase, EMPTY_ARTIFACT, artifactHasUsefulContext } = require('./exploration-phase');
 const { normalizeRoleLabel, probeStorageState } = require('./credentials-injector');
 const { isUnsafeAuthFlow, sanitizeAuthFlow } = require('./auth-flow-utils');
@@ -2174,7 +2174,11 @@ function rewriteStartCommandForPort(startCommand, port, projectPath) {
   const framework = detectProjectStartFramework(projectPath);
   const usesPackageScript = /^(?:npm|pnpm|yarn|bun)(?:\s+run)?\s+\S+/i.test(command);
   if (framework === 'cra') {
-    return `PORT=${nextPort} ${command}`;
+    // On Windows cmd.exe, inline KEY=value assignment is not supported.
+    // Use `set PORT=X && command` on Windows; the Unix prefix elsewhere.
+    return process.platform === 'win32'
+      ? `set PORT=${nextPort} && ${command}`
+      : `PORT=${nextPort} ${command}`;
   }
 
   const flag = framework === 'next' || framework === 'remix'

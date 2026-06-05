@@ -453,7 +453,10 @@
                     </div>
                     <div class="field-row flex items-center gap-4" style="margin-top:20px;">
                         <div class="field-label">Port</div>
-                        <div style="flex:1;"><input type="text" id="port" value="5173" class="input-glass"></div>
+                        <div style="flex:1;">
+                            <input type="text" id="port" value="5173" class="input-glass">
+                            <div id="singlePortStatus" style="margin-top:6px;font-family:'Space Mono',monospace;font-size:11px;color:#505050;"></div>
+                        </div>
                     </div>
                     <div class="field-row flex items-center gap-4" style="margin-top:20px;">
                         <div class="field-label">Path</div>
@@ -878,6 +881,9 @@
             if (multiServiceMode) initMultiService();
             initBackendDependency();
             initComposeStack();
+            // Probe the single-service port on load (no-op when hidden because
+            // the badge element still exists; result is just never seen).
+            if (!multiServiceMode) probeSinglePort();
         }
 
         // ── Docker Compose note (single-service layout) ────────────────────
@@ -1087,6 +1093,40 @@
             _probeTimers[idx] = setTimeout(() => probeServicePort(idx), 600);
         }
 
+        // Port probe for the single-service layout (singleServerPortSection).
+        // Shows the same amber/green badge below the port input field.
+        async function probeSinglePort() {
+            const badge = document.getElementById('singlePortStatus');
+            if (!badge) return;
+            const port = Number((portInput.value || '').trim());
+            if (!port || port < 1 || port > 65535) {
+                badge.textContent = '';
+                return;
+            }
+            badge.style.color = '#505050';
+            badge.textContent = 'checking port…';
+            try {
+                const serverPort = urlParams.get('serverPort') || '54321';
+                const r = await fetch(`http://localhost:${serverPort}/api/probe-port?port=${port}`, { signal: AbortSignal.timeout(2000) });
+                const data = await r.json();
+                if (data.inUse) {
+                    badge.style.color = '#f59e0b';
+                    badge.textContent = `⚠ port ${port} is already in use — if this is your app already running, Healix will reuse it; otherwise change the port`;
+                } else {
+                    badge.style.color = '#5fd39a';
+                    badge.textContent = `✓ port ${port} is free`;
+                }
+            } catch {
+                badge.style.color = '#505050';
+                badge.textContent = '';
+            }
+        }
+        let _singleProbeTimer;
+        function scheduleSinglePortProbe() {
+            clearTimeout(_singleProbeTimer);
+            _singleProbeTimer = setTimeout(probeSinglePort, 600);
+        }
+
         function escapeAttr(value) {
             return String(value == null ? '' : value)
                 .replace(/&/g, '&amp;')
@@ -1181,6 +1221,7 @@
 
         hostInput.addEventListener('input', updateBaseURLPreview);
         portInput.addEventListener('input', updateBaseURLPreview);
+        portInput.addEventListener('input', scheduleSinglePortProbe);
         pathInput.addEventListener('input', updateBaseURLPreview);
 
         dropzone.addEventListener('click', () => fileInput.click());

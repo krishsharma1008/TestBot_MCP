@@ -20,6 +20,38 @@ const path = require('path');
 const net = require('net');
 const Logger = require('./logger');
 
+/**
+ * On Windows, cmd.exe does not understand the Unix `KEY=value command` syntax
+ * for inline environment-variable assignment. Convert any leading `KEY=value`
+ * tokens in the command string into `set KEY=value && ...` so the command runs
+ * correctly under cmd.exe.
+ *
+ * Examples (Windows only):
+ *   "PORT=3000 node app.js"           → "set PORT=3000 && node app.js"
+ *   "NODE_ENV=prod PORT=4000 npm start"→ "set NODE_ENV=prod && set PORT=4000 && npm start"
+ *   "npm run dev"                      → "npm run dev"  (unchanged)
+ *
+ * On non-Windows the command is returned unchanged.
+ */
+function normalizeCommandForPlatform(cmd) {
+  if (process.platform !== 'win32') return cmd;
+  // Match one or more leading KEY=value (or KEY='v a l' / KEY="v a l") tokens.
+  // KEY must start with a letter or underscore and contain only word chars.
+  const leadingEnvRe = /^((?:[A-Z_][A-Z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)+)/i;
+  const m = cmd.match(leadingEnvRe);
+  if (!m) return cmd;
+  const envPart = m[1].trim();   // e.g. "PORT=3000 NODE_ENV=prod"
+  const rest = cmd.slice(m[1].length).trim();        // the actual command
+  if (!rest) return cmd; // degenerate: nothing after env vars
+  // Convert each KEY=value token to "set KEY=value"
+  const sets = envPart
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((pair) => `set ${pair}`)
+    .join(' && ');
+  return `${sets} && ${rest}`;
+}
+
 const PID_FILENAME = '.healix-services.pids';
 
 function pidFilePath(projectPath) {
@@ -85,7 +117,11 @@ function cleanupLeftoverServices(projectPath) {
  */
 function spawnService({ command, cwd, env, label = 'service', maxStderrLines = 40 }) {
   const detached = process.platform !== 'win32';
-  const proc = spawn(command, {
+  const normalizedCommand = normalizeCommandForPlatform(command);
+  if (normalizedCommand !== command) {
+    Logger.debug('MultiServiceStarter', `Normalized command for Windows`, { original: command, normalized: normalizedCommand });
+  }
+  const proc = spawn(normalizedCommand, {
     cwd,
     shell: true,
     detached,
@@ -370,4 +406,5 @@ module.exports = {
   waitForServiceReady,
   probeHttpReady,
   spawnService,
+  normalizeCommandForPlatform,
 };

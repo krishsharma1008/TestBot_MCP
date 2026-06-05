@@ -427,3 +427,56 @@ test('composeStack: null when no compose file present', async () => {
     assert.equal(settings.composeStack, null);
   } finally { cleanup(root); }
 });
+
+// ── normalizeCommandForPlatform ──────────────────────────────────────────────
+// These tests exercise the Windows-path of the normalizer directly by mocking
+// process.platform inline (the function reads it at call time).
+
+const { normalizeCommandForPlatform } = require('../src/multi-service-starter');
+
+function normalizeOnWindows(cmd) {
+  const orig = process.platform;
+  Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+  try {
+    return normalizeCommandForPlatform(cmd);
+  } finally {
+    Object.defineProperty(process, 'platform', { value: orig, configurable: true });
+  }
+}
+
+function normalizeOnUnix(cmd) {
+  const orig = process.platform;
+  Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+  try {
+    return normalizeCommandForPlatform(cmd);
+  } finally {
+    Object.defineProperty(process, 'platform', { value: orig, configurable: true });
+  }
+}
+
+test('normalizeCommandForPlatform: PORT=3000 node app.js → set PORT=3000 && node app.js on Windows', () => {
+  assert.equal(normalizeOnWindows('PORT=3000 node app.js'), 'set PORT=3000 && node app.js');
+});
+
+test('normalizeCommandForPlatform: multiple leading vars are each wrapped in set', () => {
+  assert.equal(
+    normalizeOnWindows('NODE_ENV=production PORT=5000 node server.js'),
+    'set NODE_ENV=production && set PORT=5000 && node server.js'
+  );
+});
+
+test('normalizeCommandForPlatform: npm run dev unchanged on Windows (no leading KEY=val)', () => {
+  assert.equal(normalizeOnWindows('npm run dev'), 'npm run dev');
+});
+
+test('normalizeCommandForPlatform: set PORT=3000 && npm start unchanged on Windows (already converted)', () => {
+  assert.equal(normalizeOnWindows('set PORT=3000 && npm start'), 'set PORT=3000 && npm start');
+});
+
+test('normalizeCommandForPlatform: command is unchanged on non-Windows regardless of syntax', () => {
+  assert.equal(normalizeOnUnix('PORT=3000 node app.js'), 'PORT=3000 node app.js');
+});
+
+test('normalizeCommandForPlatform: node app.js unchanged on Windows', () => {
+  assert.equal(normalizeOnWindows('node app.js'), 'node app.js');
+});
