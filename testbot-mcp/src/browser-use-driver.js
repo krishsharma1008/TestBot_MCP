@@ -141,6 +141,8 @@ function driveExploration({
   totalTimeoutMs = DEFAULT_TIMEOUT_MS,
   onHeartbeat,
   stepTimeoutS = null, // injected by tests; otherwise calibrated at runtime
+  knownRoutes = [],
+  prdFeatures = [],
 } = {}) {
   return new Promise(async (resolve) => {
     if (!targetUrl) {
@@ -220,6 +222,23 @@ function driveExploration({
       // Set HEALIX_BROWSER_HEADLESS=false in the environment to open a visible
       // browser window (useful when debugging exploration failures locally).
       HEALIX_BROWSER_HEADLESS: process.env.HEALIX_BROWSER_HEADLESS ?? 'true',
+      // Known routes and PRD features for surgical gap-fill mode in browser-use.
+      // Capped at 60 paths to keep env size sane.
+      HEALIX_KNOWN_ROUTES: Array.isArray(knownRoutes) && knownRoutes.length > 0
+        ? JSON.stringify(
+            knownRoutes
+              .slice(0, 60)
+              .map((r) => (typeof r === 'string' ? r : r?.path || ''))
+              .filter(Boolean)
+          )
+        : '',
+      HEALIX_PRD_FEATURES: Array.isArray(prdFeatures) && prdFeatures.length > 0
+        ? JSON.stringify(
+            prdFeatures
+              .map((f) => (typeof f === 'string' ? f : f?.name || f?.title || ''))
+              .filter(Boolean)
+          )
+        : '',
     };
 
     let settled = false;

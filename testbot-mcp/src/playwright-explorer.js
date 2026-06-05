@@ -27,8 +27,8 @@ const {
   scoreAuthFlowCandidate,
 } = require('./auth-flow-utils');
 
-const MAX_ROUTES_PER_WALK = 20;
-const MAX_CLICK_PROBES_PER_WALK = 8;
+const MAX_ROUTES_PER_WALK = 60;
+const MAX_CLICK_PROBES_PER_WALK = 20;
 const GOTO_TIMEOUT_MS = 15_000;
 const SETTLE_WAIT_MS = 800;
 const CLICK_PROBE_TIMEOUT_MS = 1_500;
@@ -322,7 +322,7 @@ async function _walkRoutes({ browser, contextOptions, baseURL, origin, credentia
     if (!href || !sameOrigin(href, origin)) return;
     const routeKey = routeKeyFromUrl(href, baseURL);
     if (!routeKey || visitedPaths.has(routeKey) || queueContainsRoute(queue, routeKey, baseURL)) return;
-    if (queue.length + routes.length >= MAX_ROUTES_PER_WALK) return;
+    if (visitedPaths.size >= MAX_ROUTES_PER_WALK) return;
     queue.push(new URL(href, baseURL).toString());
   };
 
@@ -389,7 +389,7 @@ async function _walkRoutes({ browser, contextOptions, baseURL, origin, credentia
         enqueueUrl(a.href);
       }
 
-      if (remainingClickProbes > 0 && (routes.length <= 2 || queue.length < 2)) {
+      if (remainingClickProbes > 0 && queue.length < 3) {
         const maxClicks = Math.min(4, remainingClickProbes);
         const clickDiscovery = await _discoverClickRoutes(page, { resetUrl: page.url(), maxClicks });
         remainingClickProbes -= clickDiscovery.attempted || 0;
@@ -556,7 +556,7 @@ async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths =
 }
 
 const ENRICH_GOTO_TIMEOUT_MS = 8_000;
-const MAX_ENRICH_ROUTES = 8;
+const MAX_ENRICH_ROUTES = 40;
 
 async function _enrichRouteDOM(page) {
   return page.evaluate(() => {
@@ -643,9 +643,91 @@ async function enrichRoutesWithDOM({ baseURL, routes = [], storageStatePaths = [
   return { enrichments, errorProbe };
 }
 
+/**
+ * Phase A parallel enrichment: visits ALL provided routes across `concurrency`
+ * browser contexts simultaneously, respecting a shared time budget.
+ * Routes are ordered by PRD-feature relevance (priorityPaths) then alphabetically.
+ * Returns `{ enrichments: Map<path, domData>, timedOut: boolean }`.
+ *
+ * This is the primary enrichment path for the inverted exploration model.
+ * The existing `enrichRoutesWithDOM` (single context, capped at MAX_ENRICH_ROUTES)
+ * is kept for the post-browser-use enrichment pass.
+ */
+async function enrichAllRoutesWithDOM({
+  routes = [],
+  baseURL,
+  storageStatePaths = [],
+  concurrency = 3,
+  timeBudgetMs = 90_000,
+  priorityPaths = [],
+  onHeartbeat,
+} = {}) {
+  if (!routes.length || !baseURL) return { enrichments: new Map(), timedOut: false };
+
+  let chromium;
+  try { ({ chromium } = require('playwright')); } catch { return { enrichments: new Map(), timedOut: false }; }
+
+  const prioritySet = new Set(priorityPaths);
+  const sortedRoutes = [...routes].sort((a, b) => {
+    const aPriority = prioritySet.has(a.path) ? 0 : 1;
+    const bPriority = prioritySet.has(b.path) ? 0 : 1;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return (a.path || '').localeCompare(b.path || '');
+  });
+
+  // Split into round-robin buckets so each context gets a balanced mix of routes.
+  const actualConcurrency = Math.max(1, Math.min(concurrency, sortedRoutes.length));
+  const buckets = Array.from({ length: actualConcurrency }, () => []);
+  sortedRoutes.forEach((route, i) => buckets[i % actualConcurrency].push(route));
+
+  const validState = (storageStatePaths || []).find(
+    (s) => s?.storageStatePath && fs.existsSync(s.storageStatePath)
+  );
+  const contextOptions = validState ? { storageState: validState.storageStatePath } : {};
+
+  const browser = await chromium.launch({ headless: true });
+  const enrichments = new Map();
+  let timedOut = false;
+  const deadline = Date.now() + timeBudgetMs;
+
+  try {
+    await Promise.all(buckets.map(async (bucket) => {
+      if (!bucket.length) return;
+      const context = await browser.newContext(contextOptions);
+      const page = await context.newPage();
+      try {
+        for (const route of bucket) {
+          if (Date.now() >= deadline) {
+            timedOut = true;
+            break;
+          }
+          const url = urlForRoute(baseURL, route.path);
+          try {
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: ENRICH_GOTO_TIMEOUT_MS });
+            await page.waitForTimeout(SETTLE_WAIT_MS);
+            await _scrollToReveal(page);
+            if (typeof onHeartbeat === 'function') {
+              try { onHeartbeat({ type: 'heartbeat', path: route.path }); } catch { /* ignore */ }
+            }
+            const dom = await _enrichRouteDOM(page).catch(() => null);
+            if (dom) enrichments.set(route.path, dom);
+          } catch { /* non-fatal — skip route */ }
+        }
+      } finally {
+        try { await context.close(); } catch { /* ignore */ }
+      }
+    }));
+  } finally {
+    try { await browser.close(); } catch { /* ignore */ }
+  }
+
+  return { enrichments, timedOut };
+}
+
 module.exports = {
   exploreWithPlaywright,
   enrichRoutesWithDOM,
+  enrichAllRoutesWithDOM,
   _buildAuthFlowCandidate,
   _mergeWalks,
   _routeKeyFromUrl: routeKeyFromUrl,

@@ -11100,248 +11100,233 @@ async function runPipeline(config, runId) {
     }
 
     // -------------------------------------------------------
-    // 2. Gather codebase context
+    // 2 + 3. Gather codebase context AND read/parse PRD in parallel.
+    // Both are fast (3-15 s combined) and their outputs are the inputs that
+    // the exploration phase needs. Running them concurrently saves 5-15 s
+    // before exploration even starts.
     // -------------------------------------------------------
     let codebaseContext = config.codebaseContext;
-    if (config.generateTests && !codebaseContext) {
-      updateStatus(statusDir, 'context', {
-        runId,
-        message: 'Gathering codebase context...',
-        aiOnlyEnforced,
-      }, telemetryReporter);
+    let parsedPRD = null;
+    let combinedPrdContent = null;
 
-      codebaseContext = await withStageBudget(runBudget, 'context', async () => {
-        const contextGatherer = new ContextGatherer({
-          projectPath: config.projectPath,
-          language: config.language,
-        });
-        return contextGatherer.gatherRichContext();
-      });
-
-      Logger.info('PipelineWorker', 'Codebase context gathered', {
-        pages: codebaseContext.pages?.length || 0,
-        endpoints: codebaseContext.apiEndpoints?.length || 0,
-        workflows: codebaseContext.workflows?.length || 0,
-      });
-
-      if (config.ideContextMode === 'on' || config.ideContextMode === 'required') {
-        updateStatus(statusDir, 'context_enrichment', {
+    const [contextResult, prdResult] = await Promise.all([
+      // ── Step 2: codebase context ──────────────────────────────────────────
+      (async () => {
+        if (!config.generateTests || codebaseContext) return codebaseContext;
+        updateStatus(statusDir, 'context', {
           runId,
-          message: 'Requesting optional IDE context enrichment...',
+          message: 'Gathering codebase context...',
           aiOnlyEnforced,
         }, telemetryReporter);
 
-        try {
-          const requester = new AgentContextRequester({
+        let ctx = await withStageBudget(runBudget, 'context', async () => {
+          const contextGatherer = new ContextGatherer({
             projectPath: config.projectPath,
-            responseTimeout: toFiniteNumber(config.ideContextTimeoutMs, 2500),
+            language: config.language,
           });
-
-          const agentContext = await withStageBudget(runBudget, 'context', async () =>
-            requester.requestContext(codebaseContext, toFiniteNumber(config.ideContextTimeoutMs, 2500))
-          );
-
-          if (agentContext && typeof agentContext === 'object' && Object.keys(agentContext).length > 0) {
-            codebaseContext = requester.mergeContexts(codebaseContext, agentContext);
-            const summary = requester.summarizeContext(codebaseContext);
-            Logger.info('PipelineWorker', 'IDE context enrichment applied', summary);
-          } else {
-            Logger.info('PipelineWorker', 'IDE context enrichment not provided; continuing with auto-gathered context');
-          }
-        } catch (error) {
-          Logger.warn('PipelineWorker', 'IDE context enrichment failed (best-effort)', { reason: error.message });
-        }
-      }
-    }
-
-    // -------------------------------------------------------
-    // 3. Read PRD file(s) if specified
-    // -------------------------------------------------------
-    let prdContent = null;
-    const prdContents = [];
-    const prdErrors = [];
-
-    if (config.prdFile) {
-      try {
-        prdContent = fs.readFileSync(config.prdFile, 'utf-8');
-        prdContents.push(prdContent);
-        Logger.info('PipelineWorker', 'Read PRD file', { path: config.prdFile, length: prdContent.length });
-      } catch (error) {
-        Logger.error('PipelineWorker', 'Could not read PRD file', { path: config.prdFile, reason: error.message });
-        prdErrors.push({ path: config.prdFile, reason: error.message });
-      }
-    }
-
-    if (Array.isArray(config.prdFiles) && config.prdFiles.length > 0) {
-      for (const prdFilePath of config.prdFiles) {
-        if (prdFilePath === config.prdFile) continue;
-        try {
-          const content = fs.readFileSync(prdFilePath, 'utf-8');
-          prdContents.push(content);
-          Logger.info('PipelineWorker', 'Read additional PRD file', { path: prdFilePath, length: content.length });
-        } catch (error) {
-          Logger.error('PipelineWorker', 'Could not read PRD file', { path: prdFilePath, reason: error.message });
-          prdErrors.push({ path: prdFilePath, reason: error.message });
-        }
-      }
-    }
-
-    if (prdErrors.length > 0) {
-      // Surface PRD-read failures as a run-level warning event instead of silently dropping them.
-      updateStatus(statusDir, 'warning', {
-        runId,
-        message: `Some PRD file(s) could not be read and were skipped (${prdErrors.length}).`,
-        prdErrors,
-      }, telemetryReporter);
-      process.stderr.write(`[HEALIX] PRD read failures for run ${runId}: ${JSON.stringify(prdErrors)}\n`);
-    }
-
-    // Auto-ingest: if the user didn't hand us any PRD at all, sniff the project
-    // root for obvious candidates (README, PRD.md, docs/*.md). This is the
-    // silent fallback that lets Healix still benefit from whatever the repo
-    // ships — previously an empty prdFiles list just skipped this stage.
-    const userSuppliedPrd = Boolean(
-      config.prdFile || (Array.isArray(config.prdFiles) && config.prdFiles.length > 0)
-    );
-    if (!userSuppliedPrd && prdContents.length === 0 && config.projectPath) {
-      try {
-        const discovered = autoDiscoverPrdDocs(config.projectPath);
-        if (discovered.paths.length > 0 && discovered.content) {
-          prdContents.push(discovered.content);
-          Logger.info('PipelineWorker', 'Auto-ingested PRD candidates', {
-            paths: discovered.paths,
-            totalBytes: discovered.totalBytes,
-          });
-          updateStatus(statusDir, 'auto_ingested_prd', {
-            runId,
-            paths: discovered.paths,
-            totalBytes: discovered.totalBytes,
-          }, telemetryReporter);
-        }
-      } catch (error) {
-        // Silent-on-failure: autoscan must never break a run.
-        Logger.warn('PipelineWorker', 'PRD auto-ingest failed (best-effort)', { reason: error.message });
-      }
-    }
-
-    // Webapp Zod schema caps `prd` at MAX_PROMPT_CHARS (default 40 000). Truncate
-    // here so both /api/parse-prd and /api/generate-tests accept the payload.
-    // 38 000 gives a 2 000-char safety margin for multi-file join separators.
-    const PRD_CHAR_CAP = 38_000;
-    const rawCombinedPrdContent = prdContents.length > 0 ? prdContents.join('\n\n---\n\n') : null;
-    const combinedPrdContent = rawCombinedPrdContent && rawCombinedPrdContent.length > PRD_CHAR_CAP
-      ? rawCombinedPrdContent.slice(0, PRD_CHAR_CAP)
-      : rawCombinedPrdContent;
-    if (rawCombinedPrdContent && rawCombinedPrdContent.length > PRD_CHAR_CAP) {
-      Logger.warn('PipelineWorker', `PRD truncated from ${rawCombinedPrdContent.length} to ${PRD_CHAR_CAP} chars to stay under webapp limit`);
-    }
-
-    // -------------------------------------------------------
-    // 3a. Parse PRD into structured acceptance criteria (Phase B).
-    //
-    // Three paths converge here:
-    //   (1) User uploaded a PRD file      → config.prdFile / config.prdFiles → combinedPrdContent
-    //   (2) Cursor agent synthesised a PRD → submitted as prd text → persisted to disk upstream → same
-    //   (3) No PRD at all                  → combinedPrdContent === null → skip entirely, generator
-    //                                        falls back to context + exploration artifacts alone.
-    //
-    // If the /api/parse-prd call fails we don't kill the run — the raw PRD string is still
-    // passed down and the generator degrades to free-form PRD mode.
-    // -------------------------------------------------------
-    let parsedPRD = null;
-    if (combinedPrdContent && config.generateTests) {
-      updateStatus(statusDir, 'parsing_prd', {
-        runId,
-        message: 'Parsing PRD into structured acceptance criteria...',
-      }, telemetryReporter);
-      try {
-        const client = new WebappClient({ apiKey: process.env.HEALIX_API_KEY });
-        // Chunked parse: split PRD by top-level `##` headings, parse each
-        // chunk separately (≤ ~1500 input tokens) so the model's 8000-token
-        // completion cap never truncates the JSON. Falls back to a
-        // deterministic regex per chunk so AC traceability is preserved
-        // even if every LLM call fails (run vz2nys repro).
-        const chunks = PrdChunked.splitByFeatureHeadings(combinedPrdContent);
-        const chunkResult = await withStageBudget(runBudget, 'prdParse', () =>
-          PrdChunked.parsePRDChunked(combinedPrdContent, {
-            parseChunkLLM: async (chunkBody, { heading }) => {
-              try {
-                const sub = await ModelLadder.runWithLadder('parse_prd', async (model) => {
-                  return await client.parsePRD({ prdContent: chunkBody, model });
-                }, {
-                  onFallback: (decision) => {
-                    Logger.warn('PipelineWorker', '[parse-prd] model ladder fallback', decision);
-                    if (statusDir) {
-                      recordRunDecision(statusDir, telemetryReporter, {
-                        runId,
-                        decisionType: 'model_ladder_decision',
-                        phase: 'parsing_prd',
-                        status: 'warning',
-                        message: `parse-prd: ${decision.model} unavailable; falling back to ${decision.nextModel || 'next'}.`,
-                        metadata: { ...decision, heading },
-                      });
-                    }
-                  },
-                });
-                return sub?.value?.parsedPRD || null;
-              } catch (err) {
-                Logger.warn('PipelineWorker', '[parse-prd] chunk LLM failed — using regex', { reason: err?.message, heading });
-                return null;
-              }
-            },
-            onChunkParsed: ({ heading, source, acCount }) => {
-              Logger.info('PipelineWorker', `[parse-prd] chunk parsed via ${source}: ${heading} (${acCount} AC)`);
-            },
-          })
-        );
-        const parseResponse = { parsedPRD: chunkResult.parsedPRD, cached: false, tokenUsage: null, stats: chunkResult.stats };
-        parsedPRD = parseResponse?.parsedPRD || null;
-        Logger.info('PipelineWorker', `[parse-prd] chunked stats: total=${chunkResult.stats.totalAcs} chunks=${chunkResult.stats.chunkCount} (llm=${chunkResult.stats.llmChunkCount}, regex=${chunkResult.stats.regexChunkCount})`);
-        const prdTokens = parseResponse?.tokenUsage;
-        if (prdTokens && prdTokens.totalTokens > 0) {
-          Logger.info('PipelineWorker', '[TOKEN USAGE] parse-prd prompt=' + prdTokens.promptTokens + ' completion=' + prdTokens.completionTokens + ' total=' + prdTokens.totalTokens);
-        } else if (parseResponse?.cached) {
-          Logger.info('PipelineWorker', '[TOKEN USAGE] parse-prd — cached (no tokens charged)');
-        }
-        if (parsedPRD) {
-          try {
-            fs.writeFileSync(
-              path.join(statusDir, 'parsed-prd.json'),
-              JSON.stringify(parsedPRD, null, 2),
-              'utf-8'
-            );
-          } catch (writeErr) {
-            Logger.warn('PipelineWorker', 'Failed to cache parsed-prd.json', { reason: writeErr.message });
-          }
-          const featureCount = Array.isArray(parsedPRD.features) ? parsedPRD.features.length : 0;
-          const acCount = Array.isArray(parsedPRD.features)
-            ? parsedPRD.features.reduce((sum, f) =>
-                sum + (Array.isArray(f.userStories)
-                  ? f.userStories.reduce((s, st) =>
-                      s + (Array.isArray(st.acceptanceCriteria) ? st.acceptanceCriteria.length : 0), 0)
-                  : 0), 0)
-            : 0;
-          Logger.info('PipelineWorker', 'PRD parsed', { featureCount, acCount, cached: !!parseResponse?.cached });
-          updateStatus(statusDir, 'prd_parsed', {
-            runId,
-            message: `Parsed PRD: ${featureCount} feature(s), ${acCount} acceptance criteria`,
-            featureCount,
-            acCount,
-            cached: !!parseResponse?.cached,
-          }, telemetryReporter);
-        }
-      } catch (parseErr) {
-        Logger.warn('PipelineWorker', 'PRD parse failed — falling back to raw PRD text', {
-          reason: parseErr.message,
-          code: parseErr.code,
+          return contextGatherer.gatherRichContext();
         });
-        updateStatus(statusDir, 'warning', {
-          runId,
-          message: `PRD parsing failed — continuing with raw PRD text. (${parseErr.message})`,
-        }, telemetryReporter);
-        // parsedPRD stays null; generator will fall back to raw prd.
-      }
-    }
+
+        Logger.info('PipelineWorker', 'Codebase context gathered', {
+          pages: ctx.pages?.length || 0,
+          endpoints: ctx.apiEndpoints?.length || 0,
+          workflows: ctx.workflows?.length || 0,
+        });
+
+        if (config.ideContextMode === 'on' || config.ideContextMode === 'required') {
+          updateStatus(statusDir, 'context_enrichment', {
+            runId,
+            message: 'Requesting optional IDE context enrichment...',
+            aiOnlyEnforced,
+          }, telemetryReporter);
+          try {
+            const requester = new AgentContextRequester({
+              projectPath: config.projectPath,
+              responseTimeout: toFiniteNumber(config.ideContextTimeoutMs, 2500),
+            });
+            const agentContext = await withStageBudget(runBudget, 'context', async () =>
+              requester.requestContext(ctx, toFiniteNumber(config.ideContextTimeoutMs, 2500))
+            );
+            if (agentContext && typeof agentContext === 'object' && Object.keys(agentContext).length > 0) {
+              ctx = requester.mergeContexts(ctx, agentContext);
+              Logger.info('PipelineWorker', 'IDE context enrichment applied', requester.summarizeContext(ctx));
+            } else {
+              Logger.info('PipelineWorker', 'IDE context enrichment not provided; continuing with auto-gathered context');
+            }
+          } catch (error) {
+            Logger.warn('PipelineWorker', 'IDE context enrichment failed (best-effort)', { reason: error.message });
+          }
+        }
+        return ctx;
+      })(),
+
+      // ── Step 3: PRD read + parse ──────────────────────────────────────────
+      (async () => {
+        const prdContents = [];
+        const prdErrors = [];
+
+        if (config.prdFile) {
+          try {
+            const prdContent = fs.readFileSync(config.prdFile, 'utf-8');
+            prdContents.push(prdContent);
+            Logger.info('PipelineWorker', 'Read PRD file', { path: config.prdFile, length: prdContent.length });
+          } catch (error) {
+            Logger.error('PipelineWorker', 'Could not read PRD file', { path: config.prdFile, reason: error.message });
+            prdErrors.push({ path: config.prdFile, reason: error.message });
+          }
+        }
+
+        if (Array.isArray(config.prdFiles) && config.prdFiles.length > 0) {
+          for (const prdFilePath of config.prdFiles) {
+            if (prdFilePath === config.prdFile) continue;
+            try {
+              const content = fs.readFileSync(prdFilePath, 'utf-8');
+              prdContents.push(content);
+              Logger.info('PipelineWorker', 'Read additional PRD file', { path: prdFilePath, length: content.length });
+            } catch (error) {
+              Logger.error('PipelineWorker', 'Could not read PRD file', { path: prdFilePath, reason: error.message });
+              prdErrors.push({ path: prdFilePath, reason: error.message });
+            }
+          }
+        }
+
+        if (prdErrors.length > 0) {
+          updateStatus(statusDir, 'warning', {
+            runId,
+            message: `Some PRD file(s) could not be read and were skipped (${prdErrors.length}).`,
+            prdErrors,
+          }, telemetryReporter);
+          process.stderr.write(`[HEALIX] PRD read failures for run ${runId}: ${JSON.stringify(prdErrors)}\n`);
+        }
+
+        const userSuppliedPrd = Boolean(
+          config.prdFile || (Array.isArray(config.prdFiles) && config.prdFiles.length > 0)
+        );
+        if (!userSuppliedPrd && prdContents.length === 0 && config.projectPath) {
+          try {
+            const discovered = autoDiscoverPrdDocs(config.projectPath);
+            if (discovered.paths.length > 0 && discovered.content) {
+              prdContents.push(discovered.content);
+              Logger.info('PipelineWorker', 'Auto-ingested PRD candidates', {
+                paths: discovered.paths,
+                totalBytes: discovered.totalBytes,
+              });
+              updateStatus(statusDir, 'auto_ingested_prd', {
+                runId,
+                paths: discovered.paths,
+                totalBytes: discovered.totalBytes,
+              }, telemetryReporter);
+            }
+          } catch (error) {
+            Logger.warn('PipelineWorker', 'PRD auto-ingest failed (best-effort)', { reason: error.message });
+          }
+        }
+
+        const PRD_CHAR_CAP = 38_000;
+        const rawCombined = prdContents.length > 0 ? prdContents.join('\n\n---\n\n') : null;
+        const combined = rawCombined && rawCombined.length > PRD_CHAR_CAP
+          ? rawCombined.slice(0, PRD_CHAR_CAP)
+          : rawCombined;
+        if (rawCombined && rawCombined.length > PRD_CHAR_CAP) {
+          Logger.warn('PipelineWorker', `PRD truncated from ${rawCombined.length} to ${PRD_CHAR_CAP} chars to stay under webapp limit`);
+        }
+
+        // ── 3a. Parse PRD into structured acceptance criteria ───────────────
+        let parsed = null;
+        if (combined && config.generateTests) {
+          updateStatus(statusDir, 'parsing_prd', {
+            runId,
+            message: 'Parsing PRD into structured acceptance criteria...',
+          }, telemetryReporter);
+          try {
+            const client = new WebappClient({ apiKey: process.env.HEALIX_API_KEY });
+            const chunkResult = await withStageBudget(runBudget, 'prdParse', () =>
+              PrdChunked.parsePRDChunked(combined, {
+                parseChunkLLM: async (chunkBody, { heading }) => {
+                  try {
+                    const sub = await ModelLadder.runWithLadder('parse_prd', async (model) => {
+                      return await client.parsePRD({ prdContent: chunkBody, model });
+                    }, {
+                      onFallback: (decision) => {
+                        Logger.warn('PipelineWorker', '[parse-prd] model ladder fallback', decision);
+                        if (statusDir) {
+                          recordRunDecision(statusDir, telemetryReporter, {
+                            runId,
+                            decisionType: 'model_ladder_decision',
+                            phase: 'parsing_prd',
+                            status: 'warning',
+                            message: `parse-prd: ${decision.model} unavailable; falling back to ${decision.nextModel || 'next'}.`,
+                            metadata: { ...decision, heading },
+                          });
+                        }
+                      },
+                    });
+                    return sub?.value?.parsedPRD || null;
+                  } catch (err) {
+                    Logger.warn('PipelineWorker', '[parse-prd] chunk LLM failed — using regex', { reason: err?.message, heading });
+                    return null;
+                  }
+                },
+                onChunkParsed: ({ heading, source, acCount }) => {
+                  Logger.info('PipelineWorker', `[parse-prd] chunk parsed via ${source}: ${heading} (${acCount} AC)`);
+                },
+              })
+            );
+            const parseResponse = { parsedPRD: chunkResult.parsedPRD, cached: false, tokenUsage: null, stats: chunkResult.stats };
+            parsed = parseResponse?.parsedPRD || null;
+            Logger.info('PipelineWorker', `[parse-prd] chunked stats: total=${chunkResult.stats.totalAcs} chunks=${chunkResult.stats.chunkCount} (llm=${chunkResult.stats.llmChunkCount}, regex=${chunkResult.stats.regexChunkCount})`);
+            const prdTokens = parseResponse?.tokenUsage;
+            if (prdTokens && prdTokens.totalTokens > 0) {
+              Logger.info('PipelineWorker', '[TOKEN USAGE] parse-prd prompt=' + prdTokens.promptTokens + ' completion=' + prdTokens.completionTokens + ' total=' + prdTokens.totalTokens);
+            } else if (parseResponse?.cached) {
+              Logger.info('PipelineWorker', '[TOKEN USAGE] parse-prd — cached (no tokens charged)');
+            }
+            if (parsed) {
+              try {
+                fs.writeFileSync(
+                  path.join(statusDir, 'parsed-prd.json'),
+                  JSON.stringify(parsed, null, 2),
+                  'utf-8'
+                );
+              } catch (writeErr) {
+                Logger.warn('PipelineWorker', 'Failed to cache parsed-prd.json', { reason: writeErr.message });
+              }
+              const featureCount = Array.isArray(parsed.features) ? parsed.features.length : 0;
+              const acCount = Array.isArray(parsed.features)
+                ? parsed.features.reduce((sum, f) =>
+                    sum + (Array.isArray(f.userStories)
+                      ? f.userStories.reduce((s, st) =>
+                          s + (Array.isArray(st.acceptanceCriteria) ? st.acceptanceCriteria.length : 0), 0)
+                      : 0), 0)
+                : 0;
+              Logger.info('PipelineWorker', 'PRD parsed', { featureCount, acCount, cached: !!parseResponse?.cached });
+              updateStatus(statusDir, 'prd_parsed', {
+                runId,
+                message: `Parsed PRD: ${featureCount} feature(s), ${acCount} acceptance criteria`,
+                featureCount,
+                acCount,
+                cached: !!parseResponse?.cached,
+              }, telemetryReporter);
+            }
+          } catch (parseErr) {
+            Logger.warn('PipelineWorker', 'PRD parse failed — falling back to raw PRD text', {
+              reason: parseErr.message,
+              code: parseErr.code,
+            });
+            updateStatus(statusDir, 'warning', {
+              runId,
+              message: `PRD parsing failed — continuing with raw PRD text. (${parseErr.message})`,
+            }, telemetryReporter);
+          }
+        }
+        return { combined, parsed, prdContents };
+      })(),
+    ]);
+
+    if (contextResult !== undefined) codebaseContext = contextResult;
+    combinedPrdContent = prdResult?.combined ?? null;
+    parsedPRD = prdResult?.parsed ?? null;
+    const prdContents = prdResult?.prdContents ?? [];
 
     const projectInfo = {
       name: config.projectName,
@@ -11496,6 +11481,16 @@ async function runPipeline(config, runId) {
         message: 'Exploring app with browser-use...',
       }, telemetryReporter);
       try {
+        // Extract knownRoutes and prdFeatures to feed the inverted exploration model.
+        const knownRoutes = Array.isArray(codebaseContext?.pages)
+          ? codebaseContext.pages
+              .map((p) => ({ path: String(p?.path || p?.route || p?.url || '').trim() }))
+              .filter((r) => r.path && r.path.startsWith('/') && !r.path.includes('*'))
+          : [];
+        const prdFeatures = Array.isArray(parsedPRD?.features)
+          ? parsedPRD.features.map((f) => ({ name: f?.name || f?.title || '' })).filter((f) => f.name)
+          : [];
+
         const result = await runExplorationPhase({
           statusDir,
           baseURL: config.baseURL,
@@ -11503,21 +11498,33 @@ async function runPipeline(config, runId) {
           projectPath: config.projectPath,
           skipExploration: explorationSkipped,
           totalTimeoutMs: 120_000,
+          knownRoutes,
+          prdFeatures,
         });
         explorationArtifact = result.artifact;
         let explorationSource = result.source;
         let explorationReason = result.reason || null;
-        if (!artifactHasUsefulContext(explorationArtifact) && Array.isArray(codebaseContext?.pages) && codebaseContext.pages.length > 0) {
+
+        // Always supplement the live artifact with static context — static
+        // testIds / selectorHints are high-quality selectors that must not be
+        // discarded when browser exploration succeeds but is incomplete.
+        const routeCountBeforeStaticMerge = (explorationArtifact?.routes || []).length;
+        if (Array.isArray(codebaseContext?.pages) && codebaseContext.pages.length > 0) {
+          if (!artifactHasUsefulContext(explorationArtifact)) {
+            // Full fallback: browser exploration returned nothing useful.
+            explorationSource = `${result.source || 'unknown'}+static-context`;
+            explorationReason = explorationReason || 'browser exploration returned no useful app context';
+            Logger.warn('PipelineWorker', 'Exploration returned no useful app context; synthesized route/form context from static code analysis', {
+              originalSource: result.source,
+            });
+          }
           explorationArtifact = synthesizeExplorationArtifactFromContext(codebaseContext, explorationArtifact);
-          explorationSource = `${result.source || 'unknown'}+static-context`;
-          explorationReason = explorationReason || 'browser exploration returned no useful app context';
-          Logger.warn('PipelineWorker', 'Exploration returned no useful app context; synthesized route/form context from static code analysis', {
-            originalSource: result.source,
-            routeCount: (explorationArtifact?.routes || []).length,
-            formCount: (explorationArtifact?.forms || []).length,
-            keyFlowCount: (explorationArtifact?.keyFlows || []).length,
-          });
         }
+        const staticRoutesAdded = (explorationArtifact?.routes || []).length - routeCountBeforeStaticMerge;
+        if (staticRoutesAdded > 0) {
+          Logger.info('PipelineWorker', `Static context merge added ${staticRoutesAdded} route(s) to exploration artifact`);
+        }
+
         routeAccessSummary = buildRouteAccessSummary(explorationArtifact);
         // preAuthRoles carries the storageState files written during the
         // exploration pre-auth pass — used in step 3c to skip redundant logins.
@@ -11532,6 +11539,9 @@ async function runPipeline(config, runId) {
           routeCount: (explorationArtifact?.routes || []).length,
           keyFlowCount: (explorationArtifact?.keyFlows || []).length,
           formCount: (explorationArtifact?.forms || []).length,
+          staticRoutesAdded,
+          explorationPhaseRouteCount: (explorationArtifact?.routes || []).length,
+          explorationPhaseSource: explorationSource,
           routeAccessSummary,
           authFlowRejected: explorationArtifact?.authFlowRejected || null,
         }, telemetryReporter);

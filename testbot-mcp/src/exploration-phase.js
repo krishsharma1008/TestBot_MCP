@@ -21,7 +21,7 @@ const fs = require('fs');
 const path = require('path');
 const Logger = require('./logger');
 const { driveExploration } = require('./browser-use-driver');
-const { exploreWithPlaywright, enrichRoutesWithDOM } = require('./playwright-explorer');
+const { exploreWithPlaywright, enrichRoutesWithDOM, enrichAllRoutesWithDOM } = require('./playwright-explorer');
 const { injectCredentials } = require('./credentials-injector');
 const { isUnsafeAuthFlow, sanitizeAuthFlow } = require('./auth-flow-utils');
 
@@ -133,6 +133,8 @@ async function runExplorationPhase({
   projectPath,
   skipExploration = false,
   totalTimeoutMs = 120_000,
+  knownRoutes = [],
+  prdFeatures = [],
 }) {
   if (skipExploration) {
     Logger.info('ExplorationPhase', 'skipExploration=true — using empty artifact');
@@ -174,6 +176,55 @@ async function runExplorationPhase({
     }
   }
 
+  // Phase A: Parallel Playwright enrichment over all known static routes.
+  // Runs before browser-use so the LLM agent can focus on gap-filling only.
+  let phaseAEnrichments = new Map();
+  const parallelEnrichmentEnabled = process.env.HEALIX_PARALLEL_ENRICHMENT !== '0';
+  if (parallelEnrichmentEnabled && Array.isArray(knownRoutes) && knownRoutes.length > 0) {
+    Logger.info('ExplorationPhase', 'Phase A: parallel Playwright enrichment over static routes', {
+      routeCount: knownRoutes.length,
+    });
+    try {
+      const concurrency = Math.max(1, parseInt(process.env.HEALIX_ENRICHMENT_CONCURRENCY || '3', 10));
+      const timeBudgetMs = Math.max(10_000, parseInt(process.env.HEALIX_ENRICHMENT_BUDGET_MS || '90000', 10));
+      // Derive priority paths by keyword-matching PRD feature names against known
+      // route paths. Features have { name } shape; routes have { path } shape.
+      const prdPaths = (() => {
+        if (!Array.isArray(prdFeatures) || !prdFeatures.length) return [];
+        const routePaths = knownRoutes.map((r) => (typeof r === 'string' ? r : r?.path || ''));
+        const matched = new Set();
+        for (const f of prdFeatures) {
+          const name = (typeof f === 'string' ? f : f?.name || '').toLowerCase();
+          const keywords = name.split(/[\s\-_/]+/).filter((w) => w.length >= 4);
+          for (const rp of routePaths) {
+            if (keywords.some((kw) => rp.toLowerCase().includes(kw))) matched.add(rp);
+          }
+        }
+        return Array.from(matched);
+      })();
+      const phaseA = await enrichAllRoutesWithDOM({
+        routes: knownRoutes.map((r) => (typeof r === 'string' ? { path: r } : r)),
+        baseURL,
+        storageStatePaths: preAuthRoles,
+        concurrency,
+        timeBudgetMs,
+        priorityPaths: prdPaths,
+        onHeartbeat: () => {},
+      });
+      phaseAEnrichments = phaseA.enrichments;
+      if (phaseA.timedOut) {
+        Logger.warn('ExplorationPhase', 'Phase A enrichment hit time budget before completing all routes', {
+          enriched: phaseAEnrichments.size,
+          total: knownRoutes.length,
+        });
+      } else {
+        Logger.info('ExplorationPhase', 'Phase A enrichment complete', { enriched: phaseAEnrichments.size });
+      }
+    } catch (phaseAErr) {
+      Logger.warn('ExplorationPhase', 'Phase A enrichment failed (non-fatal)', { reason: phaseAErr.message });
+    }
+  }
+
   // Prefer browser-use when its deps are in place; fall back to heuristic
   // Playwright exploration so the MCP works out of the box without requiring
   // an OPENAI_API_KEY on the user's machine.
@@ -183,6 +234,8 @@ async function runExplorationPhase({
     allCredentials: Array.isArray(credentials) ? credentials : (cred ? [cred] : []),
     preAuthRoleCount: preAuthRoles.length,
     totalTimeoutMs,
+    knownRoutes: Array.isArray(knownRoutes) ? knownRoutes : [],
+    prdFeatures: Array.isArray(prdFeatures) ? prdFeatures : [],
     onHeartbeat: () => { /* noop — heartbeats could be surfaced to status later */ },
   });
   let source = 'browser-use';
@@ -257,7 +310,30 @@ async function runExplorationPhase({
     }
   }
 
-  const artifact = normalizeExplorationArtifact(result.artifact, source);
+  // Merge Phase A enrichments into the live artifact. Live browser data wins on
+  // conflict — Phase A data only fills gaps where the live pass has no DOM data.
+  let mergedArtifact = result.artifact || {};
+  if (phaseAEnrichments.size > 0) {
+    const liveRoutes = Array.isArray(mergedArtifact.routes) ? mergedArtifact.routes : [];
+    const livePathSet = new Set(liveRoutes.map((r) => r.path));
+    // Enrich existing live routes that lack DOM data
+    const enrichedLive = liveRoutes.map((r) => {
+      if (phaseAEnrichments.has(r.path) && !r.labels && !r.buttons) {
+        return { ...phaseAEnrichments.get(r.path), ...r };
+      }
+      return r;
+    });
+    // Add Phase A routes not found by the live browser pass
+    const extraRoutes = [];
+    for (const [routePath, dom] of phaseAEnrichments) {
+      if (!livePathSet.has(routePath)) {
+        extraRoutes.push({ path: routePath, requiresAuth: false, source: 'phase_a_enrichment', ...dom });
+      }
+    }
+    mergedArtifact = { ...mergedArtifact, routes: [...enrichedLive, ...extraRoutes] };
+  }
+
+  const artifact = normalizeExplorationArtifact(mergedArtifact, source);
 
   if (statusDir) {
     try {

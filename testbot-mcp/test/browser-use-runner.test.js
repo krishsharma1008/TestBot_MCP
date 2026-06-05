@@ -15,9 +15,11 @@ function pythonCmd() {
   return null;
 }
 
-function buildTask({ preauthVerified = false, withCredentials = true } = {}) {
+function buildTask({ preauthVerified = false, withCredentials = true, knownRoutes = null, prdFeatures = null } = {}) {
   const cmd = pythonCmd();
   if (!cmd) return null;
+  const knownRoutesArg = knownRoutes ? JSON.stringify(knownRoutes) : 'None';
+  const prdFeaturesArg = prdFeatures ? JSON.stringify(prdFeatures) : 'None';
   const script = `
 import importlib.util, json
 spec = importlib.util.spec_from_file_location("browser_use_runner", ${JSON.stringify(runnerPath)})
@@ -28,6 +30,8 @@ task = mod._build_task(
   "user@example.test" if ${withCredentials ? 'True' : 'False'} else None,
   "Password123!" if ${withCredentials ? 'True' : 'False'} else None,
   preauth_verified=${preauthVerified ? 'True' : 'False'},
+  known_routes=${knownRoutesArg},
+  prd_features=${prdFeaturesArg},
 )
 print(json.dumps(task))
 `;
@@ -68,4 +72,65 @@ test('browser-use defaults to gpt-5.5-mini for JSON-stable exploration', () => {
   assert.match(runnerSource, /"gpt-5\.5-mini":\s*"gpt-5-mini"/);
   assert.match(runnerSource, /_provider_model\(model\)/);
   assert.match(driverSource, /HEALIX_BROWSER_USE_MODEL:\s*process\.env\.HEALIX_BROWSER_USE_MODEL\s*\|\|\s*'gpt-5\.5-mini'/);
+});
+
+test('browser-use gap-fill prompt includes already-mapped routes list when known_routes provided', (t) => {
+  const task = buildTask({
+    withCredentials: false,
+    knownRoutes: ['/dashboard', '/settings', '/reports'],
+  });
+  if (!task) {
+    t.skip('python not available');
+    return;
+  }
+  assert.match(task, /ALREADY MAPPED/i);
+  assert.match(task, /\/dashboard/);
+  assert.match(task, /\/settings/);
+  assert.match(task, /\/reports/);
+  assert.match(task, /GAP-FILL/i);
+  assert.match(task, /routes NOT in that list/i);
+});
+
+test('browser-use gap-fill prompt includes PRD features when prd_features provided', (t) => {
+  const task = buildTask({
+    withCredentials: false,
+    knownRoutes: ['/dashboard'],
+    prdFeatures: ['User Dashboard', 'Report Builder'],
+  });
+  if (!task) {
+    t.skip('python not available');
+    return;
+  }
+  assert.match(task, /PRD features to cover/i);
+  assert.match(task, /User Dashboard/);
+  assert.match(task, /Report Builder/);
+});
+
+test('browser-use task falls back to full navigation prompt when no known_routes', (t) => {
+  const task = buildTask({ withCredentials: false, knownRoutes: null });
+  if (!task) {
+    t.skip('python not available');
+    return;
+  }
+  // Legacy mode: no gap-fill block, standard navigation instruction.
+  assert.doesNotMatch(task, /ALREADY MAPPED/i);
+  assert.match(task, /NAVIGATE.*visit up to 12 distinct routes/is);
+});
+
+test('browser-use max_steps default raised to 20 and ceiling raised to 30', () => {
+  const runnerSource = fs.readFileSync(runnerPath, 'utf-8');
+  // Default and fallback both set to 20.
+  assert.match(runnerSource, /max_steps = 20/);
+  // Ceiling raised to 30 in the min/max clamp.
+  assert.match(runnerSource, /min\(30,/);
+  // Env var default is also 20.
+  assert.match(runnerSource, /HEALIX_BROWSER_USE_MAX_STEPS",\s*"20"/);
+});
+
+test('browser-use driver serializes knownRoutes and prdFeatures as env vars', () => {
+  const driverSource = fs.readFileSync(driverPath, 'utf-8');
+  assert.match(driverSource, /HEALIX_KNOWN_ROUTES/);
+  assert.match(driverSource, /HEALIX_PRD_FEATURES/);
+  // Cap at 60 paths.
+  assert.match(driverSource, /slice\(0,\s*60\)/);
 });
