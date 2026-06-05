@@ -15,6 +15,7 @@ const {
   buildRouteAccessSummary,
   synthesizeExplorationArtifactFromContext,
   allCredentialsCoveredByPreAuth,
+  hasVerifiedStorageState,
   buildGenerationRepairContext,
   minimumUsefulRunnableFloor,
   adaptiveRunnableFloor,
@@ -3167,6 +3168,52 @@ test('auth reinjection merge preserves verified pre-auth storageState when fresh
     assert.equal(merged.roles[0].storageStatePath, statePath);
     assert.equal(merged.roles[0].reusedFromPreAuth, true);
     assert.deepEqual(merged.reusedPreAuthRoles, ['admin']);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('hasVerifiedStorageState returns true for a fresh storageState file', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'healix-storage-state-ttl-'));
+  try {
+    const statePath = path.join(root, 'auth-state-user.json');
+    fs.writeFileSync(statePath, JSON.stringify({ cookies: [], origins: [] }));
+    const role = { role: 'user', storageStatePath: statePath, loginVerified: true };
+    assert.equal(hasVerifiedStorageState(role), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('hasVerifiedStorageState returns false when storageState file is older than maxAgeMs', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'healix-storage-state-stale-'));
+  try {
+    const statePath = path.join(root, 'auth-state-user.json');
+    fs.writeFileSync(statePath, JSON.stringify({ cookies: [], origins: [] }));
+    const role = { role: 'user', storageStatePath: statePath, loginVerified: true };
+    // Pass maxAgeMs=0 to force the file to be treated as already expired.
+    assert.equal(hasVerifiedStorageState(role, 0), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('hasVerifiedStorageState returns false when storageState file does not exist', () => {
+  const role = {
+    role: 'user',
+    storageStatePath: path.join(os.tmpdir(), 'healix-nonexistent-auth-state.json'),
+    loginVerified: true,
+  };
+  assert.equal(hasVerifiedStorageState(role), false);
+});
+
+test('hasVerifiedStorageState returns false when loginVerified is false', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'healix-storage-state-unverified-'));
+  try {
+    const statePath = path.join(root, 'auth-state-user.json');
+    fs.writeFileSync(statePath, JSON.stringify({ cookies: [], origins: [] }));
+    const role = { role: 'user', storageStatePath: statePath, loginVerified: false };
+    assert.equal(hasVerifiedStorageState(role), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

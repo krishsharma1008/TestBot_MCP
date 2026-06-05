@@ -826,13 +826,14 @@ function roleKeyForAuth(role) {
   return normalizeRoleLabel(role?.role || role?.name || role || 'user');
 }
 
-function hasVerifiedStorageState(role) {
-  return !!(
-    role &&
-    role.loginVerified &&
-    role.storageStatePath &&
-    fs.existsSync(role.storageStatePath)
-  );
+function hasVerifiedStorageState(role, maxAgeMs = (Number(process.env.HEALIX_STORAGE_STATE_MAX_AGE_MINUTES) || 55) * 60 * 1000) {
+  if (!role?.loginVerified || !role?.storageStatePath) return false;
+  try {
+    const stat = fs.statSync(role.storageStatePath);
+    return (Date.now() - stat.mtimeMs) < maxAgeMs;
+  } catch {
+    return false;
+  }
 }
 
 function allCredentialsCoveredByPreAuth(credentials = [], preAuthRoles = []) {
@@ -13077,6 +13078,7 @@ module.exports = {
   buildRouteAccessSummary,
   synthesizeExplorationArtifactFromContext,
   allCredentialsCoveredByPreAuth,
+  hasVerifiedStorageState,
   mergeCredentialInjectionRoles,
   shouldTrustDiscoveredAuthFlow,
   hasApiSurfaceForGeneration,
