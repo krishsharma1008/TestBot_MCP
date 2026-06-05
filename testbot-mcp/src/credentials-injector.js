@@ -484,6 +484,44 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
         const fieldTimeout = isDiscovered ? 15_000 : 8_000;
         const usernameFill = await fillFirstVisible(page, userFieldCandidates, credentials.username, fieldTimeout);
         if (!usernameFill.ok) throw new Error(usernameFill.reason);
+
+        // Two-step (email-first) flow: the gate found only the username field.
+        // Click Continue/Next to reveal the password field before trying to fill it.
+        if (formGate.via === 'username') {
+          const continueSelectors = [
+            'button[type="submit"]',
+            'input[type="submit"]',
+            'button:has-text("Continue")',
+            'button:has-text("Next")',
+            'button:has-text("Sign in")',
+            'button:has-text("Log in")',
+          ];
+          // Try pressing Enter on the username field first (most reliable); fall
+          // back to clicking a submit-style button if that doesn't work.
+          await page.locator(usernameFill.selector).first().press('Enter').catch(async () => {
+            for (const sel of continueSelectors) {
+              try {
+                const btn = page.locator(sel).first();
+                if ((await btn.count().catch(() => 0)) > 0) {
+                  await btn.click({ timeout: 5_000 });
+                  return;
+                }
+              } catch { /* try next */ }
+            }
+          });
+
+          // Wait up to 4 s for the password field to appear after the step-1 submit.
+          const passGate = await pageHasCredentialForm(page, [], passFieldCandidates, 4_000);
+          if (!passGate.ok) {
+            // Password field never appeared — passwordless / magic-link app.
+            return {
+              ok: false,
+              noLoginForm: true,
+              reason: 'two_step_no_password_field: username submitted but no password field appeared — app may use magic-link or SSO',
+            };
+          }
+        }
+
         const passwordFill = await fillFirstVisible(page, passFieldCandidates, credentials.password, 10_000);
         if (!passwordFill.ok) throw new Error(passwordFill.reason);
         // Both credential fields filled — this is a genuine login form. Record

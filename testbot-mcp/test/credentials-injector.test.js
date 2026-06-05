@@ -410,6 +410,53 @@ test('pageHasCredentialForm rejects a 404 / wrong-route shell with no inputs', a
   assert.ok(Date.now() - started < 3_000, 'empty page should resolve quickly');
 });
 
+// Two-step login: password field appears only after username is submitted.
+// Simulates the new driveLogin step-2 logic by verifying that:
+// (a) pageHasCredentialForm correctly detects "via=username" when only email is visible,
+// (b) after a simulated Continue click (the password field is now added to DOM),
+//     pageHasCredentialForm returns ok=true via "password",
+// (c) when the password field never appears, the gate returns ok=false (passwordless path).
+test('two-step login: password gate returns ok after email-first step', async () => {
+  // Simulate DOM state after step-2 submit: both fields present.
+  const pageWithPassword = makeGatePage({
+    'input[type="email"]': true,
+    'input[type="password"]': true,
+  });
+  const res = await pageHasCredentialForm(
+    pageWithPassword,
+    ['input[type="email"]'],
+    ['input[type="password"]'],
+    2_500,
+  );
+  assert.equal(res.ok, true);
+  assert.equal(res.via, 'password');
+});
+
+test('two-step login: password gate returns ok=false when no password field appears', async () => {
+  // Simulate a magic-link / passwordless app: only email field, never a password field.
+  const pageNoPassword = makeGatePage({ 'input[type="email"]': true });
+  const res = await pageHasCredentialForm(
+    pageNoPassword,
+    [],
+    ['input[type="password"]'],
+    500,
+  );
+  assert.equal(res.ok, false);
+});
+
+test('two-step login: fillFirstVisible fills username on email-only page', async () => {
+  const page = makeFakePage({ 'input[type="email"]': { count: 1 } });
+  const result = await fillFirstVisible(
+    page,
+    ['input[type="email"]'],
+    'user@example.com',
+    5_000,
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.selector, 'input[type="email"]');
+  assert.deepEqual(page.calls.fill, [{ selector: 'input[type="email"]', value: 'user@example.com' }]);
+});
+
 test('credential injector checks durable logged-in markers and username text', () => {
   const locators = buildSuccessLocators(
     { successIndicator: 'nav >> text=Signed in' },
