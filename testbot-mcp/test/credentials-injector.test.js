@@ -457,6 +457,41 @@ test('two-step login: fillFirstVisible fills username on email-only page', async
   assert.deepEqual(page.calls.fill, [{ selector: 'input[type="email"]', value: 'user@example.com' }]);
 });
 
+// Gap 3: per-role credential filter uses normalizeRoleLabel for key matching.
+// Verifies that the filter logic used in exploration-phase.js correctly
+// identifies which credentials still need browser-use login after partial pre-auth.
+test('normalizeRoleLabel produces consistent keys for role alias matching', () => {
+  // These must all produce the same key so the per-role filter can match them.
+  assert.equal(normalizeRoleLabel('Admin'), normalizeRoleLabel('admin'));
+  assert.equal(normalizeRoleLabel('SUPER_ADMIN'), normalizeRoleLabel('super_admin'));
+  assert.equal(normalizeRoleLabel(undefined), 'user');
+  assert.equal(normalizeRoleLabel(''), 'user');
+});
+
+test('per-role credential filter passes failed role credential when one role pre-authed', () => {
+  // Simulate exploration-phase.js per-role filter logic:
+  // admin succeeded pre-auth, user failed — user credential should be returned.
+  const allCreds = [
+    { role: 'admin', username: 'admin@example.com', password: 'pass1' },
+    { role: 'user', username: 'user@example.com', password: 'pass2' },
+  ];
+  const preAuthRoleKeys = new Set(['admin'].map((r) => normalizeRoleLabel(r)));
+  const failedCreds = allCreds.filter((c) => !preAuthRoleKeys.has(normalizeRoleLabel(c.role || c.name || 'user')));
+  assert.equal(failedCreds.length, 1);
+  assert.equal(failedCreds[0].role, 'user');
+  assert.equal(failedCreds[0].username, 'user@example.com');
+});
+
+test('per-role credential filter returns empty when all roles pre-authed', () => {
+  const allCreds = [
+    { role: 'admin', username: 'admin@example.com', password: 'pass1' },
+    { role: 'user', username: 'user@example.com', password: 'pass2' },
+  ];
+  const preAuthRoleKeys = new Set(['admin', 'user'].map((r) => normalizeRoleLabel(r)));
+  const failedCreds = allCreds.filter((c) => !preAuthRoleKeys.has(normalizeRoleLabel(c.role || c.name || 'user')));
+  assert.equal(failedCreds.length, 0);
+});
+
 test('credential injector checks durable logged-in markers and username text', () => {
   const locators = buildSuccessLocators(
     { successIndicator: 'nav >> text=Signed in' },

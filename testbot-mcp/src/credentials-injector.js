@@ -636,8 +636,15 @@ async function injectCredentials({
       Logger.info('CredentialsInjector', `Login verified for role=${role}`, { storageStatePath });
       roles.push({ role, name: role, storageStatePath, loginVerified: true });
     } else {
-      Logger.warn('CredentialsInjector', `Login failed for role=${role}`, { reason: result.reason });
-      roles.push({ role, name: role, storageStatePath: null, loginVerified: false, reason: result.reason });
+      Logger.warn('CredentialsInjector', `Login failed for role=${role}`, { reason: result.reason, noLoginForm: result.noLoginForm || false });
+      roles.push({
+        role,
+        name: role,
+        storageStatePath: null,
+        loginVerified: false,
+        reason: result.reason,
+        ...(result.noLoginForm ? { noLoginForm: true } : {}),
+      });
     }
   }
   return roles;

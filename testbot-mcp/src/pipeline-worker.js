@@ -11531,8 +11531,13 @@ async function runPipeline(config, runId) {
         routeAccessSummary = buildRouteAccessSummary(explorationArtifact);
         // preAuthRoles carries the storageState files written during the
         // exploration pre-auth pass — used in step 3c to skip redundant logins.
+        // preAuthFailedRoles carries roles that failed injection (noLoginForm etc.)
+        // — surfaced in the auth_injected status event for user-facing diagnostics.
         if (Array.isArray(result.preAuthRoles)) {
           config = { ...config, _preAuthRoles: result.preAuthRoles };
+        }
+        if (Array.isArray(result.preAuthFailedRoles)) {
+          config = { ...config, _preAuthFailedRoles: result.preAuthFailedRoles };
         }
         updateStatus(statusDir, 'explored', {
           runId,
@@ -11586,6 +11591,10 @@ async function runPipeline(config, runId) {
     let roles = [];
     if (Array.isArray(config.testCredentials) && config.testCredentials.length > 0) {
       const preAuthRoles = Array.isArray(config._preAuthRoles) ? config._preAuthRoles : [];
+      const preAuthFailedRoles = Array.isArray(config._preAuthFailedRoles) ? config._preAuthFailedRoles : [];
+      const noLoginFormRoles = preAuthFailedRoles
+        .filter((r) => r.noLoginForm)
+        .map((r) => r.role);
       const allPreAuthVerified = allCredentialsCoveredByPreAuth(config.testCredentials, preAuthRoles);
       const hasTrustedAuthFlow = shouldTrustDiscoveredAuthFlow(explorationArtifact?.authFlow);
 
@@ -11602,6 +11611,10 @@ async function runPipeline(config, runId) {
           message: `${roles.filter((r) => r.loginVerified).length}/${roles.length} role login(s) verified (reused from pre-auth)`,
           roles: summarizeAuthRoles(roles),
           authFlowRejected: explorationArtifact?.authFlowRejected || null,
+          ...(noLoginFormRoles.length > 0 ? {
+            noLoginFormRoles,
+            noLoginFormHint: 'Sign-in route not found — check HEALIX_LOGIN_URL config or verify the app\'s login path',
+          } : {}),
         }, telemetryReporter);
         recordRunDecision(statusDir, telemetryReporter, {
           runId,
@@ -11646,6 +11659,10 @@ async function runPipeline(config, runId) {
           message: `${roles.length} role(s) configured — auth handled by generated auth-setup.ts`,
           roles: summarizeAuthRoles(roles),
           authFlowRejected: explorationArtifact?.authFlowRejected || null,
+          ...(noLoginFormRoles.length > 0 ? {
+            noLoginFormRoles,
+            noLoginFormHint: 'Sign-in route not found — check HEALIX_LOGIN_URL config or verify the app\'s login path',
+          } : {}),
         }, telemetryReporter);
         recordRunDecision(statusDir, telemetryReporter, {
           runId,

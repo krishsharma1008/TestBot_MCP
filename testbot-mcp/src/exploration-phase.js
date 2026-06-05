@@ -22,7 +22,7 @@ const path = require('path');
 const Logger = require('./logger');
 const { driveExploration } = require('./browser-use-driver');
 const { exploreWithPlaywright, enrichRoutesWithDOM, enrichAllRoutesWithDOM } = require('./playwright-explorer');
-const { injectCredentials } = require('./credentials-injector');
+const { injectCredentials, normalizeRoleLabel } = require('./credentials-injector');
 const { isUnsafeAuthFlow, sanitizeAuthFlow } = require('./auth-flow-utils');
 
 const EMPTY_ARTIFACT = Object.freeze({
@@ -154,6 +154,7 @@ async function runExplorationPhase({
   // Playwright heuristic explorer which runs one walk per role and merges the
   // results. browser-use handles its own login via the improved task prompt.
   let preAuthRoles = [];
+  let preAuthFailedRoles = [];
   if (cred && projectPath) {
     try {
       const allCreds = Array.isArray(credentials) ? credentials : [cred];
@@ -164,12 +165,18 @@ async function runExplorationPhase({
         authFlow: null,
       });
       preAuthRoles = injected.filter((r) => r.loginVerified && r.storageStatePath);
+      preAuthFailedRoles = injected.filter((r) => !r.loginVerified);
       if (preAuthRoles.length > 0) {
         Logger.info('ExplorationPhase', `Pre-auth login succeeded for ${preAuthRoles.length} role(s) — explorer will start authenticated`, {
           roles: preAuthRoles.map((r) => r.role),
         });
       } else {
-        Logger.info('ExplorationPhase', 'Pre-auth login could not be verified for any role — exploring as unauthenticated');
+        const allNoLoginForm = injected.length > 0 && injected.every((r) => r.noLoginForm);
+        if (allNoLoginForm) {
+          Logger.warn('ExplorationPhase', 'Pre-auth skipped — sign-in route not found for any role. Check HEALIX_LOGIN_URL config or verify the app\'s login path');
+        } else {
+          Logger.info('ExplorationPhase', 'Pre-auth login could not be verified for any role — exploring as unauthenticated');
+        }
       }
     } catch (preAuthErr) {
       Logger.warn('ExplorationPhase', 'Pre-auth attempt failed (best-effort)', { reason: preAuthErr.message });
@@ -228,10 +235,18 @@ async function runExplorationPhase({
   // Prefer browser-use when its deps are in place; fall back to heuristic
   // Playwright exploration so the MCP works out of the box without requiring
   // an OPENAI_API_KEY on the user's machine.
+  // Only withhold credentials for roles that successfully pre-authed.
+  // If admin pre-authed but user failed, still pass the user credential to
+  // browser-use so it can attempt login for that role's routes.
+  const allCreds = Array.isArray(credentials) ? credentials : (cred ? [cred] : []);
+  const preAuthRoleKeys = new Set(preAuthRoles.map((r) => normalizeRoleLabel(r.role || r.name || 'user')));
+  const failedCreds = allCreds.filter((c) => !preAuthRoleKeys.has(normalizeRoleLabel(c.role || c.name || 'user')));
+  const browserUseCred = failedCreds.length > 0 ? { username: failedCreds[0].username, password: failedCreds[0].password } : undefined;
+
   let result = await driveExploration({
     targetUrl: baseURL,
-    credentials: preAuthRoles.length > 0 ? undefined : credsForAgent,
-    allCredentials: Array.isArray(credentials) ? credentials : (cred ? [cred] : []),
+    credentials: browserUseCred,
+    allCredentials: allCreds,
     preAuthRoleCount: preAuthRoles.length,
     totalTimeoutMs,
     knownRoutes: Array.isArray(knownRoutes) ? knownRoutes : [],
@@ -253,7 +268,7 @@ async function runExplorationPhase({
       Logger.warn('ExplorationPhase', 'browser-use returned no usable context — falling back to Playwright heuristic', {
         observedErrors: result.artifact?.observedErrors || [],
       });
-      const fallback = await runPlaywrightFallback({ baseURL, credsForAgent, preAuthRoles });
+      const fallback = await runPlaywrightFallback({ baseURL, credsForAgent: browserUseCred, preAuthRoles });
       if (fallback.available) {
         const fallbackArtifact = fallback.artifact || {};
         const browserAuthFlow = result.artifact?.authFlow || null;
@@ -347,7 +362,7 @@ async function runExplorationPhase({
     }
   }
 
-  return { artifact, source, preAuthRoles };
+  return { artifact, source, preAuthRoles, preAuthFailedRoles };
 }
 
 module.exports = {

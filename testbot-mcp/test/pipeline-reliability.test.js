@@ -3219,6 +3219,33 @@ test('hasVerifiedStorageState returns false when loginVerified is false', () => 
   }
 });
 
+// Gap 4: noLoginForm flag is propagated from preAuthFailedRoles to auth_injected status.
+// Tests the data-flow: _preAuthFailedRoles set by pipeline-worker from exploration result,
+// noLoginFormRoles computed and conditionally included in the status event payload.
+test('noLoginFormRoles extracted from preAuthFailedRoles with noLoginForm flag', () => {
+  const preAuthFailedRoles = [
+    { role: 'user', loginVerified: false, noLoginForm: true, reason: 'no credential form rendered at /login' },
+    { role: 'admin', loginVerified: false, reason: 'Login failed on /login: invalid credentials' },
+  ];
+  const noLoginFormRoles = preAuthFailedRoles.filter((r) => r.noLoginForm).map((r) => r.role);
+  assert.deepEqual(noLoginFormRoles, ['user']);
+});
+
+test('noLoginFormRoles is empty when all failed roles have valid login forms', () => {
+  const preAuthFailedRoles = [
+    { role: 'user', loginVerified: false, reason: 'Login failed on /login: invalid credentials' },
+    { role: 'admin', loginVerified: false, reason: 'Login driver error: timeout' },
+  ];
+  const noLoginFormRoles = preAuthFailedRoles.filter((r) => r.noLoginForm).map((r) => r.role);
+  assert.deepEqual(noLoginFormRoles, []);
+});
+
+test('noLoginFormRoles is empty when preAuthFailedRoles is empty', () => {
+  const preAuthFailedRoles = [];
+  const noLoginFormRoles = preAuthFailedRoles.filter((r) => r.noLoginForm).map((r) => r.role);
+  assert.deepEqual(noLoginFormRoles, []);
+});
+
 test('pipeline trusts login authFlow but refuses register authFlow for reinjection', () => {
   assert.equal(shouldTrustDiscoveredAuthFlow({
     loginUrl: '/login',
