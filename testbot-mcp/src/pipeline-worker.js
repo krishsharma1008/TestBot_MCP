@@ -11610,10 +11610,11 @@ async function runPipeline(config, runId) {
       // Additionally run a lightweight probe to guard against corrupt states
       // written by broad fallback selectors matching non-login form inputs.
       let reusePreAuth = false;
+      let probeFailedRoleKeys = new Set();
       if (allPreAuthVerified && !hasTrustedAuthFlow) {
         const protectedPath = firstProtectedRoute(explorationArtifact);
         const probeResults = protectedPath
-          ? await Promise.all(
+          ? (await Promise.allSettled(
               preAuthRoles.map(async (role) => {
                 const probe = await probeStorageState({
                   baseURL: config.baseURL,
@@ -11622,12 +11623,22 @@ async function runPipeline(config, runId) {
                 });
                 return { role, probe };
               }),
+            )).map((outcome, i) =>
+              outcome.status === 'fulfilled'
+                ? outcome.value
+                : { role: preAuthRoles[i], probe: { authenticated: false, reason: outcome.reason?.message || 'probe threw unexpectedly' } },
             )
           : preAuthRoles.map((role) => ({ role, probe: { authenticated: true } }));
 
-        const failedProbe = probeResults.find(({ probe }) => !probe.authenticated);
-        if (failedProbe) {
-          Logger.warn('PipelineWorker', `Pre-auth storageState for ${roleKeyForAuth(failedProbe.role)} failed probe (${failedProbe.probe.reason}) — falling through to fresh credential injection`);
+        const failedProbeKeys = new Set(
+          probeResults.filter(({ probe }) => !probe.authenticated).map(({ role }) => roleKeyForAuth(role)),
+        );
+        if (failedProbeKeys.size > 0) {
+          for (const { role, probe } of probeResults.filter(({ probe: p }) => !p.authenticated)) {
+            Logger.warn('PipelineWorker', `Pre-auth storageState for ${roleKeyForAuth(role)} failed probe (${probe.reason}) — will not reuse`);
+          }
+          // Carry the failed keys so the deferred path can exclude them too.
+          probeFailedRoleKeys = failedProbeKeys;
         } else {
           reusePreAuth = true;
         }
@@ -11667,11 +11678,13 @@ async function runPipeline(config, runId) {
         });
       } else {
         // Auth is handled by the generated auth-setup.ts Playwright setup
-        // project. Use pre-auth states if available (partial coverage or probe
-        // unavailable); otherwise register expected storageState paths so
-        // downstream Playwright config and Tier B decisions are populated.
-        if (preAuthRoles.length > 0) {
-          roles = preAuthRoles;
+        // project. Use pre-auth states if available, excluding any roles whose
+        // storageState failed the session probe (corrupt state). Otherwise
+        // register expected storageState paths so downstream Playwright config
+        // and Tier B decisions are populated.
+        const safePreAuthRoles = preAuthRoles.filter((r) => !probeFailedRoleKeys.has(roleKeyForAuth(r)));
+        if (safePreAuthRoles.length > 0) {
+          roles = safePreAuthRoles;
           Logger.info('PipelineWorker', 'Using pre-auth storageStates for role configuration (auth-setup.ts handles verification at test time)', {
             roles: roles.map((r) => roleKeyForAuth(r)),
           });

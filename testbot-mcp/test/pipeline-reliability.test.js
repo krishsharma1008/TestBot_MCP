@@ -8,6 +8,7 @@ const test = require('node:test');
 const {
   classifyPipelineErrorFromStderr,
 } = require('../src/failure-triage/pipeline-error-classifier');
+const { normalizeRoleLabel } = require('../src/credentials-injector');
 const PlaywrightIntegration = require('../src/playwright-integration');
 const ContextGatherer = require('../src/context-gatherer');
 
@@ -3191,9 +3192,13 @@ test('hasVerifiedStorageState returns false when storageState file is older than
   try {
     const statePath = path.join(root, 'auth-state-user.json');
     fs.writeFileSync(statePath, JSON.stringify({ cookies: [], origins: [] }));
+    // Backdate the file to 60 minutes ago so it reliably exceeds the 55-minute
+    // default threshold. Using maxAgeMs=0 is flaky because filesystem mtime
+    // precision can place the file fractionally ahead of Date.now().
+    const sixtyMinAgo = new Date(Date.now() - 60 * 60 * 1000);
+    fs.utimesSync(statePath, sixtyMinAgo, sixtyMinAgo);
     const role = { role: 'user', storageStatePath: statePath, loginVerified: true };
-    // Pass maxAgeMs=0 to force the file to be treated as already expired.
-    assert.equal(hasVerifiedStorageState(role, 0), false);
+    assert.equal(hasVerifiedStorageState(role), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -3277,6 +3282,66 @@ test('no protected route skips probe and allows reuse', () => {
     : preAuthRoles.map((role) => ({ role, probe: { authenticated: true } }));
   assert.equal(probeResults.length, 1);
   assert.equal(probeResults[0].probe.authenticated, true);
+});
+
+// Gap 5 (fix 2): probe rejection (Promise.allSettled outcome) is treated as authenticated:false.
+test('probe allSettled rejection maps to authenticated:false', () => {
+  const preAuthRoles = [
+    { role: 'admin', storageStatePath: '/tmp/admin.json' },
+    { role: 'user', storageStatePath: '/tmp/user.json' },
+  ];
+  // Simulate one fulfilled, one rejected allSettled outcome.
+  const settled = [
+    { status: 'fulfilled', value: { role: preAuthRoles[0], probe: { authenticated: true } } },
+    { status: 'rejected', reason: new Error('playwright OOM') },
+  ];
+  const probeResults = settled.map((outcome, i) =>
+    outcome.status === 'fulfilled'
+      ? outcome.value
+      : { role: preAuthRoles[i], probe: { authenticated: false, reason: outcome.reason?.message || 'probe threw unexpectedly' } },
+  );
+  assert.equal(probeResults[0].probe.authenticated, true);
+  assert.equal(probeResults[1].probe.authenticated, false);
+  assert.ok(probeResults[1].probe.reason.includes('playwright OOM'));
+});
+
+// Gap 5 (fix 3): deferred path filters probe-failed roles from safePreAuthRoles.
+test('safePreAuthRoles excludes probe-failed roles so deferred path does not use corrupt storageStates', () => {
+  const preAuthRoles = [
+    { role: 'admin', storageStatePath: '/tmp/admin.json', loginVerified: true },
+    { role: 'user', storageStatePath: '/tmp/user.json', loginVerified: true },
+  ];
+  const probeFailedRoleKeys = new Set(['admin']); // admin's storageState failed the probe
+
+  const safePreAuthRoles = preAuthRoles.filter((r) => {
+    const key = r.role || r.name || 'user';
+    return !probeFailedRoleKeys.has(key);
+  });
+
+  assert.equal(safePreAuthRoles.length, 1);
+  assert.equal(safePreAuthRoles[0].role, 'user');
+});
+
+test('safePreAuthRoles is all preAuthRoles when no probe failures', () => {
+  const preAuthRoles = [
+    { role: 'admin', storageStatePath: '/tmp/admin.json', loginVerified: true },
+    { role: 'user', storageStatePath: '/tmp/user.json', loginVerified: true },
+  ];
+  const probeFailedRoleKeys = new Set();
+  const safePreAuthRoles = preAuthRoles.filter((r) => !probeFailedRoleKeys.has(r.role || r.name || 'user'));
+  assert.equal(safePreAuthRoles.length, 2);
+});
+
+// Gap 3 (fix): browserUseCred is undefined when all roles pre-authed (no cred to pass to browser-use).
+test('browserUseCred is undefined when all roles are pre-authed', () => {
+  const allCreds = [
+    { role: 'admin', username: 'admin@example.com', password: 'pass1' },
+    { role: 'user', username: 'user@example.com', password: 'pass2' },
+  ];
+  const preAuthRoleKeys = new Set(['admin', 'user'].map((r) => normalizeRoleLabel(r)));
+  const failedCreds = allCreds.filter((c) => !preAuthRoleKeys.has(normalizeRoleLabel(c.role || c.name || 'user')));
+  const browserUseCred = failedCreds.length > 0 ? { username: failedCreds[0].username, password: failedCreds[0].password } : undefined;
+  assert.equal(browserUseCred, undefined);
 });
 
 // Gap 4: noLoginForm flag is propagated from preAuthFailedRoles to auth_injected status.

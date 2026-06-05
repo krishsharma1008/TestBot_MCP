@@ -496,19 +496,25 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
             'button:has-text("Sign in")',
             'button:has-text("Log in")',
           ];
-          // Try pressing Enter on the username field first (most reliable); fall
-          // back to clicking a submit-style button if that doesn't work.
-          await page.locator(usernameFill.selector).first().press('Enter').catch(async () => {
+          // Press Enter on the username field. Some apps trap the Enter keypress
+          // with e.preventDefault() and require a button click instead — using
+          // .catch() would miss those because press() resolves without error
+          // even when the app ignores the key. Instead, press Enter, then probe
+          // whether the password field appeared within 1s. If not, fall back to
+          // clicking the first matching submit-style button.
+          await page.locator(usernameFill.selector).first().press('Enter').catch(() => null);
+          const quickPassCheck = await pageHasCredentialForm(page, [], passFieldCandidates, 1_000);
+          if (!quickPassCheck.ok) {
             for (const sel of continueSelectors) {
               try {
                 const btn = page.locator(sel).first();
                 if ((await btn.count().catch(() => 0)) > 0) {
                   await btn.click({ timeout: 5_000 });
-                  return;
+                  break;
                 }
               } catch { /* try next */ }
             }
-          });
+          }
 
           // Wait up to 4 s for the password field to appear after the step-1 submit.
           const passGate = await pageHasCredentialForm(page, [], passFieldCandidates, 4_000);

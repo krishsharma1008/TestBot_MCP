@@ -146,7 +146,6 @@ async function runExplorationPhase({
   }
 
   const cred = primaryCredential(credentials);
-  const credsForAgent = cred ? { username: cred.username, password: cred.password } : undefined;
 
   // Pre-authenticate ALL roles before exploration so every role's protected
   // routes are reachable. We use fallback selectors (no authFlow yet) for a
@@ -308,7 +307,7 @@ async function runExplorationPhase({
     Logger.info('ExplorationPhase', 'browser-use unavailable — falling back to Playwright heuristic', {
       reason: result.reason,
     });
-    const fallback = await runPlaywrightFallback({ baseURL, credsForAgent, preAuthRoles });
+    const fallback = await runPlaywrightFallback({ baseURL, credsForAgent: browserUseCred, preAuthRoles });
     if (fallback.available) {
       result = fallback;
       source = 'playwright-heuristic+enrichment';
