@@ -8,6 +8,33 @@
 //     workspaceCoverageRegistry (target_type='requirement' rows are the PRD
 //     ACs) and joins to qa_test_cases.tier to build an AC × tier matrix.
 
+export interface FeatureStat {
+  total: number
+  passed: number
+  failed: number
+}
+
+export interface FeatureDimensions {
+  ui: FeatureStat | null        // null = no UI tests for this feature
+  api: FeatureStat | null       // null = no API tests for this feature
+  smoke: FeatureStat | null
+  sanity: FeatureStat | null
+  regression: FeatureStat | null
+  positive: FeatureStat | null  // from @happy-path
+  negative: FeatureStat | null
+  boundary: FeatureStat | null
+}
+
+export interface FeatureCoverageEntry extends FeatureDimensions {
+  slug: string
+  displayName: string
+  total: number
+  passed: number
+  failed: number
+}
+
+export type FeatureCoverage = Record<string, FeatureCoverageEntry>
+
 export interface CoverageMetrics {
   coverageScore: number
   functionalCoverage: number
@@ -25,6 +52,7 @@ export interface CoverageMetrics {
   edgePassed: number
   failureTotal: number
   failurePassed: number
+  featureCoverage?: FeatureCoverage
 }
 
 // ─── Type classification helpers ─────────────────────────────────────────────

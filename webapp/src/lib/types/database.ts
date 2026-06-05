@@ -1,3 +1,5 @@
+export type { FeatureStat, FeatureDimensions, FeatureCoverageEntry, FeatureCoverage } from '@/lib/coverage'
+
 export interface User {
   id: string
   email: string
