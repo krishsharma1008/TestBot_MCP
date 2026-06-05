@@ -40,8 +40,12 @@ const SERVICE_SCHEMA = z.object({
   host: z.string().min(1).max(255).optional(),
   port: z.number().int().min(1).max(65535),
   path: z.string().max(500).optional(),
-  startCommand: z.string().min(1).max(500),
+  // Optional: a manually-added external service the user already runs themselves
+  // omits the start command — the starter skips launching it and only relies on
+  // it being reachable (see multi-service-starter.js:282).
+  startCommand: z.string().min(1).max(500).optional(),
   isPrimary: z.boolean().optional(),
+  isExternal: z.boolean().optional(),
   framework: z.string().max(100).optional(),
 }).passthrough();
 
@@ -182,6 +186,27 @@ class ConfigUILauncher {
         isPrimary: !!svc.isPrimary,
       }));
       params.set('services', JSON.stringify(slim));
+    }
+
+    // Frontend-only repos: pass the detected external backend so the form can
+    // render a "start your backend first" prerequisite banner.
+    if (projectInfo.backendDependency && projectInfo.backendDependency.url) {
+      params.set('backendDependency', JSON.stringify({
+        url: projectInfo.backendDependency.url,
+        port: projectInfo.backendDependency.port || null,
+        source: projectInfo.backendDependency.source || null,
+      }));
+    }
+
+    // Docker Compose stack: pass the detected file + start command so the form can
+    // note the whole stack launches via Compose (single-service layout).
+    if (projectInfo.composeStack && projectInfo.composeStack.command) {
+      params.set('composeStack', JSON.stringify({
+        file: projectInfo.composeStack.file || null,
+        command: projectInfo.composeStack.command,
+        port: projectInfo.composeStack.port || null,
+        services: Array.isArray(projectInfo.composeStack.serviceNames) ? projectInfo.composeStack.serviceNames : [],
+      }));
     }
 
     return `http://localhost:${this.config.port}/config-form.html?${params.toString()}`;
@@ -336,6 +361,36 @@ class ConfigUILauncher {
         if (pathname === '/api/health' && req.method === 'GET') {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ status: 'ok', sessionActive: true }));
+          return;
+        }
+
+        // Port-probe endpoint — the form calls this (same-origin, no CORS) to
+        // check whether a port is already occupied on localhost before the user
+        // submits. Returns { port, inUse } so the form can show a live badge.
+        if (pathname === '/api/probe-port' && req.method === 'GET') {
+          const qs = new URLSearchParams(url.split('?')[1] || '');
+          const probePort = parseInt(qs.get('port') || '0', 10);
+          if (!probePort || probePort < 1 || probePort > 65535) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'invalid port' }));
+            return;
+          }
+          const net = require('net');
+          // Wrap TCP probe in async IIFE — the outer request handler is sync.
+          (async () => {
+            const inUse = await new Promise((resolve) => {
+              const sock = new net.Socket();
+              sock.setTimeout(800);
+              sock.once('connect', () => { sock.destroy(); resolve(true); });
+              sock.once('timeout', () => { sock.destroy(); resolve(false); });
+              sock.once('error', () => { sock.destroy(); resolve(false); });
+              sock.connect(probePort, '127.0.0.1');
+            });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ port: probePort, inUse }));
+          })().catch(() => {
+            try { res.writeHead(500); res.end('{}'); } catch { /* ignore */ }
+          });
           return;
         }
 

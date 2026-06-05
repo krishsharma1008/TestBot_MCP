@@ -11430,7 +11430,9 @@ async function runPipeline(config, runId) {
         // sub-path. Falls back to projectPath for single-service repos, which
         // preserves prior behavior.
         const primaryCwd = primaryServiceFromConfig?.path && primaryServiceFromConfig.path !== '.'
-          ? path.join(config.projectPath, primaryServiceFromConfig.path)
+          ? (path.isAbsolute(primaryServiceFromConfig.path)
+            ? primaryServiceFromConfig.path
+            : path.join(config.projectPath, primaryServiceFromConfig.path))
           : config.projectPath;
         let primaryGetStderr = null;
         try {

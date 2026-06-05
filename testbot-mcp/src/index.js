@@ -750,6 +750,12 @@ class HealixMCPServer {
         ? params.services
         : (Array.isArray(context.services) ? context.services : undefined),
       apiOnly: typeof params.apiOnly === 'boolean' ? params.apiOnly : detectedApiOnly,
+      // For frontend-only repos, the external backend (if any) the app expects to
+      // call. Surfaced to the config UI so it can prompt the user to start it first.
+      backendDependency: context.backendDependency || null,
+      // When a docker-compose stack is detected, the whole stack starts via
+      // `docker compose up`; the config UI notes this instead of a per-service split.
+      composeStack: context.composeStack || null,
       jira: params.jira,
       openDashboard: params.openDashboard !== false,
       generationMode: resolvedGenerationMode,
@@ -1986,6 +1992,10 @@ Return the JSON structure above based on what you find in the codebase.
           services: Array.isArray(baseConfig.services) && baseConfig.services.length > 1
             ? baseConfig.services
             : undefined,
+          // Frontend-only repos: the external backend the app expects to talk to.
+          // The form renders a "start your backend first" prerequisite banner.
+          backendDependency: baseConfig.backendDependency || undefined,
+          composeStack: baseConfig.composeStack || undefined,
           testType: baseConfig.testType,
           generateTests: baseConfig.generateTests,
           openDashboard: baseConfig.openDashboard,

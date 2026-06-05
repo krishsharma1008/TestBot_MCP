@@ -309,7 +309,11 @@ async function startSecondaryServices({ projectPath, services, waitMs = 30_000, 
       }
     }
 
-    const cwd = svc.path && svc.path !== '.' ? path.join(projectPath, svc.path) : projectPath;
+    // Manually-added external services may carry an absolute path; everything
+    // else is relative to the repo root.
+    const cwd = svc.path && svc.path !== '.'
+      ? (path.isAbsolute(svc.path) ? svc.path : path.join(projectPath, svc.path))
+      : projectPath;
     Logger.info('MultiServiceStarter', `Starting ${svc.role} service`, {
       cmd: svc.startCommand,
       cwd,
