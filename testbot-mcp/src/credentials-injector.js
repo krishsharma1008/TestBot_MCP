@@ -613,6 +613,48 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
   }
 }
 
+/**
+ * Lightweight session probe — opens a Playwright context pre-loaded with a
+ * storageState file, navigates to a protected route, and checks whether the
+ * browser stays on that route (authenticated) or gets redirected to a login
+ * path (expired/corrupt state).
+ *
+ * Returns { authenticated: true } when the page reaches the target without
+ * landing on a known login path. Returns { authenticated: false, reason } when
+ * the state appears stale or Playwright is unavailable.
+ */
+async function probeStorageState({
+  baseURL,
+  storageStatePath,
+  protectedPath = '/',
+  timeoutMs = 10_000,
+} = {}) {
+  if (!storageStatePath) return { authenticated: false, reason: 'no storageStatePath provided' };
+  let chromium;
+  try {
+    ({ chromium } = require('playwright'));
+  } catch {
+    return { authenticated: false, reason: 'playwright not installed' };
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ storageState: storageStatePath });
+    const page = await context.newPage();
+    const targetUrl = new URL(protectedPath, baseURL).href;
+    await page.goto(targetUrl, { waitUntil: 'load', timeout: timeoutMs });
+    const finalPathname = (() => { try { return new URL(page.url()).pathname; } catch { return '/'; } })();
+    const isLoginPage = COMMON_LOGIN_PATHS.some((p) => finalPathname === p || finalPathname.startsWith(p + '?'));
+    return isLoginPage
+      ? { authenticated: false, reason: `redirected to login page ${finalPathname}` }
+      : { authenticated: true };
+  } catch (err) {
+    return { authenticated: false, reason: `probe error: ${err.message}` };
+  } finally {
+    try { await browser.close(); } catch { /* ignore */ }
+  }
+}
+
 async function injectCredentials({
   projectPath,
   baseURL,
@@ -625,13 +667,24 @@ async function injectCredentials({
   }
   ensureAuthDir(projectPath);
 
-  const roles = [];
-  for (const cred of credentials) {
-    if (!cred?.username || !cred?.password) continue;
-    const role = normalizeRoleLabel(cred.role || cred.name || 'user');
-    const storageStatePath = stateFileFor(projectPath, role);
+  const settled = await Promise.allSettled(
+    credentials
+      .filter((cred) => cred?.username && cred?.password)
+      .map(async (cred) => {
+        const role = normalizeRoleLabel(cred.role || cred.name || 'user');
+        const storageStatePath = stateFileFor(projectPath, role);
+        const result = await driveLogin({ baseURL, authFlow, credentials: cred, storageStatePath });
+        return { role, storageStatePath, result };
+      }),
+  );
 
-    const result = await driveLogin({ baseURL, authFlow, credentials: cred, storageStatePath });
+  const roles = [];
+  for (const outcome of settled) {
+    if (outcome.status === 'rejected') {
+      Logger.warn('CredentialsInjector', 'Unexpected driveLogin rejection (should not happen — driveLogin never throws)', { reason: outcome.reason?.message });
+      continue;
+    }
+    const { role, storageStatePath, result } = outcome.value;
     if (result.ok) {
       Logger.info('CredentialsInjector', `Login verified for role=${role}`, { storageStatePath });
       roles.push({ role, name: role, storageStatePath, loginVerified: true });
@@ -652,6 +705,7 @@ async function injectCredentials({
 
 module.exports = {
   injectCredentials,
+  probeStorageState,
   authDirFor,
   stateFileFor,
   buildLoginCandidates,

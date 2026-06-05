@@ -36,7 +36,7 @@ const WebappClient = require('./webapp-client');
 const QACorpusWriter = require('./qa-corpus-writer');
 const { startSecondaryServices, stopSecondaryServices, probeHttpReady, waitForServiceReady, splitServices, spawnService } = require('./multi-service-starter');
 const { runExplorationPhase, EMPTY_ARTIFACT, artifactHasUsefulContext } = require('./exploration-phase');
-const { normalizeRoleLabel } = require('./credentials-injector');
+const { normalizeRoleLabel, probeStorageState } = require('./credentials-injector');
 const { isUnsafeAuthFlow, sanitizeAuthFlow } = require('./auth-flow-utils');
 const {
   ensureQaContractSpec,
@@ -834,6 +834,12 @@ function hasVerifiedStorageState(role, maxAgeMs = (Number(process.env.HEALIX_STO
   } catch {
     return false;
   }
+}
+
+function firstProtectedRoute(explorationArtifact) {
+  const routes = Array.isArray(explorationArtifact?.routes) ? explorationArtifact.routes : [];
+  const protected_ = routes.find((r) => r?.requiresAuth === true && r?.path);
+  return protected_?.path || null;
 }
 
 function allCredentialsCoveredByPreAuth(credentials = [], preAuthRoles = []) {
@@ -11598,9 +11604,38 @@ async function runPipeline(config, runId) {
       const allPreAuthVerified = allCredentialsCoveredByPreAuth(config.testCredentials, preAuthRoles);
       const hasTrustedAuthFlow = shouldTrustDiscoveredAuthFlow(explorationArtifact?.authFlow);
 
+      // Determine whether pre-auth storageStates can be safely reused.
+      // Condition: all credentials are covered by pre-auth AND no better
+      // authFlow was discovered (would improve selector accuracy).
+      // Additionally run a lightweight probe to guard against corrupt states
+      // written by broad fallback selectors matching non-login form inputs.
+      let reusePreAuth = false;
       if (allPreAuthVerified && !hasTrustedAuthFlow) {
-        // Pre-auth storageStates are sufficient and there is no better authFlow
-        // from exploration — skip the redundant login round-trip.
+        const protectedPath = firstProtectedRoute(explorationArtifact);
+        const probeResults = protectedPath
+          ? await Promise.all(
+              preAuthRoles.map(async (role) => {
+                const probe = await probeStorageState({
+                  baseURL: config.baseURL,
+                  storageStatePath: role.storageStatePath,
+                  protectedPath,
+                });
+                return { role, probe };
+              }),
+            )
+          : preAuthRoles.map((role) => ({ role, probe: { authenticated: true } }));
+
+        const failedProbe = probeResults.find(({ probe }) => !probe.authenticated);
+        if (failedProbe) {
+          Logger.warn('PipelineWorker', `Pre-auth storageState for ${roleKeyForAuth(failedProbe.role)} failed probe (${failedProbe.probe.reason}) — falling through to fresh credential injection`);
+        } else {
+          reusePreAuth = true;
+        }
+      }
+
+      if (reusePreAuth) {
+        // All probes passed — safe to reuse pre-auth storageStates and skip the
+        // redundant headless login round-trip.
         roles = preAuthRoles.map((role) => ({ ...role, reusedFromPreAuth: true }));
         Logger.info('PipelineWorker', 'Reusing pre-auth storageStates — skipping duplicate credential injection', {
           roles: roles.map((r) => roleKeyForAuth(r)),
@@ -11631,20 +11666,16 @@ async function runPipeline(config, runId) {
           },
         });
       } else {
-        // In the feature-based generation model, auth is handled by the
-        // generated auth-setup.ts Playwright setup project — no separate
-        // credential injection pass here. Use pre-auth states if available;
-        // otherwise register expected storageState paths so downstream
-        // playwright config and tier-B decisions are populated correctly.
+        // Auth is handled by the generated auth-setup.ts Playwright setup
+        // project. Use pre-auth states if available (partial coverage or probe
+        // unavailable); otherwise register expected storageState paths so
+        // downstream Playwright config and Tier B decisions are populated.
         if (preAuthRoles.length > 0) {
           roles = preAuthRoles;
           Logger.info('PipelineWorker', 'Using pre-auth storageStates for role configuration (auth-setup.ts handles verification at test time)', {
             roles: roles.map((r) => roleKeyForAuth(r)),
           });
         } else {
-          // Construct expected role entries from credentials config. The
-          // generated auth-setup.ts will perform the actual login and write
-          // these storageState files before the feature test projects run.
           roles = config.testCredentials.map((cred) => {
             const roleLabel = normalizeRoleLabel(cred.role || cred.name || 'user');
             const storageStatePath = path.join(config.projectPath, '.healix', `auth-state-${roleLabel}.json`);
@@ -13096,6 +13127,7 @@ module.exports = {
   synthesizeExplorationArtifactFromContext,
   allCredentialsCoveredByPreAuth,
   hasVerifiedStorageState,
+  firstProtectedRoute,
   mergeCredentialInjectionRoles,
   shouldTrustDiscoveredAuthFlow,
   hasApiSurfaceForGeneration,

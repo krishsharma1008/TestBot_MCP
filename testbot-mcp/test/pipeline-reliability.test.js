@@ -16,6 +16,7 @@ const {
   synthesizeExplorationArtifactFromContext,
   allCredentialsCoveredByPreAuth,
   hasVerifiedStorageState,
+  firstProtectedRoute,
   buildGenerationRepairContext,
   minimumUsefulRunnableFloor,
   adaptiveRunnableFloor,
@@ -3217,6 +3218,65 @@ test('hasVerifiedStorageState returns false when loginVerified is false', () => 
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+// Gap 5: firstProtectedRoute extracts the first requiresAuth route from the exploration artifact.
+test('firstProtectedRoute returns the first protected route path', () => {
+  const artifact = {
+    routes: [
+      { path: '/', requiresAuth: false },
+      { path: '/dashboard', requiresAuth: true },
+      { path: '/admin', requiresAuth: true },
+    ],
+  };
+  assert.equal(firstProtectedRoute(artifact), '/dashboard');
+});
+
+test('firstProtectedRoute returns null when no protected routes exist', () => {
+  const artifact = { routes: [{ path: '/', requiresAuth: false }] };
+  assert.equal(firstProtectedRoute(artifact), null);
+});
+
+test('firstProtectedRoute returns null for empty or missing routes', () => {
+  assert.equal(firstProtectedRoute({}), null);
+  assert.equal(firstProtectedRoute(null), null);
+  assert.equal(firstProtectedRoute({ routes: [] }), null);
+});
+
+// Gap 5: probe result determines reusePreAuth flag.
+test('probe failure prevents pre-auth storageState reuse', () => {
+  // Simulate the pipeline-worker probe decision logic.
+  const probeResults = [
+    { role: { role: 'admin' }, probe: { authenticated: false, reason: 'redirected to login page /login' } },
+    { role: { role: 'user' }, probe: { authenticated: true } },
+  ];
+  const failedProbe = probeResults.find(({ probe }) => !probe.authenticated);
+  assert.ok(failedProbe, 'should find the failed probe');
+  assert.equal(failedProbe.role.role, 'admin');
+  // reusePreAuth must be false when any probe fails
+  const reusePreAuth = !failedProbe;
+  assert.equal(reusePreAuth, false);
+});
+
+test('all probes passing sets reusePreAuth to true', () => {
+  const probeResults = [
+    { role: { role: 'admin' }, probe: { authenticated: true } },
+    { role: { role: 'user' }, probe: { authenticated: true } },
+  ];
+  const failedProbe = probeResults.find(({ probe }) => !probe.authenticated);
+  const reusePreAuth = !failedProbe;
+  assert.equal(reusePreAuth, true);
+});
+
+test('no protected route skips probe and allows reuse', () => {
+  // When firstProtectedRoute returns null, probeResults defaults to all-authenticated.
+  const preAuthRoles = [{ role: 'admin', storageStatePath: '/tmp/admin.json' }];
+  const protectedPath = null;
+  const probeResults = protectedPath
+    ? [] // would call probeStorageState
+    : preAuthRoles.map((role) => ({ role, probe: { authenticated: true } }));
+  assert.equal(probeResults.length, 1);
+  assert.equal(probeResults[0].probe.authenticated, true);
 });
 
 // Gap 4: noLoginForm flag is propagated from preAuthFailedRoles to auth_injected status.

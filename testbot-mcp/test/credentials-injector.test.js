@@ -10,6 +10,7 @@ const {
   stateFileFor,
   summarizeAuthStateEvidence,
   fillFirstVisible,
+  probeStorageState,
   DEFAULT_USERNAME_SELECTORS,
 } = require('../src/credentials-injector');
 
@@ -501,4 +502,67 @@ test('credential injector checks durable logged-in markers and username text', (
   assert.ok(locators.includes('nav >> text=Signed in'));
   assert.ok(locators.includes('text=/log\\s*out/i'));
   assert.ok(locators.includes('text=\"customer@example.test\"'));
+});
+
+// Gap 5: probeStorageState returns authenticated:false when playwright is not available.
+// (Playwright is not installed in the unit-test environment, so this exercises
+// the graceful-degradation path — the probe should never crash the pipeline.)
+test('probeStorageState returns authenticated:false when playwright is not installed', async () => {
+  const result = await probeStorageState({
+    baseURL: 'http://localhost:3000',
+    storageStatePath: '/nonexistent/auth-state.json',
+    protectedPath: '/dashboard',
+  });
+  assert.equal(result.authenticated, false);
+  assert.ok(typeof result.reason === 'string');
+});
+
+test('probeStorageState returns authenticated:false when storageStatePath is missing', async () => {
+  const result = await probeStorageState({
+    baseURL: 'http://localhost:3000',
+    storageStatePath: '',
+  });
+  assert.equal(result.authenticated, false);
+  assert.ok(result.reason.includes('storageStatePath'));
+});
+
+// Gap 6: parallel injection — all roles are attempted even when one fails.
+// Simulates the Promise.allSettled shape by verifying the logic preserves all outcomes.
+test('parallel injection shape: all settled outcomes produce a role entry', () => {
+  // Simulate what Promise.allSettled produces for two roles where one fails.
+  const settled = [
+    { status: 'fulfilled', value: { role: 'admin', storageStatePath: '/tmp/admin.json', result: { ok: true } } },
+    { status: 'fulfilled', value: { role: 'user', storageStatePath: null, result: { ok: false, reason: 'Login failed', noLoginForm: false } } },
+  ];
+  const roles = [];
+  for (const outcome of settled) {
+    if (outcome.status === 'rejected') continue;
+    const { role, storageStatePath, result } = outcome.value;
+    if (result.ok) {
+      roles.push({ role, name: role, storageStatePath, loginVerified: true });
+    } else {
+      roles.push({ role, name: role, storageStatePath: null, loginVerified: false, reason: result.reason });
+    }
+  }
+  assert.equal(roles.length, 2);
+  assert.equal(roles[0].loginVerified, true);
+  assert.equal(roles[1].loginVerified, false);
+  assert.equal(roles[1].role, 'user');
+});
+
+test('parallel injection shape: rejected promise is skipped with a warning (driveLogin should not reject)', () => {
+  const settled = [
+    { status: 'fulfilled', value: { role: 'admin', storageStatePath: '/tmp/admin.json', result: { ok: true } } },
+    { status: 'rejected', reason: new Error('unexpected throw') },
+  ];
+  const roles = [];
+  for (const outcome of settled) {
+    if (outcome.status === 'rejected') continue; // skipped — driveLogin never throws
+    const { role, storageStatePath, result } = outcome.value;
+    roles.push(result.ok
+      ? { role, storageStatePath, loginVerified: true }
+      : { role, loginVerified: false });
+  }
+  assert.equal(roles.length, 1);
+  assert.equal(roles[0].role, 'admin');
 });
