@@ -393,7 +393,19 @@ async def _drive_agent(target_url, username, password, timeout_s):
         if "browser_profile" in sig_params:
             try:
                 from browser_use.browser.profile import BrowserProfile  # type: ignore
-                agent_kwargs["browser_profile"] = BrowserProfile(headless=headless)
+                profile_kwargs = {"headless": headless}
+                # Load the pre-auth storageState so the secondary gap-fill runs
+                # as an authenticated session and can reach protected routes.
+                storage_state = os.environ.get("HEALIX_PREAUTH_STORAGE_STATE", "").strip()
+                if storage_state and os.path.isfile(storage_state):
+                    try:
+                        from inspect import signature as _sig
+                        if "storage_state" in _sig(BrowserProfile).parameters:
+                            profile_kwargs["storage_state"] = storage_state
+                            _emit({"type": "progress", "message": "browser-use loaded pre-auth storageState for authenticated gap-fill"})
+                    except Exception:
+                        pass  # older BrowserProfile without storage_state support
+                agent_kwargs["browser_profile"] = BrowserProfile(**profile_kwargs)
             except Exception:
                 pass  # older version without BrowserProfile — leave default
     except Exception:

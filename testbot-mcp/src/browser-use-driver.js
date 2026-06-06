@@ -76,21 +76,34 @@ async function calibrateStepTimeoutS({ openaiApiKey, calibrationPromptUrl } = {}
 }
 
 function resolvePython() {
+  // Resolve to the concrete interpreter executable (sys.executable) rather than
+  // a launcher alias like `py`. Spawning the real python.exe with a script path
+  // bypasses shebang handling — critical on Windows, where `py runner.py` honors
+  // the script's `#!/usr/bin/env python3` shebang and delegates to the PATH
+  // `python`/`python3`, which is often the Microsoft Store stub (exit 9009).
+  // Using `-c` (no script file) means no shebang is consulted during probing.
+  const probe = (cmd) => {
+    try {
+      const res = spawnSync(cmd, ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf-8' });
+      if (res.status === 0) {
+        const exe = (res.stdout || '').trim();
+        return exe || cmd;
+      }
+    } catch { /* not runnable */ }
+    return null;
+  };
+
   const configured = process.env.HEALIX_BROWSER_USE_PYTHON || process.env.BROWSER_USE_PYTHON;
   if (configured) {
-    try {
-      const res = spawnSync(configured, ['--version'], { stdio: 'ignore' });
-      if (res.status === 0) return configured;
-    } catch { /* fall through to PATH candidates */ }
+    const exe = probe(configured);
+    if (exe) return exe;
   }
   const candidates = process.platform === 'win32'
     ? ['py', 'python', 'python3']
     : ['python3', 'python'];
   for (const cmd of candidates) {
-    try {
-      const res = spawnSync(cmd, ['--version'], { stdio: 'ignore' });
-      if (res.status === 0) return cmd;
-    } catch { /* try next */ }
+    const exe = probe(cmd);
+    if (exe) return exe;
   }
   return null;
 }
@@ -143,6 +156,7 @@ function driveExploration({
   stepTimeoutS = null, // injected by tests; otherwise calibrated at runtime
   knownRoutes = [],
   prdFeatures = [],
+  preAuthRoles = [],
 } = {}) {
   return new Promise(async (resolve) => {
     if (!targetUrl) {
@@ -239,6 +253,14 @@ function driveExploration({
               .filter(Boolean)
           )
         : '',
+      // Pre-auth storageState so browser-use's secondary gap-fill runs as an
+      // authenticated session and can reach protected areas. Uses the first
+      // verified role's state file; empty when no role pre-authed.
+      HEALIX_PREAUTH_STORAGE_STATE: (() => {
+        const verified = (Array.isArray(preAuthRoles) ? preAuthRoles : [])
+          .find((r) => r?.storageStatePath && fs.existsSync(r.storageStatePath));
+        return verified ? verified.storageStatePath : '';
+      })(),
     };
 
     let settled = false;

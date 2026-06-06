@@ -36,7 +36,7 @@ const WebappClient = require('./webapp-client');
 const QACorpusWriter = require('./qa-corpus-writer');
 const { startSecondaryServices, stopSecondaryServices, probeHttpReady, waitForServiceReady, splitServices, spawnService, normalizeCommandForPlatform } = require('./multi-service-starter');
 const { runExplorationPhase, EMPTY_ARTIFACT, artifactHasUsefulContext } = require('./exploration-phase');
-const { normalizeRoleLabel, probeStorageState } = require('./credentials-injector');
+const { normalizeRoleLabel, probeStorageState, injectCredentials } = require('./credentials-injector');
 const { isUnsafeAuthFlow, sanitizeAuthFlow } = require('./auth-flow-utils');
 const {
   ensureQaContractSpec,
@@ -763,10 +763,12 @@ function synthesizeExplorationArtifactFromContext(context = {}, previousArtifact
     const rawPath = String(page?.path || page?.route || page?.url || '').trim();
     if (!rawPath || !rawPath.startsWith('/') || rawPath.includes('*') || seen.has(rawPath)) continue;
     const requiresAuth = page?.requiresAuth === true || page?.authRequired === true || page?.protected === true;
+    const requiredRole = page?.requiredRole || null;
     seen.add(rawPath);
     routes.push({
       path: rawPath,
       requiresAuth,
+      requiredRole,
       source: 'static_context',
       sourceFile: page?.sourceFile || page?.file || null,
       elements: Array.isArray(page?.uiHints?.elements) ? page.uiHints.elements.slice(0, 8) : [],
@@ -4839,7 +4841,7 @@ async function validateGeneratedTestsWithList({ projectPath, validateGeneratedTe
     let stderr = '';
 
     const timer = setTimeout(() => {
-      child.kill('SIGTERM');
+      killPreStartedProc(child);
       resolve({ valid: false, reason: 'validation_timeout', stderr: stderr.slice(0, 2000) });
     }, Math.max(1000, timeoutMs));
 
@@ -11499,7 +11501,11 @@ async function runPipeline(config, runId) {
         // Extract knownRoutes and prdFeatures to feed the inverted exploration model.
         const knownRoutes = Array.isArray(codebaseContext?.pages)
           ? codebaseContext.pages
-              .map((p) => ({ path: String(p?.path || p?.route || p?.url || '').trim() }))
+              .map((p) => ({
+                path: String(p?.path || p?.route || p?.url || '').trim(),
+                requiresAuth: p?.requiresAuth === true,
+                requiredRole: p?.requiredRole || null,
+              }))
               .filter((r) => r.path && r.path.startsWith('/') && !r.path.includes('*'))
           : [];
         const prdFeatures = Array.isArray(parsedPRD?.features)
@@ -11695,14 +11701,45 @@ async function runPipeline(config, runId) {
             roles: roles.map((r) => roleKeyForAuth(r)),
           });
         } else {
-          roles = config.testCredentials.map((cred) => {
-            const roleLabel = normalizeRoleLabel(cred.role || cred.name || 'user');
-            const storageStatePath = path.join(config.projectPath, '.healix', `auth-state-${roleLabel}.json`);
-            return { role: roleLabel, name: roleLabel, storageStatePath, loginVerified: false };
+          // Pre-auth produced no usable storageStates. Attempt direct credential
+          // injection now using any authFlow discovered during exploration — this
+          // is required when the project has its own playwright.config.ts (no
+          // auth-setup.ts hook available) and gives the injector one more try
+          // with better selectors than the null-fallback used during pre-auth.
+          const discoveredAuthFlow = explorationArtifact?.authFlow || null;
+          Logger.info('PipelineWorker', 'Attempting direct credential injection post-exploration', {
+            hasDiscoveredAuthFlow: !!discoveredAuthFlow,
+            credentialRoles: config.testCredentials.map((c) => normalizeRoleLabel(c.role || c.name || 'user')),
           });
-          Logger.info('PipelineWorker', 'Auth deferred to generated auth-setup.ts Playwright setup project', {
-            roles: roles.map((r) => r.role),
-          });
+          try {
+            const freshRoles = await injectCredentials({
+              projectPath: config.projectPath,
+              baseURL: config.baseURL,
+              credentials: config.testCredentials,
+              authFlow: discoveredAuthFlow,
+            });
+            const mergedResult = mergeCredentialInjectionRoles({ freshRoles, preAuthRoles });
+            roles = mergedResult.roles;
+            const verifiedCount = roles.filter((r) => r.loginVerified).length;
+            if (verifiedCount > 0) {
+              Logger.info('PipelineWorker', `Direct credential injection succeeded for ${verifiedCount}/${roles.length} role(s)`, {
+                roles: roles.map((r) => ({ role: r.role, verified: r.loginVerified })),
+              });
+            } else {
+              Logger.warn('PipelineWorker', 'Direct credential injection failed for all roles — @auth tests may fail', {
+                failed: mergedResult.failedFreshRoles,
+              });
+            }
+          } catch (injErr) {
+            Logger.warn('PipelineWorker', 'Direct credential injection threw unexpectedly — creating stub role entries', {
+              reason: injErr.message,
+            });
+            roles = config.testCredentials.map((cred) => {
+              const roleLabel = normalizeRoleLabel(cred.role || cred.name || 'user');
+              const storageStatePath = path.join(config.projectPath, '.healix', `auth-state-${roleLabel}.json`);
+              return { role: roleLabel, name: roleLabel, storageStatePath, loginVerified: false };
+            });
+          }
         }
         updateStatus(statusDir, 'auth_injected', {
           runId,

@@ -26,6 +26,7 @@ const {
   sanitizeAuthFlow,
   scoreAuthFlowCandidate,
 } = require('./auth-flow-utils');
+const { normalizeRoleLabel } = require('./credentials-injector');
 
 const MAX_ROUTES_PER_WALK = 60;
 const MAX_CLICK_PROBES_PER_WALK = 20;
@@ -301,7 +302,7 @@ function _buildAuthFlowCandidate({ resolvedPathname, signals }) {
  * Walk up to MAX_ROUTES_PER_WALK routes in a single browser context.
  * Returns the raw walk results (routes, forms, authFlow, keyFlows, observedErrors).
  */
-async function _walkRoutes({ browser, contextOptions, baseURL, origin, credentials, onHeartbeat }) {
+async function _walkRoutes({ browser, contextOptions, baseURL, origin, credentials, seedRoutes = [], onHeartbeat }) {
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
 
@@ -325,6 +326,15 @@ async function _walkRoutes({ browser, contextOptions, baseURL, origin, credentia
     if (visitedPaths.size >= MAX_ROUTES_PER_WALK) return;
     queue.push(new URL(href, baseURL).toString());
   };
+
+  // Seed the queue with routes known from static code analysis. Protected
+  // routes are often reached only via programmatic navigation (e.g. a SPA's
+  // router.navigate() after login) with no anchor from the landing page, so a
+  // link-following crawl starting at baseURL alone would never visit them.
+  for (const seed of Array.isArray(seedRoutes) ? seedRoutes : []) {
+    const seedPath = typeof seed === 'string' ? seed : seed?.path;
+    if (seedPath) enqueueUrl(urlForRoute(baseURL, seedPath));
+  }
 
   try {
     while (queue.length && routes.length < MAX_ROUTES_PER_WALK) {
@@ -489,7 +499,7 @@ function _mergeWalks(walks) {
  *   per role so that role-specific routes are all discovered.
  * @param {Function} [opts.onHeartbeat]
  */
-async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths = [], onHeartbeat } = {}) {
+async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths = [], seedRoutes = [], onHeartbeat } = {}) {
   if (!baseURL) {
     return { available: false, reason: 'No baseURL provided to playwright-explorer' };
   }
@@ -525,6 +535,7 @@ async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths =
             baseURL,
             origin,
             credentials,
+            seedRoutes,
             onHeartbeat,
           });
           walks.push({ role, ...walk });
@@ -541,6 +552,7 @@ async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths =
         baseURL,
         origin,
         credentials,
+        seedRoutes,
         onHeartbeat,
       });
       walks.push({ role: null, ...walk });
@@ -675,15 +687,48 @@ async function enrichAllRoutesWithDOM({
     return (a.path || '').localeCompare(b.path || '');
   });
 
-  // Split into round-robin buckets so each context gets a balanced mix of routes.
-  const actualConcurrency = Math.max(1, Math.min(concurrency, sortedRoutes.length));
-  const buckets = Array.from({ length: actualConcurrency }, () => []);
-  sortedRoutes.forEach((route, i) => buckets[i % actualConcurrency].push(route));
+  // Map each verified role to its storageState file so a route gated for a
+  // specific role is enriched under THAT role's session — an RBAC app must not
+  // explore admin- and user-gated pages under a single session.
+  const roleStateMap = new Map();
+  const validStates = [];
+  for (const s of Array.isArray(storageStatePaths) ? storageStatePaths : []) {
+    if (s?.storageStatePath && fs.existsSync(s.storageStatePath)) {
+      const label = normalizeRoleLabel(s.role || s.name || 'user');
+      if (!roleStateMap.has(label)) roleStateMap.set(label, s.storageStatePath);
+      validStates.push(s.storageStatePath);
+    }
+  }
+  const defaultState = validStates[0] || null;
 
-  const validState = (storageStatePaths || []).find(
-    (s) => s?.storageStatePath && fs.existsSync(s.storageStatePath)
-  );
-  const contextOptions = validState ? { storageState: validState.storageStatePath } : {};
+  const stateForRoute = (route) => {
+    if (route?.requiredRole) {
+      const label = normalizeRoleLabel(route.requiredRole);
+      if (roleStateMap.has(label)) return roleStateMap.get(label);
+    }
+    // Auth-gated route with no role-specific session, or any unmatched route:
+    // fall back to any authenticated session; public routes use no session.
+    return route?.requiresAuth ? defaultState : (defaultState || null);
+  };
+
+  // Partition routes by the session they should be visited under, then split
+  // each partition into round-robin buckets (one browser context per bucket).
+  const partitions = new Map(); // storageStatePath|'' -> routes[]
+  for (const route of sortedRoutes) {
+    const key = stateForRoute(route) || '';
+    if (!partitions.has(key)) partitions.set(key, []);
+    partitions.get(key).push(route);
+  }
+
+  const buckets = []; // { storageStatePath|null, routes[] }
+  for (const [statePath, partRoutes] of partitions) {
+    const n = Math.max(1, Math.min(concurrency, partRoutes.length));
+    const partBuckets = Array.from({ length: n }, () => []);
+    partRoutes.forEach((route, i) => partBuckets[i % n].push(route));
+    for (const b of partBuckets) {
+      if (b.length) buckets.push({ storageStatePath: statePath || null, routes: b });
+    }
+  }
 
   const browser = await chromium.launch({ headless: true });
   const enrichments = new Map();
@@ -691,12 +736,13 @@ async function enrichAllRoutesWithDOM({
   const deadline = Date.now() + timeBudgetMs;
 
   try {
-    await Promise.all(buckets.map(async (bucket) => {
-      if (!bucket.length) return;
+    await Promise.all(buckets.map(async ({ storageStatePath, routes: bucketRoutes }) => {
+      if (!bucketRoutes.length) return;
+      const contextOptions = storageStatePath ? { storageState: storageStatePath } : {};
       const context = await browser.newContext(contextOptions);
       const page = await context.newPage();
       try {
-        for (const route of bucket) {
+        for (const route of bucketRoutes) {
           if (Date.now() >= deadline) {
             timedOut = true;
             break;

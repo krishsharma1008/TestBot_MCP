@@ -10,6 +10,16 @@ const path = require('path');
 const Logger = require('./logger');
 const { extractQaContracts } = require('./qa-contracts');
 
+// Optional YAML parser for inline @swagger / OpenAPI JSDoc blocks. When absent,
+// endpoint schema extraction degrades to controller/handler source analysis.
+let yaml = null;
+try { yaml = require('js-yaml'); } catch { /* optional */ }
+
+// Common client-side route-guard wrapper component names. When a route's
+// element is wrapped in one of these, the route is auth-gated and the page
+// behind it should be explored under an authenticated session.
+const ROUTE_GUARD_RE = /\b(ProtectedRoute|PrivateRoute|RequireAuth|RequireRole|RequireRoles|AuthGuard|RoleGuard|AuthRoute|AuthenticatedRoute|GuardedRoute|RestrictedRoute|Protected|Authenticated)\b/;
+
 class ContextGatherer {
   constructor(config = {}) {
     this.config = {
@@ -1219,10 +1229,13 @@ class ContextGatherer {
             const routePath = rawRoutePath === '' ? '/' : (rawRoutePath.startsWith('/') ? rawRoutePath : `/${rawRoutePath}`);
             if (routePath && !routePath.includes('*') && !pages.some(p => p.path === routePath)) {
               const uiHints = this.extractPageUIHints(file);
+              const guard = this.extractRouteGuardInfo(content, match.index);
               pages.push({
                 path: routePath,
                 sourceFile: path.relative(this.config.projectPath, file),
                 routeComponent: this.extractRouteComponentName(content, match.index),
+                requiresAuth: guard.requiresAuth,
+                requiredRole: guard.requiredRole,
                 description: this.formatPageName(routePath),
                 components: uiHints.components,
                 interactions: uiHints.interactions,
@@ -1326,6 +1339,16 @@ class ContextGatherer {
     const langEndpoints = await this.findMultiLangEndpoints(projectPath);
     endpoints.push(...langEndpoints);
 
+    // Client-side API call discovery (fetch/axios). Augments server-side route
+    // detection and is the primary source for frontend-only repos that call an
+    // external API. Only adds calls not already covered by a server endpoint.
+    const clientEndpoints = await this.findClientApiCalls(projectPath);
+    const normParams = (p) => String(p).replace(/:[^/]+/g, ':p');
+    for (const ce of clientEndpoints) {
+      const dup = endpoints.some((e) => e.method === ce.method && normParams(e.path) === normParams(ce.path));
+      if (!dup) endpoints.push(ce);
+    }
+
     // If no endpoints found, add health check
     if (endpoints.length === 0) {
       endpoints.push({
@@ -1400,38 +1423,60 @@ class ContextGatherer {
   }
 
   /**
-   * Find Express.js route definitions
+   * Find Express.js route definitions.
+   *
+   * Resolves `app.use('/prefix', routerVar)` mount points so router-file paths
+   * become their real absolute URLs (e.g. `router.get('/:id')` in userRoutes.js
+   * mounted at `/api/users` → `GET /api/users/:id`). Without prefix resolution,
+   * sibling routers that share relative paths (`/`, `/:id`) collapse into each
+   * other and entire route groups are silently lost.
    */
   async findExpressRoutes(projectPath) {
     const endpoints = [];
     const routePatterns = [
-      /app\.(get|post|put|patch|delete)\s*\(\s*["'`]([^"'`]+)["'`]/gi,
-      /router\.(get|post|put|patch|delete)\s*\(\s*["'`]([^"'`]+)["'`]/gi,
+      /(app|router)\.(get|post|put|patch|delete)\s*\(\s*["'`]([^"'`]+)["'`]/gi,
     ];
-    
+
     const files = this.findFiles(projectPath, ['.js', '.ts']);
-    
+    const mountMap = this.resolveExpressMounts(files);
+
     for (const file of files.slice(0, this.config.maxFiles)) {
       // Skip node_modules and test files
       if (file.includes('node_modules') || file.includes('.spec.') || file.includes('.test.')) continue;
-      
+
       try {
         const content = this.readFileCached(file);
         if (!content) continue;
-        
+
+        const mountPrefix = mountMap.get(path.resolve(file)) || '';
+
         for (const pattern of routePatterns) {
+          pattern.lastIndex = 0;
           let match;
           while ((match = pattern.exec(content)) !== null) {
-            const method = match[1].toUpperCase();
-            const routePath = match[2];
-            
-            if (!endpoints.some(e => e.method === method && e.path === routePath)) {
+            const registrar = match[1].toLowerCase(); // 'app' or 'router'
+            const method = match[2].toUpperCase();
+            const relPath = match[3];
+            // `app.<method>(...)` paths are already absolute; only `router.*`
+            // paths inherit the mount prefix discovered from app.use(...).
+            const fullPath = registrar === 'app'
+              ? this.joinRoutePath('', relPath)
+              : this.joinRoutePath(mountPrefix, relPath);
+            const requiresAuth = this.detectExpressRouteAuth(content, match.index);
+
+            if (!endpoints.some(e => e.method === method && e.path === fullPath)) {
+              const schema = this.extractEndpointSchema({ content, matchIndex: match.index, method, routeFile: file });
               endpoints.push({
                 method,
-                path: routePath,
-                description: `${method} ${routePath}`,
-                requiresAuth: content.includes('auth') || content.includes('token'),
+                path: fullPath,
+                description: schema.summary || `${method} ${fullPath}`,
+                requiresAuth,
                 source: path.relative(this.config.projectPath, file),
+                ...(schema.requestBody ? { requestBody: schema.requestBody } : {}),
+                ...(schema.pathParams && schema.pathParams.length ? { pathParams: schema.pathParams } : {}),
+                ...(schema.queryParams && schema.queryParams.length ? { queryParams: schema.queryParams } : {}),
+                ...(schema.responseCodes && schema.responseCodes.length ? { responseCodes: schema.responseCodes } : {}),
+                ...(schema.schemaSource ? { schemaSource: schema.schemaSource } : {}),
               });
             }
           }
@@ -1440,8 +1485,319 @@ class ContextGatherer {
         // Ignore errors
       }
     }
-    
+
     return endpoints;
+  }
+
+  /**
+   * Build a map of router-file → mount prefix by parsing entry files
+   * (app.js/server.js/index.js/main.js) for `require` aliases and the
+   * `app.use('/prefix', alias)` calls that mount them.
+   */
+  resolveExpressMounts(files) {
+    const map = new Map();
+    const entries = files.filter((f) =>
+      /(?:app|server|index|main)\.(?:js|ts)$/i.test(path.basename(f)) && !f.includes('node_modules'));
+
+    for (const entry of entries) {
+      const content = this.readFileCached(entry);
+      if (!content || !content.includes('app.use')) continue;
+
+      // const userRoutes = require('./routes/userRoutes')
+      const requireMap = new Map();
+      const reqRe = /(?:const|let|var)\s+([A-Za-z0-9_$]+)\s*=\s*require\(\s*["'`](\.[^"'`]+)["'`]\s*\)/g;
+      let rm;
+      while ((rm = reqRe.exec(content)) !== null) {
+        const resolved = this.resolveRequirePath(entry, rm[2]);
+        if (resolved) requireMap.set(rm[1], resolved);
+      }
+
+      // app.use('/api/users', userRoutes)
+      const useRe = /app\.use\(\s*["'`](\/[^"'`]*)["'`]\s*,\s*([A-Za-z0-9_$]+)\s*\)/g;
+      let um;
+      while ((um = useRe.exec(content)) !== null) {
+        const resolved = requireMap.get(um[2]);
+        if (resolved) map.set(resolved, um[1]);
+      }
+    }
+
+    return map;
+  }
+
+  resolveRequirePath(fromFile, reqPath) {
+    const base = path.resolve(path.dirname(fromFile), reqPath);
+    const candidates = [base, `${base}.js`, `${base}.ts`, path.join(base, 'index.js'), path.join(base, 'index.ts')];
+    for (const c of candidates) {
+      try {
+        if (fs.existsSync(c) && fs.statSync(c).isFile()) return path.resolve(c);
+      } catch { /* ignore */ }
+    }
+    return null;
+  }
+
+  joinRoutePath(prefix, rel) {
+    const p = String(prefix || '').replace(/\/+$/, '');
+    let r = String(rel || '');
+    if (!r.startsWith('/')) r = `/${r}`;
+    if (r === '/') return p || '/';
+    return `${p}${r}`.replace(/\/{2,}/g, '/');
+  }
+
+  /**
+   * Decide whether an Express route is auth-gated by inspecting the middleware
+   * arguments of the route registration itself (between the path string and the
+   * handler) — not a file-wide keyword scan, which mislabels login/logout
+   * routes that merely live in an auth-named file.
+   */
+  detectExpressRouteAuth(content, matchIndex = 0) {
+    const window = String(content || '').slice(matchIndex, matchIndex + 300);
+    const callEnd = window.indexOf(')');
+    const call = callEnd > -1 ? window.slice(0, callEnd) : window;
+    return /\b(authenticate|authorize|requireAuth|requireRole|requiredRole|verifyToken|isAuthenticated|ensureAuth|protect|checkRole|checkAuth|authMiddleware|authGuard|passport|verifyJWT|ensureLoggedIn)\b/i.test(call);
+  }
+
+  /**
+   * Extract request/response schema for an Express route, following the
+   * fallback chain: (1) inline @swagger / OpenAPI JSDoc directly above the
+   * route, (2) the resolved controller/handler function body (req.body /
+   * req.params / req.query / res.status). Returns {} when nothing is found.
+   */
+  extractEndpointSchema({ content, matchIndex, method, routeFile }) {
+    // Layer 1: inline @swagger JSDoc block immediately above the route.
+    const swaggerYaml = this.extractSwaggerBlockAbove(content, matchIndex);
+    if (swaggerYaml) {
+      const parsed = this.parseSwaggerBlock(swaggerYaml, method);
+      if (parsed) return { ...parsed, schemaSource: 'swagger' };
+    }
+
+    // Layer 2: controller/handler source analysis.
+    const handlerRef = this.extractRouteHandlerRef(content, matchIndex);
+    const controller = this.resolveControllerFn(handlerRef, content, routeFile);
+    if (controller) {
+      const fromCode = this.extractHandlerSchema(controller);
+      if (fromCode && (fromCode.requestBody || fromCode.pathParams.length || fromCode.responseCodes.length)) {
+        return { ...fromCode, schemaSource: 'controller' };
+      }
+    }
+
+    return {};
+  }
+
+  /** Find the nearest preceding JSDoc block containing @swagger / @openapi. */
+  extractSwaggerBlockAbove(content, matchIndex) {
+    const before = String(content || '').slice(0, matchIndex);
+    const lastClose = before.lastIndexOf('*/');
+    if (lastClose === -1) return null;
+    // Only accept the comment if it sits directly above the route (no other
+    // code statements between the comment and the route registration).
+    const between = before.slice(lastClose + 2).trim();
+    if (between && !/^[)\];,]*$/.test(between)) return null;
+    const open = before.lastIndexOf('/**', lastClose);
+    if (open === -1) return null;
+    const block = before.slice(open, lastClose);
+    if (!/@swagger|@openapi/i.test(block)) return null;
+    // Strip the JSDoc framing (` * `) to recover raw YAML, dropping the
+    // `@swagger` marker line itself.
+    return block
+      .replace(/^\/\*\*?/, '')
+      .split('\n')
+      .map((line) => line.replace(/^\s*\*\s?/, ''))
+      .filter((line) => !/^\s*@(swagger|openapi)\s*$/i.test(line))
+      .join('\n');
+  }
+
+  /** Parse a swagger YAML block into a normalized schema for the given method. */
+  parseSwaggerBlock(yamlText, method) {
+    if (!yaml) return null;
+    let doc;
+    try { doc = yaml.load(yamlText); } catch { return null; }
+    if (!doc || typeof doc !== 'object') return null;
+
+    for (const pathKey of Object.keys(doc)) {
+      const methods = doc[pathKey];
+      if (!methods || typeof methods !== 'object') continue;
+      const entry = methods[String(method).toLowerCase()];
+      if (!entry || typeof entry !== 'object') continue;
+
+      const result = { summary: entry.summary || null };
+
+      const schema = entry.requestBody?.content?.['application/json']?.schema;
+      if (schema?.properties) {
+        result.requestBody = {
+          fields: Object.keys(schema.properties),
+          required: Array.isArray(schema.required) ? schema.required : [],
+        };
+      }
+
+      const params = Array.isArray(entry.parameters) ? entry.parameters : [];
+      result.pathParams = params.filter((p) => p?.in === 'path').map((p) => p.name).filter(Boolean);
+      result.queryParams = params.filter((p) => p?.in === 'query').map((p) => p.name).filter(Boolean);
+
+      result.responseCodes = entry.responses
+        ? Object.keys(entry.responses).map((c) => parseInt(c, 10)).filter(Number.isFinite)
+        : [];
+
+      return result;
+    }
+    return null;
+  }
+
+  /** Pull the last identifier argument (the handler) from a route registration. */
+  extractRouteHandlerRef(content, matchIndex) {
+    const window = String(content || '').slice(matchIndex, matchIndex + 400);
+    const open = window.indexOf('(');
+    const close = window.indexOf(')', open);
+    if (open < 0 || close < 0) return null;
+    const args = window.slice(open + 1, close).replace(/^\s*["'`][^"'`]*["'`]\s*,?/, '');
+    const ids = args.match(/[A-Za-z_$][A-Za-z0-9_$.]*/g) || [];
+    return ids.length ? ids[ids.length - 1] : null;
+  }
+
+  /** Resolve `ctrl.fn` to the controller file + function name and its source. */
+  resolveControllerFn(handlerRef, routeFileContent, routeFile) {
+    if (!handlerRef) return null;
+    const dot = handlerRef.indexOf('.');
+    const obj = dot > -1 ? handlerRef.slice(0, dot) : handlerRef;
+    const fnName = dot > -1 ? handlerRef.slice(dot + 1) : handlerRef;
+
+    let controllerFile = routeFile;
+    if (dot > -1) {
+      const reqRe = new RegExp(`(?:const|let|var)\\s+${obj.replace(/\$/g, '\\$')}\\s*=\\s*require\\(\\s*["'\`](\\.[^"'\`]+)["'\`]`, 'm');
+      const m = routeFileContent.match(reqRe);
+      if (m) {
+        const resolved = this.resolveRequirePath(routeFile, m[1]);
+        if (resolved) controllerFile = resolved;
+      }
+    }
+    const content = this.readFileCached(controllerFile);
+    if (!content) return null;
+    return { fnName, content };
+  }
+
+  /** Infer schema from a controller function body (req.body/params/query, res.status). */
+  extractHandlerSchema({ fnName, content }) {
+    const text = String(content || '');
+    // Locate the function definition; bound the body to the next sibling export.
+    const defRe = new RegExp(`(?:exports\\.${fnName}|(?:async\\s+)?function\\s+${fnName}|${fnName}\\s*[:=])`, 'm');
+    const start = text.search(defRe);
+    if (start === -1) return null;
+    const nextExport = text.slice(start + 1).search(/\n\s*(?:exports\.|module\.exports|(?:async\s+)?function\s+[A-Za-z])/);
+    const body = nextExport > -1 ? text.slice(start, start + 1 + nextExport) : text.slice(start, start + 1500);
+
+    const bodyFields = new Set();
+    const destructure = body.match(/(?:const|let|var)\s*\{([^}]+)\}\s*=\s*req\.body/);
+    if (destructure) {
+      destructure[1].split(',').forEach((s) => {
+        const name = s.trim().split(':')[0].replace(/\.\.\./, '').trim();
+        if (name) bodyFields.add(name);
+      });
+    }
+    for (const m of body.matchAll(/req\.body\.([A-Za-z0-9_$]+)/g)) bodyFields.add(m[1]);
+
+    const pathParams = [...new Set([...body.matchAll(/req\.params\.([A-Za-z0-9_$]+)/g)].map((m) => m[1]))];
+    const queryParams = [...new Set([...body.matchAll(/req\.query\.([A-Za-z0-9_$]+)/g)].map((m) => m[1]))];
+    const responseCodes = [...new Set([...body.matchAll(/res\s*\.\s*status\(\s*(\d{3})\s*\)/g)].map((m) => parseInt(m[1], 10)))];
+
+    return {
+      summary: null,
+      requestBody: bodyFields.size ? { fields: [...bodyFields], required: [] } : null,
+      pathParams,
+      queryParams,
+      responseCodes,
+    };
+  }
+
+  /**
+   * Discover API calls made from client code (fetch / axios). Used as the third
+   * fallback in the endpoint chain: when a project has no server-side routes or
+   * controllers in-repo (e.g. a frontend talking to an external API), the calls
+   * the UI actually makes are the authoritative endpoint list.
+   *
+   * Template-literal base URLs (`${process.env.API_URL}/api/x`) are stripped to
+   * the path, and interpolated segments (`${id}`) become `:param`.
+   */
+  async findClientApiCalls(projectPath) {
+    const endpoints = [];
+    const seen = new Set();
+    const urlLiteral = '(`[^`]+`|"[^"]+"|\'[^\']+\')';
+    const fetchRe = new RegExp(`fetch\\s*\\(\\s*${urlLiteral}`, 'g');
+    const axiosMethodRe = new RegExp(`axios\\s*\\.\\s*(get|post|put|patch|delete)\\s*\\(\\s*${urlLiteral}`, 'gi');
+    const axiosConfigRe = new RegExp(`axios\\s*\\(\\s*\\{[^}]*?url\\s*:\\s*${urlLiteral}`, 'gi');
+
+    const files = this.findFiles(projectPath, ['.js', '.jsx', '.ts', '.tsx']);
+
+    for (const file of files.slice(0, this.config.maxFiles)) {
+      if (file.includes('node_modules') || file.includes('.spec.') || file.includes('.test.')) continue;
+      try {
+        const content = this.readFileCached(file);
+        if (!content) continue;
+        const rel = path.relative(this.config.projectPath, file);
+
+        const add = (method, rawUrl, atIndex) => {
+          const apiPath = this.normalizeClientUrl(rawUrl);
+          if (!apiPath) return;
+          const key = `${method} ${apiPath}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          endpoints.push({ method, path: apiPath, description: `${method} ${apiPath}`, requiresAuth: false, source: rel, schemaSource: 'client_call' });
+        };
+
+        for (const m of content.matchAll(fetchRe)) {
+          // fetch defaults to GET unless its own options object specifies a
+          // method. The search is bounded to this call's options object so it
+          // never picks up the method of a later, unrelated fetch call.
+          add(this.extractFetchMethod(content, m.index + m[0].length), m[1], m.index);
+        }
+        for (const m of content.matchAll(axiosMethodRe)) add(m[1].toUpperCase(), m[2], m.index);
+        for (const m of content.matchAll(axiosConfigRe)) {
+          // axios({ url, method }) — method lives in the same object literal;
+          // bound the search to that object (up to its first closing brace).
+          const after = content.slice(m.index, m.index + 400);
+          const objEnd = after.indexOf('}');
+          const scope = objEnd > -1 ? after.slice(0, objEnd) : after;
+          const methodMatch = scope.match(/method\s*:\s*["'`](GET|POST|PUT|PATCH|DELETE)["'`]/i);
+          add((methodMatch ? methodMatch[1] : 'GET').toUpperCase(), m[1], m.index);
+        }
+      } catch { /* ignore */ }
+    }
+
+    return endpoints;
+  }
+
+  /** Reduce a client-side fetch/axios URL literal to a comparable API path. */
+  normalizeClientUrl(raw) {
+    let s = String(raw || '').replace(/^[`'"]|[`'"]$/g, '');
+    s = s.replace(/^https?:\/\/[^/]+/, '');   // strip absolute host
+    s = s.replace(/^\$\{[^}]+\}/, '');         // strip leading ${BASE_URL}
+    s = s.replace(/\$\{[^}]+\}/g, ':param');   // remaining interpolations → :param
+    s = s.split('?')[0].split('#')[0];          // drop query/hash
+    if (!s.startsWith('/')) return null;
+    if (s.length > 1) s = s.replace(/\/+$/, '');
+    return s;
+  }
+
+  /**
+   * Determine a fetch() call's HTTP method. Returns GET when the call has no
+   * options object; otherwise reads `method` from the options object that
+   * immediately follows the URL — scanned with balanced braces so the search
+   * cannot leak into a subsequent fetch call.
+   */
+  extractFetchMethod(content, afterUrlIndex) {
+    const rest = String(content || '').slice(afterUrlIndex);
+    const lead = (rest.match(/^\s*/) || [''])[0].length;
+    if (rest[lead] !== ',') return 'GET'; // fetch(url) → GET
+    const braceStart = rest.indexOf('{', lead);
+    if (braceStart === -1) return 'GET';
+    let depth = 0;
+    let end = -1;
+    for (let i = braceStart; i < rest.length && i < braceStart + 800; i++) {
+      const ch = rest[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    const opts = end > -1 ? rest.slice(braceStart, end + 1) : rest.slice(braceStart, braceStart + 300);
+    const mm = opts.match(/method\s*:\s*["'`](GET|POST|PUT|PATCH|DELETE)["'`]/i);
+    return mm ? mm[1].toUpperCase() : 'GET';
   }
 
   /**
@@ -2019,8 +2375,22 @@ class ContextGatherer {
 
   extractRouteComponentName(content, matchIndex = 0) {
     const afterRoutePath = String(content || '').slice(Math.max(0, matchIndex), matchIndex + 700);
-    const elementMatch = afterRoutePath.match(/(?:element\s*=\s*\{\s*<|element\s*:\s*<)([A-Z][A-Za-z0-9_]*)\b/);
-    if (elementMatch) return elementMatch[1];
+
+    // Tolerate `element={ ( <Comp` and `element: ( <Comp` — JSX may sit behind
+    // an optional brace, parens, and arbitrary whitespace/newlines.
+    const elementMatch = afterRoutePath.match(/element\s*[:=]\s*\{?\s*\(?\s*<\s*([A-Z][A-Za-z0-9_]*)/);
+    if (elementMatch) {
+      const comp = elementMatch[1];
+      // When the element is a route guard wrapper (ProtectedRoute, etc.), the
+      // meaningful page component is the one nested inside it — look past the
+      // wrapper for the next JSX component.
+      if (ROUTE_GUARD_RE.test(comp)) {
+        const afterGuard = afterRoutePath.slice(elementMatch.index + elementMatch[0].length);
+        const inner = afterGuard.match(/<\s*([A-Z][A-Za-z0-9_]*)/);
+        if (inner) return inner[1];
+      }
+      return comp;
+    }
 
     const componentMatch = afterRoutePath.match(/(?:component|Component)\s*=\s*\{\s*([A-Z][A-Za-z0-9_]*)\s*\}/);
     if (componentMatch) return componentMatch[1];
@@ -2029,6 +2399,37 @@ class ContextGatherer {
     if (objectComponentMatch) return objectComponentMatch[1];
 
     return null;
+  }
+
+  /**
+   * Detect route-level auth gating from a guard wrapper (ProtectedRoute,
+   * PrivateRoute, RequireAuth, etc.) and extract the role it requires. The
+   * window is bounded to the current route's definition (up to the next
+   * `path:`/`path=`) so we never attribute the next route's guard to this one.
+   */
+  extractRouteGuardInfo(content, matchIndex = 0) {
+    const rest = String(content || '').slice(matchIndex + 1);
+    const nextPath = rest.search(/\bpath\s*[:=]\s*["'`]/);
+    const window = nextPath > -1 ? rest.slice(0, nextPath) : rest.slice(0, 600);
+
+    const requiresAuthFromGuard = ROUTE_GUARD_RE.test(window);
+
+    let requiredRole = null;
+    const singleRole = window.match(/(?:requiredRole|requiredRoles|allowedRole|role)\s*[:=]\s*\{?\s*["']([^"']+)["']/);
+    if (singleRole) {
+      requiredRole = singleRole[1];
+    } else {
+      const roleArray = window.match(/(?:allowedRoles|requiredRoles|roles)\s*[:=]\s*\{?\s*\[([^\]]+)\]/);
+      if (roleArray) {
+        requiredRole = roleArray[1]
+          .split(',')
+          .map((s) => s.replace(/["'\s]/g, ''))
+          .filter(Boolean)
+          .join('|') || null;
+      }
+    }
+
+    return { requiresAuth: requiresAuthFromGuard || !!requiredRole, requiredRole };
   }
 
   extractNearestComponentName(content, targetIndex = 0) {
