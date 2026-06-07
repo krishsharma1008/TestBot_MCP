@@ -351,6 +351,47 @@ test('credential injector treats discovered successIndicator as advisory', () =>
   }), false);
 });
 
+test('credential injector rejects soft signals when the auth request failed (no real artifact)', () => {
+  // The RBAC failure mode: login POST hit ERR_CONNECTION_REFUSED, yet the login
+  // page text "Login to Dashboard" matches the generic /dashboard/i success
+  // locator. A locator/url match alone must NOT count as verified here.
+  assert.equal(shouldAcceptLoginVerification({
+    urlChanged: false,
+    successIndicatorVisible: true,
+    authStateEvidence: { hasAuthState: false },
+    failureVisible: false,
+    loginNetworkFailed: true,
+  }), false);
+
+  // Even a URL change is untrustworthy when the auth request failed.
+  assert.equal(shouldAcceptLoginVerification({
+    urlChanged: true,
+    successIndicatorVisible: false,
+    authStateEvidence: { hasAuthState: false },
+    failureVisible: false,
+    loginNetworkFailed: true,
+  }), false);
+
+  // But a genuine auth artifact still counts even if a (possibly unrelated)
+  // auth-ish request failed — the session demonstrably exists.
+  assert.equal(shouldAcceptLoginVerification({
+    urlChanged: false,
+    successIndicatorVisible: false,
+    authStateEvidence: { hasAuthState: true, cookieName: 'session' },
+    failureVisible: false,
+    loginNetworkFailed: true,
+  }), true);
+
+  // A success-locator match ALONE (still on the login page, no auth artifact)
+  // must NOT verify — this is the RBAC "Login to Dashboard" false positive.
+  assert.equal(shouldAcceptLoginVerification({
+    urlChanged: false,
+    successIndicatorVisible: true,
+    authStateEvidence: { hasAuthState: false },
+    failureVisible: false,
+  }), false);
+});
+
 // Fake page for pageHasCredentialForm: `visible` maps selector → bool. A
 // selector absent from the map has count 0 (does not exist).
 function makeGatePage(visible = {}) {

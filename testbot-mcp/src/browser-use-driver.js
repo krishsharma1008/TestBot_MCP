@@ -23,6 +23,7 @@
 const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const Logger = require('./logger');
 
 const RUNNER_SCRIPT = path.join(__dirname, '..', 'scripts', 'browser_use_runner.py');
@@ -208,6 +209,26 @@ function driveExploration({
     if (!calibratedStepTimeoutS) calibratedStepTimeoutS = STEP_TIMEOUT_MIN_S;
     Logger.info('BrowserUseDriver', `Adaptive step timeout calibrated to ${calibratedStepTimeoutS}s`);
 
+    // Hand browser-use a THROWAWAY COPY of the pre-auth storageState, never the
+    // canonical `.healix/auth-state-<role>.json`. browser-use opens a persistent
+    // profile and forcibly writes the session back to the storage_state path on
+    // exit — if pointed at the real file, an agent that wanders off-app (e.g. to
+    // google.com) overwrites and corrupts the session the test-execution phase
+    // relies on. The copy absorbs any such writeback and is discarded.
+    let browserUseStatePath = '';
+    try {
+      const verified = (Array.isArray(preAuthRoles) ? preAuthRoles : [])
+        .find((r) => r?.storageStatePath && fs.existsSync(r.storageStatePath));
+      if (verified) {
+        const tmp = path.join(os.tmpdir(), `healix-bu-state-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`);
+        fs.copyFileSync(verified.storageStatePath, tmp);
+        browserUseStatePath = tmp;
+      }
+    } catch (copyErr) {
+      Logger.warn('BrowserUseDriver', 'Could not copy pre-auth storageState for browser-use; gap-fill will run unauthenticated', { reason: copyErr.message });
+      browserUseStatePath = '';
+    }
+
     const env = {
       ...process.env,
       HEALIX_TARGET_URL: targetUrl,
@@ -253,14 +274,9 @@ function driveExploration({
               .filter(Boolean)
           )
         : '',
-      // Pre-auth storageState so browser-use's secondary gap-fill runs as an
-      // authenticated session and can reach protected areas. Uses the first
-      // verified role's state file; empty when no role pre-authed.
-      HEALIX_PREAUTH_STORAGE_STATE: (() => {
-        const verified = (Array.isArray(preAuthRoles) ? preAuthRoles : [])
-          .find((r) => r?.storageStatePath && fs.existsSync(r.storageStatePath));
-        return verified ? verified.storageStatePath : '';
-      })(),
+      // Pre-auth storageState (a throwaway copy — see above) so browser-use's
+      // secondary gap-fill runs authenticated without risking the canonical file.
+      HEALIX_PREAUTH_STORAGE_STATE: browserUseStatePath,
     };
 
     let settled = false;
@@ -281,6 +297,11 @@ function driveExploration({
       if (settled) return;
       settled = true;
       clearTimeout(killTimer);
+      // Discard the throwaway storageState copy (and any session browser-use
+      // wrote back into it) so it never lingers or leaks into later runs.
+      if (browserUseStatePath) {
+        try { fs.unlinkSync(browserUseStatePath); } catch { /* already gone */ }
+      }
       resolve(payload);
     };
 

@@ -326,12 +326,22 @@ async function fillFirstVisible(page, selectors = [], value, timeoutMs = 10_000)
 
 function shouldAcceptLoginVerification({
   urlChanged = false,
-  successIndicatorVisible = false,
+  successIndicatorVisible = false, // advisory only — never sufficient on its own
   authStateEvidence = null,
   failureVisible = false,
+  loginNetworkFailed = false,
 } = {}) {
   if (failureVisible) return false;
-  return Boolean(urlChanged || successIndicatorVisible || authStateEvidence?.hasAuthState);
+  // A failed auth network request (login POST hit ERR_CONNECTION_REFUSED or 5xx)
+  // means authentication never actually happened — require a real auth artifact.
+  if (loginNetworkFailed) return Boolean(authStateEvidence?.hasAuthState);
+  // A success-locator match ALONE is not trustworthy: login pages routinely
+  // contain words like "Dashboard"/"Login" that match generic success locators
+  // (the RBAC demo's login heading is literally "Login to Dashboard"). Require a
+  // real signal — navigation away from the login page, or an auth artifact
+  // (cookie / localStorage / sessionStorage token). successIndicatorVisible is
+  // retained only as a label for the verification signal, not for acceptance.
+  return Boolean(urlChanged || authStateEvidence?.hasAuthState);
 }
 
 async function waitForLoginVerification({
@@ -342,6 +352,7 @@ async function waitForLoginVerification({
   authFlow,
   credentials,
   timeoutMs = 25_000,
+  getAuthFailure = null,
 } = {}) {
   const start = Date.now();
   const successLocators = buildSuccessLocators(authFlow, credentials);
@@ -362,6 +373,8 @@ async function waitForLoginVerification({
     const marker = await isAnyLocatorVisible(page, successLocators, 500);
     const authStateEvidence = await collectAuthStateEvidence(page, context, baseURL);
     const urlChanged = finalPathname !== loginPathname;
+    const authFailure = typeof getAuthFailure === 'function' ? getAuthFailure() : null;
+    const loginNetworkFailed = Boolean(authFailure);
 
     last = {
       finalPathname,
@@ -376,6 +389,7 @@ async function waitForLoginVerification({
       successIndicatorVisible: marker.visible,
       authStateEvidence,
       failureVisible,
+      loginNetworkFailed,
     })) {
       return {
         ok: true,
@@ -391,6 +405,17 @@ async function waitForLoginVerification({
       return {
         ok: false,
         reason: `Login failed on ${loginPathname}: ${failureText}`,
+        terminal: true,
+      };
+    }
+
+    // The auth request itself failed and no real session was established —
+    // fail fast rather than waiting for the full timeout on a login that
+    // physically cannot complete (e.g. backend unreachable / wrong port).
+    if (loginNetworkFailed && !authStateEvidence?.hasAuthState && !urlChanged) {
+      return {
+        ok: false,
+        reason: `Login request failed (${authFailure.type}): ${authFailure.detail}`,
         terminal: true,
       };
     }
@@ -426,6 +451,27 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page = await context.newPage();
+
+  // Track failures of the auth request triggered by submitting the login form.
+  // A connection refusal / 5xx here means the credentials were never actually
+  // checked, so any post-submit "success" UI is illusory. Reset per attempt.
+  let authNetworkFailure = null;
+  const AUTH_REQUEST_RE = /(login|sign-?in|auth|authenticate|session|token)/i;
+  page.on('requestfailed', (req) => {
+    try {
+      if (req.method() === 'POST' && AUTH_REQUEST_RE.test(req.url())) {
+        authNetworkFailure = { type: 'network', detail: `${req.url()} :: ${req.failure() && req.failure().errorText}` };
+      }
+    } catch { /* ignore */ }
+  });
+  page.on('response', (resp) => {
+    try {
+      const req = resp.request();
+      if (req.method() === 'POST' && AUTH_REQUEST_RE.test(resp.url()) && resp.status() >= 500) {
+        authNetworkFailure = { type: 'http', detail: `${resp.status()} ${resp.url()}` };
+      }
+    } catch { /* ignore */ }
+  });
 
   try {
     const cleanAuthFlow = sanitizeAuthFlow(authFlow);
@@ -534,27 +580,60 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
         // it so a later "no form found anywhere" verdict can't be reported when
         // the real issue was a credential rejection on a confirmed form.
         sawLoginForm = true;
+        // Clear any stale auth-request failure from a prior candidate so the
+        // verification only reacts to THIS submit's network outcome.
+        authNetworkFailure = null;
 
         // Wait for SPA navigation to complete. Supabase fires router.replace() in the
         // .then() of signInWithPassword — this is async and fires AFTER the API response,
         // so networkidle can resolve before the redirect. waitForURL is the only reliable
-        // signal that the auth flow has actually completed. Pressing Enter is
-        // more reliable than only looking for button[type=submit], because many
-        // SPA forms use untyped <button> elements or custom UI wrappers.
+        // signal that the auth flow has actually completed.
+        //
+        // Submit by CLICKING the submit button first. Many forms (e.g. the RBAC
+        // demo) wire the action to a <button> onClick and do NOT submit on Enter,
+        // so press('Enter') silently no-ops — and because press() resolves without
+        // throwing, an Enter-then-catch-click pattern never reaches the click. We
+        // click when a submit-style control exists and only fall back to Enter
+        // when there is none (or the click fails).
         await Promise.all([
           page.waitForURL(
             (url) => { try { return url.pathname !== loginPathname; } catch { return false; } },
             { timeout: 20_000 }
           ).catch(() => null),
-          page.locator(passwordFill.selector).first().press('Enter').catch(async () => {
-            const submit = page.locator([
+          (async () => {
+            // Try submit controls in priority order. Crucially, include
+            // `<button type="button">` — React forms commonly wire submit to an
+            // onClick handler on a type="button" element (the RBAC demo's
+            // "Submit" is exactly this), which a `:not([type="button"])` filter
+            // would wrongly exclude. Text matches come before the broad button
+            // fallback so we don't click an unrelated control.
+            const submitCandidates = [
               'button[type="submit"]',
               'input[type="submit"]',
-              'button:not([type="reset"]):not([type="button"])',
-            ].join(', ')).first();
-            const count = await submit.count().catch(() => 0);
-            if (count > 0) await submit.click({ timeout: 10_000 });
-          }),
+              'button:has-text("Log in")',
+              'button:has-text("Login")',
+              'button:has-text("Sign in")',
+              'button:has-text("Sign In")',
+              'button:has-text("Submit")',
+              'button:has-text("Continue")',
+              'button:has-text("Next")',
+              'button:not([type="reset"])',
+            ];
+            let clicked = false;
+            for (const sel of submitCandidates) {
+              try {
+                const btn = page.locator(sel).first();
+                if ((await btn.count().catch(() => 0)) > 0 && await btn.isVisible().catch(() => false)) {
+                  await btn.click({ timeout: 8_000 });
+                  clicked = true;
+                  break;
+                }
+              } catch { /* try next candidate */ }
+            }
+            if (!clicked) {
+              await page.locator(passwordFill.selector).first().press('Enter').catch(() => {});
+            }
+          })(),
         ]);
 
         // Allow middleware chain redirects (e.g. /admin -> / for non-admin
@@ -571,6 +650,7 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
           authFlow: effectiveAuthFlow,
           credentials,
           timeoutMs: effectiveAuthFlow?.successIndicator ? 30_000 : 25_000,
+          getAuthFailure: () => authNetworkFailure,
         });
 
         if (!verification.ok) {
