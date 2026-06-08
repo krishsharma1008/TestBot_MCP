@@ -76,6 +76,7 @@ export interface ApiEndpoint {
   requiresAuth?: boolean
   authRequired?: boolean
   auth?: string
+  requiredRole?: string | null
   requestBody?: unknown
   requestSchema?: Record<string, unknown>
   responseSchema?: Record<string, unknown>

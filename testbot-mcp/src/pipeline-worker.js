@@ -761,9 +761,23 @@ function synthesizeExplorationArtifactFromContext(context = {}, previousArtifact
 
   for (const page of pages) {
     const rawPath = String(page?.path || page?.route || page?.url || '').trim();
-    if (!rawPath || !rawPath.startsWith('/') || rawPath.includes('*') || seen.has(rawPath)) continue;
+    if (!rawPath || !rawPath.startsWith('/') || rawPath.includes('*')) continue;
     const requiresAuth = page?.requiresAuth === true || page?.authRequired === true || page?.protected === true;
     const requiredRole = page?.requiredRole || null;
+    if (seen.has(rawPath)) {
+      // Static analysis knows whether a route is auth-gated; Playwright defaults
+      // to false because it navigates with a pre-auth storageState and always
+      // sees content. Preserve the static signal — it is more authoritative for
+      // auth-gating than a Playwright observation made under authenticated state.
+      if (requiresAuth || requiredRole) {
+        const existing = routes.find((r) => r?.path === rawPath);
+        if (existing) {
+          existing.requiresAuth = existing.requiresAuth || requiresAuth;
+          existing.requiredRole = existing.requiredRole || requiredRole;
+        }
+      }
+      continue;
+    }
     seen.add(rawPath);
     routes.push({
       path: rawPath,

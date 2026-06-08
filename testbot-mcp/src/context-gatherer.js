@@ -1462,7 +1462,7 @@ class ContextGatherer {
             const fullPath = registrar === 'app'
               ? this.joinRoutePath('', relPath)
               : this.joinRoutePath(mountPrefix, relPath);
-            const requiresAuth = this.detectExpressRouteAuth(content, match.index);
+            const auth = this.detectExpressRouteAuth(content, match.index);
 
             if (!endpoints.some(e => e.method === method && e.path === fullPath)) {
               const schema = this.extractEndpointSchema({ content, matchIndex: match.index, method, routeFile: file });
@@ -1470,7 +1470,8 @@ class ContextGatherer {
                 method,
                 path: fullPath,
                 description: schema.summary || `${method} ${fullPath}`,
-                requiresAuth,
+                requiresAuth: auth.requiresAuth,
+                ...(auth.requiredRole ? { requiredRole: auth.requiredRole } : {}),
                 source: path.relative(this.config.projectPath, file),
                 ...(schema.requestBody ? { requestBody: schema.requestBody } : {}),
                 ...(schema.pathParams && schema.pathParams.length ? { pathParams: schema.pathParams } : {}),
@@ -1548,12 +1549,42 @@ class ContextGatherer {
    * arguments of the route registration itself (between the path string and the
    * handler) — not a file-wide keyword scan, which mislabels login/logout
    * routes that merely live in an auth-named file.
+   *
+   * Returns { requiresAuth: boolean, requiredRole: string|null }.
+   * requiredRole is extracted from HOF middleware calls like authorize('admin'),
+   * requireRole('user'), checkRole("manager"), hasRole('admin').
    */
   detectExpressRouteAuth(content, matchIndex = 0) {
-    const window = String(content || '').slice(matchIndex, matchIndex + 300);
-    const callEnd = window.indexOf(')');
-    const call = callEnd > -1 ? window.slice(0, callEnd) : window;
-    return /\b(authenticate|authorize|requireAuth|requireRole|requiredRole|verifyToken|isAuthenticated|ensureAuth|protect|checkRole|checkAuth|authMiddleware|authGuard|passport|verifyJWT|ensureLoggedIn)\b/i.test(call);
+    const text = String(content || '');
+
+    // Find the opening paren of the route call, then walk to its matching close
+    // paren using balanced depth — handles nested parens like authorize('admin').
+    const openParen = text.indexOf('(', matchIndex);
+    if (openParen === -1) return { requiresAuth: false, requiredRole: null };
+
+    let depth = 0;
+    let closeParen = -1;
+    const scanLimit = Math.min(text.length, openParen + 600);
+    for (let i = openParen; i < scanLimit; i++) {
+      if (text[i] === '(') depth++;
+      else if (text[i] === ')') {
+        depth--;
+        if (depth === 0) { closeParen = i; break; }
+      }
+    }
+    const call = text.slice(openParen, closeParen > -1 ? closeParen + 1 : openParen + 500);
+
+    // Named auth middleware passed as positional arguments before the handler.
+    const AUTH_MW_RE = /\b(authenticate|authorize|requireAuth|requireRole|requiredRole|verifyToken|isAuthenticated|ensureAuth|protect|checkRole|checkAuth|authMiddleware|authGuard|passport|verifyJWT|ensureLoggedIn|jwtMiddleware|bearerAuth|tokenAuth)\b/i;
+    const requiresAuth = AUTH_MW_RE.test(call);
+
+    // Role extracted from HOF middleware: authorize('admin'), requireRole('user'),
+    // checkRole("manager"), hasRole('admin'), permit('editor'), can('read').
+    const ROLE_HOF_RE = /\b(?:authorize|requireRole|checkRole|hasRole|permit|can)\s*\(\s*['"`]([^'"`]+)['"`]/i;
+    const roleMatch = call.match(ROLE_HOF_RE);
+    const requiredRole = roleMatch ? roleMatch[1] : null;
+
+    return { requiresAuth: requiresAuth || !!requiredRole, requiredRole };
   }
 
   /**

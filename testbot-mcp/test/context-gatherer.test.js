@@ -107,9 +107,44 @@ test('detectExpressRouteAuth flags middleware-guarded routes only', () => {
   const guarded = `router.get('/', authMiddleware, ctrl.list)`;
   const loginRoute = `router.post('/login', authController.login)`;
   const plain = `router.get('/', userController.getUsers)`;
-  assert.equal(cg.detectExpressRouteAuth(guarded, 0), true);
-  assert.equal(cg.detectExpressRouteAuth(loginRoute, 0), false, 'authController.login must not be a false positive');
-  assert.equal(cg.detectExpressRouteAuth(plain, 0), false);
+  assert.equal(cg.detectExpressRouteAuth(guarded, 0).requiresAuth, true);
+  assert.equal(cg.detectExpressRouteAuth(loginRoute, 0).requiresAuth, false, 'authController.login must not be a false positive');
+  assert.equal(cg.detectExpressRouteAuth(plain, 0).requiresAuth, false);
+});
+
+test('detectExpressRouteAuth: authenticate + authorize(role) → requiresAuth:true, requiredRole extracted', () => {
+  // RBAC pattern: positional middleware authenticate (JWT verify) +
+  // authorize('admin') HOF (role check) before the handler.
+  const cg = new ContextGatherer();
+  const rbacAdmin = `router.get('/', authenticate, authorize('admin'), getAllRoles)`;
+  const rbacUser  = `router.post('/', verifyToken, requireRole('user'), createItem)`;
+  const rbacMgr   = `router.put('/:id', isAuthenticated, checkRole("manager"), updateItem)`;
+
+  const admin = cg.detectExpressRouteAuth(rbacAdmin, 0);
+  assert.equal(admin.requiresAuth, true);
+  assert.equal(admin.requiredRole, 'admin');
+
+  const user = cg.detectExpressRouteAuth(rbacUser, 0);
+  assert.equal(user.requiresAuth, true);
+  assert.equal(user.requiredRole, 'user');
+
+  const mgr = cg.detectExpressRouteAuth(rbacMgr, 0);
+  assert.equal(mgr.requiresAuth, true);
+  assert.equal(mgr.requiredRole, 'manager');
+});
+
+test('detectExpressRouteAuth: authenticate only (no role HOF) → requiresAuth:true, requiredRole:null', () => {
+  const cg = new ContextGatherer();
+  const result = cg.detectExpressRouteAuth(`router.get('/profile', authenticate, getProfile)`, 0);
+  assert.equal(result.requiresAuth, true);
+  assert.equal(result.requiredRole, null);
+});
+
+test('detectExpressRouteAuth: unauthenticated route → requiresAuth:false, requiredRole:null', () => {
+  const cg = new ContextGatherer();
+  const result = cg.detectExpressRouteAuth(`router.get('/health', healthCheck)`, 0);
+  assert.equal(result.requiresAuth, false);
+  assert.equal(result.requiredRole, null);
 });
 
 test('extractRouteHandlerRef returns the last identifier argument (the handler)', () => {

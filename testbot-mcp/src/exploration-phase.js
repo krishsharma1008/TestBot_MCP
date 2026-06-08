@@ -66,9 +66,19 @@ function mergeGapFillArtifact(primary = {}, gapFill = {}) {
   const routes = Array.isArray(primary?.routes) ? [...primary.routes] : [];
   const seenRoutes = new Set(routes.map((r) => r?.path).filter(Boolean));
   for (const r of Array.isArray(gapFill?.routes) ? gapFill.routes : []) {
-    if (r?.path && !seenRoutes.has(r.path)) {
+    if (!r?.path) continue;
+    if (!seenRoutes.has(r.path)) {
       seenRoutes.add(r.path);
       routes.push({ ...r, source: r.source || 'browser-use-gapfill' });
+    } else if (r.requiresAuth || r.requiredRole) {
+      // If the gap-fill source carries a truthy auth signal for a route already
+      // in the primary artifact, preserve it — the primary Playwright pass
+      // defaults to requiresAuth:false when navigating under a pre-auth session.
+      const existing = routes.find((pr) => pr?.path === r.path);
+      if (existing) {
+        existing.requiresAuth = existing.requiresAuth || r.requiresAuth;
+        existing.requiredRole = existing.requiredRole || r.requiredRole;
+      }
     }
   }
 
@@ -384,11 +394,18 @@ async function runExplorationPhase({
       }
       return r;
     });
-    // Add Phase A routes not found by the live browser pass
+    // Add Phase A routes not found by the live browser pass. Use the auth
+    // signal from knownRoutes (static analysis) rather than defaulting to false.
+    const knownRouteAuthMap = new Map(
+      (Array.isArray(knownRoutes) ? knownRoutes : [])
+        .filter((r) => r?.path)
+        .map((r) => [r.path, { requiresAuth: r.requiresAuth === true, requiredRole: r.requiredRole || null }])
+    );
     const extraRoutes = [];
     for (const [routePath, dom] of phaseAEnrichments) {
       if (!livePathSet.has(routePath)) {
-        extraRoutes.push({ path: routePath, requiresAuth: false, source: 'phase_a_enrichment', ...dom });
+        const auth = knownRouteAuthMap.get(routePath) || { requiresAuth: false, requiredRole: null };
+        extraRoutes.push({ path: routePath, requiresAuth: auth.requiresAuth, requiredRole: auth.requiredRole, source: 'phase_a_enrichment', ...dom });
       }
     }
     mergedArtifact = { ...mergedArtifact, routes: [...enrichedLive, ...extraRoutes] };
