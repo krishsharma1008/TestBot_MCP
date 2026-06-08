@@ -11357,10 +11357,21 @@ async function runPipeline(config, runId) {
     parsedPRD = prdResult?.parsed ?? null;
     const prdContents = prdResult?.prdContents ?? [];
 
+    // When the repo splits frontend + backend, `config.baseURL` points at the
+    // primary (frontend) service. API specs need the backend origin so direct
+    // `request()` calls hit the right port instead of resolving against the
+    // frontend. Derive it from the detected backend/fullstack service; leave it
+    // equal to baseURL for single-service / fullstack / api-only repos so the
+    // generator keeps emitting clean relative paths.
+    const backendService = (Array.isArray(config.services) ? config.services : [])
+      .find((service) => service && (service.role === 'backend' || service.role === 'fullstack'));
+    const apiBaseURL = backendService?.baseURL || config.baseURL;
+
     const projectInfo = {
       name: config.projectName,
       framework: codebaseContext?.projectStructure?.framework || 'Unknown',
       baseURL: config.baseURL,
+      apiBaseURL,
       startCommand: config.startCommand,
       testCredentials: config.testCredentials,
       services: Array.isArray(config.services) ? config.services : undefined,

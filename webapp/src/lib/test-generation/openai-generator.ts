@@ -786,8 +786,37 @@ ${this.buildOutputFormatSection(`${slug}-ui.spec.ts`)}`
 
   // ─── Feature API agent prompt builders ───────────────────────────────────
 
+  /**
+   * Resolve the origin that generated API specs should target for direct
+   * `request()` calls. In multi-service repos `projectInfo.baseURL` is the
+   * frontend (Playwright's primary), so relative API paths would wrongly
+   * resolve against the frontend port. Prefer an explicit `apiBaseURL`, then a
+   * detected backend/fullstack service, and fall back to `baseURL` when there
+   * is no separate backend (single-service / fullstack / api-only repos).
+   */
+  resolveApiBaseURL(projectInfo: ProjectInfo): string {
+    const fallback = projectInfo.baseURL || 'http://localhost:3000'
+    if (projectInfo.apiBaseURL) return projectInfo.apiBaseURL
+    const backend = (projectInfo.services || []).find(
+      (s) => s && (s.role === 'backend' || s.role === 'fullstack')
+    )
+    return backend?.baseURL || fallback
+  }
+
   buildFeatureAPISystemPrompt(projectInfo: ProjectInfo): string {
     const slug = this.getFeatureSlug()
+    const baseURL = projectInfo.baseURL || 'http://localhost:3000'
+    const apiBaseURL = this.resolveApiBaseURL(projectInfo)
+    // Only force absolute backend URLs when the API origin actually differs
+    // from the frontend. Same-origin repos keep clean relative paths so there
+    // is no behavior change for single-service / fullstack / api-only apps.
+    const apiOriginDiffers = apiBaseURL !== baseURL
+    const baseURLSection = apiOriginDiffers
+      ? `## URLs
+- Frontend Base URL (UI only): ${baseURL}
+- API Base URL: ${apiBaseURL}
+- The backend runs on a DIFFERENT origin than the frontend. Prefix EVERY \`request.get/post/put/delete/fetch\` call with the API Base URL above (e.g. \`request.get('${apiBaseURL}/api/...')\`). NEVER use relative API paths — they would resolve against the frontend port and fail.`
+      : `## Base URL: ${baseURL}`
     return `You are an expert API testing engineer. Generate comprehensive Playwright API tests scoped to the current feature.
 
 ## Guidelines
@@ -801,7 +830,7 @@ ${this.buildOutputFormatSection(`${slug}-ui.spec.ts`)}`
 - Include at least one lightweight stress/burst test (Promise.all with small N).
 - Scope strictly to this feature's acceptance criteria and endpoints.
 
-## Base URL: ${projectInfo.baseURL || 'http://localhost:3000'}
+${baseURLSection}
 
 ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
   }
@@ -820,6 +849,8 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
       testKind: 'api',
     })
 
+    const baseURL = projectInfo.baseURL || 'http://localhost:3000'
+    const apiBaseURL = this.resolveApiBaseURL(projectInfo)
     const requirements = [
       `Emit a single file named ${slug}-api.spec.ts.`,
       'Use only statuses/fields that are present in CONTEXT_JSON endpoint contracts or schemas.',
@@ -828,6 +859,11 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
       'Include a lightweight burst test (Promise.all with small N) and assert no 5xx responses.',
       'Cover and tag all API categories: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].',
     ]
+    if (apiBaseURL !== baseURL) {
+      requirements.push(
+        `The backend is on a separate origin. Prefix every request() URL with the API base URL "${apiBaseURL}" (CONTEXT_JSON.meta.projectInfo.apiBaseURL). Do NOT use relative paths — they resolve against the frontend and fail.`,
+      )
+    }
     if (apiOnly) {
       requirements.push(
         'This repository is API-ONLY (no frontend). Produce at least two MULTI-STEP API FLOW tests tagged [CAT:api_flow] where later requests consume data from earlier requests.',
@@ -873,15 +909,26 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
       ? `Emit TWO files: ${slug}-actions.ts (exported helpers, no test blocks) and ${slug}-ui.spec.ts (tests importing from ./${slug}-actions).`
       : `Emit a single file: ${slug}-api.spec.ts.`
 
+    const requirements = [
+      'Each test() title MUST start with [REQ:{acId}][{kind}] exactly as specified in the "Required title prefix" for each spec.',
+      'Each test() block MUST be preceded by a // @spec {spec.id} comment on its own line (e.g., // @spec F1-UI-01). Use the exact spec id from the spec definition.',
+      'Implement each spec as one test() block. Steps and assertions are already decided — translate them to Playwright code.',
+      'Use selector ladder preference: testId → role/name → label → placeholder → text.',
+      'Do not invent additional test cases beyond those listed.',
+    ]
+    if (agentType === 'api') {
+      const baseURL = projectInfo.baseURL || 'http://localhost:3000'
+      const apiBaseURL = this.resolveApiBaseURL(projectInfo)
+      if (apiBaseURL !== baseURL) {
+        requirements.push(
+          `The backend is on a separate origin. Prefix every request() URL with the API base URL "${apiBaseURL}" (CONTEXT_JSON.meta.projectInfo.apiBaseURL). Do NOT use relative paths or the frontend base URL — they would resolve against the frontend port and fail.`,
+        )
+      }
+    }
+
     return this.buildStructuredUserPrompt({
       task: `Implement the following ${specs.length} pre-planned test cases for the "${slug}" feature. ${fileNote} Do NOT add or remove test cases — implement exactly the specs listed below.`,
-      requirements: [
-        'Each test() title MUST start with [REQ:{acId}][{kind}] exactly as specified in the "Required title prefix" for each spec.',
-        'Each test() block MUST be preceded by a // @spec {spec.id} comment on its own line (e.g., // @spec F1-UI-01). Use the exact spec id from the spec definition.',
-        'Implement each spec as one test() block. Steps and assertions are already decided — translate them to Playwright code.',
-        'Use selector ladder preference: testId → role/name → label → placeholder → text.',
-        'Do not invent additional test cases beyond those listed.',
-      ],
+      requirements,
       payload: { ...payload as object, TEST_CASES: specLines },
     })
   }
@@ -1202,6 +1249,7 @@ ${this.buildOutputFormatSection('e2e-workflows.spec.ts')}`
         projectInfo: {
           name: projectInfo.name || 'App',
           baseURL: projectInfo.baseURL || 'http://localhost:3000',
+          apiBaseURL: this.resolveApiBaseURL(projectInfo),
           framework: projectInfo.framework || 'Unknown',
           startCommand: projectInfo.startCommand || null,
           routingMode,

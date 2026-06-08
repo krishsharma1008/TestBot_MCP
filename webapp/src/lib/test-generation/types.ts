@@ -15,6 +15,12 @@ export interface ServiceInfo {
 export interface ProjectInfo {
   name?: string
   baseURL?: string
+  // Backend/API origin for direct `request()` calls in generated API specs.
+  // When the repo splits frontend + backend, `baseURL` points at the frontend
+  // (Playwright's primary) while `apiBaseURL` points at the backend service so
+  // API tests hit the right port. Defaults to `baseURL` when there is no
+  // separate backend (single-service / fullstack / api-only repos).
+  apiBaseURL?: string
   framework?: string
   startCommand?: string
   // When the repo splits frontend + backend (monorepo) these describe each service
