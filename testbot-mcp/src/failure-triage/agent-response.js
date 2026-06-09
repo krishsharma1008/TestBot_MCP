@@ -318,7 +318,5 @@ function truncate(s, n) {
 
 module.exports = {
   buildAgentResponse,
-  verifyPatchAgainstDisk,
-  autoApplyKillSwitchOn,
   AUTO_APPLY_CONFIDENCE_FLOOR,
 };

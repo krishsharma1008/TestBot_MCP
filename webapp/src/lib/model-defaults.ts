@@ -1,9 +1,9 @@
-export const DEFAULT_OPENAI_MODEL = 'gpt-5.5-mini'
+export const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
 
 const PROVIDER_MODEL_ALIASES: Record<string, string> = {
   // Product-facing Healix default. OpenAI's public API currently exposes this
   // capability under gpt-5-mini, so translate only at the provider boundary.
-  'gpt-5.5-mini': 'gpt-5-mini',
+  'gpt-5.5-mini': 'gpt-5.4-mini',
 }
 
 export function resolveConfiguredOpenAIModel(override?: string | null): string {

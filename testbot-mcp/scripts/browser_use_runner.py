@@ -72,7 +72,7 @@ _ARTIFACT_TEMPLATE = {
 }
 
 _PROVIDER_MODEL_ALIASES = {
-    "gpt-5.5-mini": "gpt-5-mini",
+    "gpt-5.5-mini": "gpt-5.4-mini",
 }
 
 
