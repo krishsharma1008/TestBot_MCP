@@ -63,6 +63,33 @@ function isAuthishRoute(routePath) {
   return /(^|\/|#)(login|sign-in|signin|auth|register|signup|sign-up)(\/|$|\?)/i.test(String(routePath || ''));
 }
 
+/**
+ * After navigating to a route during DOM enrichment, decide whether the page
+ * bounced to the login screen — i.e. the session for the route's required role
+ * is missing/invalid and the protected page redirected us to auth.
+ *
+ * Recording the login DOM as a protected route's content is the RC3 regression:
+ * the generator then gets login selectors (email/password/Submit) for a
+ * dashboard route and falls back to an ungrounded `main` locator. When this
+ * returns true, callers skip DOM capture and flag the route un-enriched so the
+ * static-analysis hints survive instead.
+ *
+ * Returns false for routes that are themselves login/auth pages (landing there
+ * is expected) and for anything that can't be evaluated.
+ */
+function landedOnLoginPage(page, route) {
+  // The route itself is a login/auth page — landing there is expected.
+  if (isAuthishRoute(route?.path)) return false;
+  let landedKey = '';
+  try {
+    const landed = new URL(page.url());
+    landedKey = `${landed.pathname}${landed.hash || ''}`;
+  } catch {
+    return false;
+  }
+  return isAuthishRoute(landedKey);
+}
+
 function queueContainsRoute(queue, routeKey, baseURL) {
   return queue.some((queuedUrl) => routeKeyFromUrl(queuedUrl, baseURL) === routeKey);
 }
@@ -630,8 +657,15 @@ async function enrichRoutesWithDOM({ baseURL, routes = [], storageStatePaths = [
         if (typeof onHeartbeat === 'function') {
           try { onHeartbeat({ type: 'heartbeat', path: route.path }); } catch { /* ignore */ }
         }
-        const dom = await _enrichRouteDOM(page).catch(() => null);
-        if (dom) enrichments[route.path] = dom;
+        if ((route.requiresAuth || route.requiredRole) && landedOnLoginPage(page, route)) {
+          // Protected route bounced to login — the required role's session is
+          // missing. Do NOT record the login DOM as this route's content; flag
+          // it un-enriched so static hints survive (see landedOnLoginPage).
+          enrichments[route.path] = { redirectedToLogin: true, unenriched: true };
+        } else {
+          const dom = await _enrichRouteDOM(page).catch(() => null);
+          if (dom) enrichments[route.path] = dom;
+        }
       } catch { /* non-fatal — skip route */ }
     }
 
@@ -755,8 +789,15 @@ async function enrichAllRoutesWithDOM({
             if (typeof onHeartbeat === 'function') {
               try { onHeartbeat({ type: 'heartbeat', path: route.path }); } catch { /* ignore */ }
             }
-            const dom = await _enrichRouteDOM(page).catch(() => null);
-            if (dom) enrichments.set(route.path, dom);
+            if ((route.requiresAuth || route.requiredRole) && landedOnLoginPage(page, route)) {
+              // Protected route bounced to login — its role session is missing.
+              // Skip the login DOM so the generator keeps static dashboard hints
+              // instead of login selectors (see landedOnLoginPage).
+              enrichments.set(route.path, { redirectedToLogin: true, unenriched: true });
+            } else {
+              const dom = await _enrichRouteDOM(page).catch(() => null);
+              if (dom) enrichments.set(route.path, dom);
+            }
           } catch { /* non-fatal — skip route */ }
         }
       } finally {
@@ -777,4 +818,6 @@ module.exports = {
   _buildAuthFlowCandidate,
   _mergeWalks,
   _routeKeyFromUrl: routeKeyFromUrl,
+  _landedOnLoginPage: landedOnLoginPage,
+  _isAuthishRoute: isAuthishRoute,
 };

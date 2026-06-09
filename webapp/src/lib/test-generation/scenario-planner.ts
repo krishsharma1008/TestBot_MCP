@@ -102,6 +102,18 @@ export async function planFeatureTestCases(
   // Ensure featureId is always set correctly regardless of what LLM returned
   specs = specs.map((s) => ({ ...s, featureId: feature.id }))
 
+  // Drop api specs that target a frontend page route / invented endpoint instead
+  // of a real backend endpoint — they would otherwise be generated and then
+  // hard-quarantined as ungrounded_api_endpoint, costing whole files of coverage.
+  const grounded = groundApiSpecsToEndpoints(specs, context?.apiEndpoints)
+  if (grounded.dropped.length > 0) {
+    console.warn(
+      `[scenario-planner] dropped ${grounded.dropped.length} ungrounded api spec(s) for ${feature.id}:`,
+      grounded.dropped.map((s) => `${s.id}(${s.targetEndpoint || specEndpointPath(s) || 'no-endpoint'})`).join(', '),
+    )
+  }
+  specs = grounded.kept
+
   // Filter by testType
   if (testType === 'frontend') specs = specs.filter((s) => s.agentType === 'ui')
   if (testType === 'backend') specs = specs.filter((s) => s.agentType === 'api')
@@ -129,6 +141,9 @@ Rules:
 - Assign agentType "ui" for browser-interaction tests and "api" for HTTP API tests.
 - Resolve targetRoute from the observed routes list (exact path string). Leave undefined if no matching route.
 - Resolve targetEndpoint from the observed API endpoints (format: "METHOD /path"). Leave undefined if not found.
+- CRITICAL — agentType "api" is ONLY allowed when the acceptance criterion maps to a real backend endpoint from the "Observed API Endpoints" list. Set its targetEndpoint to that exact "METHOD /path".
+- NEVER create an "api" test that hits a frontend page route (e.g. /login, /admindashboard, /userdashboard, /dashboard). Those are SPA pages, NOT backend endpoints — an API test against them returns HTML/404 and is worthless. The login API is in the endpoint list (e.g. POST /api/auth/login), not the /login page.
+- If an acceptance criterion is about a screen/shell/navigation (viewing a dashboard, opening a tab, seeing a list) and no backend endpoint directly serves it, make it a "ui" test — do NOT force an "api" test. Reserve "api" tests for ACs that exercise a real endpoint (e.g. CRUD via /api/...).
 - title must be a plain human-readable label — do NOT include [REQ:...] or [positive] prefixes.
 - steps and assertions must be plain English sentences.
 - id format: "{featureId}-UI-{nn}" for ui specs, "{featureId}-API-{nn}" for api specs, zero-padded to 2 digits.
@@ -255,6 +270,78 @@ function formatApiEndpoints(apiEndpoints: ApiEndpoint[] | undefined | null): str
       return `${method} ${ep.path}${auth}`
     })
   )]
+}
+
+/**
+ * Normalize an endpoint path for comparison: strip query/trailing slash and
+ * collapse path params (`:id`, `{id}`, numeric/hash segments) to `:param`.
+ */
+export function normalizeEndpointPath(p: string): string {
+  const base = String(p || '').split('?')[0].replace(/\/+$/, '')
+  if (!base) return '/'
+  return base
+    .replace(/\/(:[^/]+|\{[^}]+\}|\d+|[0-9a-fA-F]{8,})/g, '/:param')
+    .toLowerCase()
+}
+
+function buildRealEndpointPathSet(apiEndpoints: ApiEndpoint[] | undefined | null): Set<string> {
+  const set = new Set<string>()
+  for (const ep of apiEndpoints || []) {
+    // Skip the synthetic /api/health fallback Healix injects when no endpoints
+    // are found — it is not a real surface to plan against.
+    const isSyntheticHealth =
+      String(ep?.method || 'GET').toUpperCase() === 'GET' &&
+      ep?.path === '/api/health' &&
+      (ep?.synthetic === true || ep?.source === 'healix_fallback' || !ep?.source)
+    if (isSyntheticHealth || !ep?.path) continue
+    set.add(normalizeEndpointPath(ep.path))
+  }
+  return set
+}
+
+/** Extract the endpoint path an `api` spec intends to hit, from its
+ *  `targetEndpoint` ("METHOD /path" or "/path") or, failing that, the first
+ *  path-like token in its steps. */
+function specEndpointPath(spec: TestCaseSpec): string | null {
+  if (spec.targetEndpoint) {
+    const m = String(spec.targetEndpoint).match(/\/[^\s'"`]*/)
+    if (m) return m[0]
+  }
+  for (const step of spec.steps || []) {
+    const m = String(step).match(/\b(?:GET|POST|PUT|PATCH|DELETE)\b[^/]*?(\/[A-Za-z0-9/_:{}.-]+)/i)
+    if (m) return m[1]
+    const rel = String(step).match(/(?:request\.[a-z]+\(|fetch\(|url:\s*['"`])\s*['"`]?([^'"`)\s]+)/i)
+    if (rel && rel[1].startsWith('/')) return rel[1]
+  }
+  return null
+}
+
+/**
+ * Drop `api` specs whose endpoint cannot be grounded against the real backend
+ * surface. The scenario LLM frequently maps a UI-centric AC (e.g. "view the
+ * admin dashboard") to an `api` test that hits a frontend SPA route
+ * (`/admindashboard`, `/login`) instead of a real backend endpoint — those
+ * tests later trip the `ungrounded_api_endpoint` hard quality gate and the whole
+ * file is quarantined (run 1780943240194-599omu lost 29 tests this way).
+ *
+ * We only filter when real endpoints are known; with no endpoint context we
+ * leave specs untouched to avoid false drops.
+ */
+export function groundApiSpecsToEndpoints(
+  specs: TestCaseSpec[],
+  apiEndpoints: ApiEndpoint[] | undefined | null,
+): { kept: TestCaseSpec[]; dropped: TestCaseSpec[] } {
+  const real = buildRealEndpointPathSet(apiEndpoints)
+  if (real.size === 0) return { kept: specs, dropped: [] }
+  const kept: TestCaseSpec[] = []
+  const dropped: TestCaseSpec[] = []
+  for (const spec of specs) {
+    if (spec.agentType !== 'api') { kept.push(spec); continue }
+    const candidate = specEndpointPath(spec)
+    if (candidate && real.has(normalizeEndpointPath(candidate))) kept.push(spec)
+    else dropped.push(spec)
+  }
+  return { kept, dropped }
 }
 
 function coerceSpecs(raw: unknown, featureId: string): TestCaseSpec[] {

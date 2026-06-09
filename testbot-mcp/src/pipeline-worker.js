@@ -738,9 +738,19 @@ function buildRouteAccessSummary(explorationArtifact) {
   const publicRoutes = routes
     .filter((route) => route && route.requiresAuth === false)
     .map((route) => String(route.path || '/'));
-  const protectedRoutes = routes
-    .filter((route) => route && route.requiresAuth === true)
-    .map((route) => String(route.path || '/'));
+  const protectedRouteEntries = routes.filter((route) => route && route.requiresAuth === true);
+  const protectedRoutes = protectedRouteEntries.map((route) => String(route.path || '/'));
+  // Keep the per-route requiredRole alongside the path so downstream tier
+  // gating can tell which protected routes need a specific role (e.g. an
+  // /admindashboard route gated on `admin`) versus generic authentication.
+  const protectedRoutesDetail = [];
+  const seenProtected = new Set();
+  for (const route of protectedRouteEntries) {
+    const routePath = String(route.path || '/');
+    if (seenProtected.has(routePath)) continue;
+    seenProtected.add(routePath);
+    protectedRoutesDetail.push({ path: routePath, requiredRole: route.requiredRole || null });
+  }
   return {
     authMode: explorationArtifact?.authFlow
       ? 'auth_flow_detected'
@@ -748,9 +758,417 @@ function buildRouteAccessSummary(explorationArtifact) {
     authFlowDetected: !!explorationArtifact?.authFlow,
     publicRoutes: [...new Set(publicRoutes)],
     protectedRoutes: [...new Set(protectedRoutes)],
+    protectedRoutesDetail,
     totalObservedRoutes: routes.length,
     authFlowRejected: explorationArtifact?.authFlowRejected || null,
   };
+}
+
+/**
+ * Resolve the API base URL for direct `request()` calls in generated specs.
+ *
+ * When a repo splits frontend + backend, `config.baseURL` points at the primary
+ * (frontend) service; API specs need the backend origin so requests hit the
+ * right port instead of resolving against the frontend.
+ *
+ * The config form (config-ui-launcher.js) only round-trips host+port for
+ * non-primary services and drops the detector's per-service `baseURL`, so the
+ * backend service often arrives with no `baseURL`. This helper backfills a
+ * baseURL for every service from its host+port (mutating `config.services` in
+ * place so all downstream consumers and the persisted pipeline-config.json get
+ * the complete value), then returns the backend/fullstack service's baseURL —
+ * falling back to `config.baseURL` for single-service / fullstack / api-only
+ * repos so the generator keeps emitting clean relative paths.
+ *
+ * Regression: run 1780931739696-dzd39m had a backend service with port:5000 but
+ * no baseURL, so apiBaseURL resolved to the frontend :3001 and every API test
+ * failed against the wrong origin.
+ */
+function resolveApiBaseURL(config = {}) {
+  const services = Array.isArray(config?.services) ? config.services : [];
+  for (const service of services) {
+    if (service && !service.baseURL && service.port) {
+      service.baseURL = `http://${service.host || 'localhost'}:${service.port}`;
+    }
+  }
+  const backendService = services.find(
+    (service) => service && (service.role === 'backend' || service.role === 'fullstack'),
+  );
+  return backendService?.baseURL || config?.baseURL;
+}
+
+/**
+ * Gate role-dependent tests when their required role has no verified session.
+ *
+ * RC2 (run 1780925226135-3xfian): admin pre-auth failed environmentally, so no
+ * `.healix/auth-state-admin.json` existed, yet 10 admin-dashboard tests
+ * (`toHaveURL(/admindashboard/)`) were still generated and executed against the
+ * user session → guaranteed redirect to login → 10 red failures that should
+ * have been reported as *blocked*, not *failed*.
+ *
+ * This pass scans the generated specs and converts any test block that targets a
+ * protected route whose `requiredRole` is NOT among the verified roles into a
+ * `test.skip(...)` with an annotation, so the run reports them as skipped rather
+ * than failing. It is conservative: a block is gated only when it both navigates
+ * to the blocked-role route AND asserts arriving there (toHaveURL) or claims an
+ * authenticated/role success — the same heuristic the quality auditor uses.
+ *
+ * Returns { applied, gatedFiles, gatedBlocks, blockedRoles }.
+ */
+function gateBlockedRoleSpecs({ projectPath, routeAccessSummary, roles = [] } = {}) {
+  const generatedDir = path.join(projectPath, 'tests', 'generated');
+  if (!fs.existsSync(generatedDir)) {
+    return { applied: false, reason: 'generated_dir_missing', gatedFiles: [], gatedBlocks: 0, blockedRoles: [] };
+  }
+
+  const verifiedRoleLabels = new Set(
+    (roles || [])
+      .filter((r) => r && r.loginVerified && r.storageStatePath)
+      .map((r) => normalizeRoleLabel(r.role || r.name || 'user')),
+  );
+
+  // Protected routes whose requiredRole has no verified session this run.
+  const detail = Array.isArray(routeAccessSummary?.protectedRoutesDetail)
+    ? routeAccessSummary.protectedRoutesDetail
+    : [];
+  const blockedRoutes = [];
+  const blockedRoles = new Set();
+  for (const entry of detail) {
+    if (!entry || !entry.requiredRole) continue;
+    const roleLabel = normalizeRoleLabel(entry.requiredRole);
+    if (verifiedRoleLabels.has(roleLabel)) continue;
+    const normalizedPath = normalizeRouteForAudit(entry.path);
+    if (!normalizedPath) continue;
+    blockedRoutes.push({ path: normalizedPath, role: roleLabel });
+    blockedRoles.add(roleLabel);
+  }
+
+  if (blockedRoutes.length === 0) {
+    return { applied: false, reason: 'no_blocked_role_routes', gatedFiles: [], gatedBlocks: 0, blockedRoles: [] };
+  }
+
+  const gatedFiles = [];
+  let gatedBlocks = 0;
+  const files = fs.readdirSync(generatedDir).filter((name) => GENERATED_SPEC_FILE_PATTERN.test(name));
+
+  for (const name of files) {
+    const filePath = path.join(generatedDir, name);
+    // Tier-0 smoke specs are the last line of defense and must always run.
+    if (TierIsolation.isTier0Path(projectPath, filePath)) continue;
+
+    let content;
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      continue;
+    }
+
+    const blocks = findGeneratedTestBlocks(content);
+    if (blocks.length === 0) continue;
+
+    // Rewrite from the end so earlier offsets stay valid.
+    const edits = [];
+    for (const block of blocks) {
+      if (/\btest\.(?:skip|fixme)\s*\(/.test(block.content)) continue;
+
+      // Primary signal: an explicit @role:<role> tag for an unverified role.
+      // applyRoleScopedAuthTags runs first and resolves the role even when the
+      // protected-route navigation lives in an imported helper, so this catches
+      // cases the inline goto scan below misses.
+      let matchedRole = null;
+      for (const role of blockedRoles) {
+        const tagRe = new RegExp(`@role:${role.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9_-])`);
+        if (tagRe.test(block.content)) { matchedRole = role; break; }
+      }
+
+      // Fallback signal: inline goto to the blocked route + a destination/auth
+      // assertion (covers specs that weren't role-tagged for any reason).
+      if (!matchedRole) {
+        const blockRoutes = extractGotoRoutes(block.content).map(normalizeRouteForAudit).filter(Boolean);
+        const matched = blockedRoutes.find((r) => blockRoutes.includes(r.path));
+        if (!matched) continue;
+        const escaped = matched.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\/$/, '');
+        const expectsDestination = new RegExp(`toHaveURL\\([\\s\\S]{0,160}${escaped}`, 'i').test(block.content);
+        const claimsAuthSuccess = /\b(authenticated|signed[- ]?in|admin\s+(?:dashboard|panel)|role[- ]?based\s+redirect)/i.test(block.content);
+        if (!expectsDestination && !claimsAuthSuccess) continue;
+        matchedRole = matched.role;
+      }
+
+      // Convert `test(` / `test.only(` etc. into `test.skip(` and prepend an
+      // annotation so the report explains why it was blocked.
+      const replaced = block.content.replace(/^\btest(?:\.(?:only|fixme|fail|slow))?\s*\(/, 'test.skip(');
+      if (replaced === block.content) continue;
+      const annotation = `// [HEALIX:BLOCKED_ROLE] requires "${matchedRole}" session (pre-auth not verified) — gated to skip, not fail.\n`;
+      edits.push({ start: block.start, end: block.end, text: annotation + replaced });
+    }
+
+    if (edits.length === 0) continue;
+    edits.sort((a, b) => b.start - a.start);
+    let next = content;
+    for (const edit of edits) {
+      next = next.slice(0, edit.start) + edit.text + next.slice(edit.end);
+    }
+    try {
+      fs.writeFileSync(filePath, next, 'utf8');
+      gatedFiles.push(name);
+      gatedBlocks += edits.length;
+    } catch (err) {
+      Logger.warn('PipelineWorker', 'Failed to gate blocked-role spec', { filename: name, error: err?.message });
+    }
+  }
+
+  return {
+    applied: gatedBlocks > 0,
+    gatedFiles,
+    gatedBlocks,
+    blockedRoles: [...blockedRoles],
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Role-scoped auth tagging (RC-A / RC-B, run 1780943240194-599omu)
+//
+// Generated specs carried a single undifferentiated `@auth` tag (only on the
+// auth agent's file), while every tier-B project grepped the identical
+// /@auth|@tierB/. Result: each authenticated test ran under BOTH role sessions,
+// and the app's role guard redirected whichever role didn't match — guaranteeing
+// ~half failed. Tests that hit a protected route via an imported helper weren't
+// tagged @auth at all and ran unauthenticated.
+//
+// This pass deterministically (re)tags every generated test based on the routes
+// it actually exercises — following page.goto() into locally-imported helper
+// modules — so the tier-B config can scope each role to its own tests.
+// ───────────────────────────────────────────────────────────────────────────
+
+// A test that performs login itself must run UNAUTHENTICATED — injecting a
+// session would redirect it away from the login form. Such tests are stripped of
+// auth/role tags so they run in tierA. Detection is intentionally PRECISE
+// (login route, a login helper call, or a password field next to a login-labelled
+// button) so an authenticated "change password" / "settings" test that merely
+// fills a password is NOT mistaken for a login test and stripped.
+const LOGIN_ROUTE_RE = /^\/(?:login|signin|sign-?in|auth(?:\/.*)?|account\/login|users\/sign_in)$/i;
+const LOGIN_HELPER_CALL_RE = /\b(?:login|logIn|signIn|signin|doLogin|loginAs|signInAs|authenticate)\s*\(/;
+const PASSWORD_INTERACTION_RE = /type\s*=\s*["']password["']|getBy(?:Label|Placeholder)\s*\([^)]*[Pp]assword|\.fill\s*\([^)]*[Pp]assword/;
+const LOGIN_BUTTON_RE = /getByRole\(\s*['"`]button['"`][\s\S]{0,100}name\s*:\s*[^})]*?(?:log\s?in|sign\s?-?in)/i;
+
+function contentLooksSelfAuth(content, routes = []) {
+  if (Array.isArray(routes) && routes.some((r) => LOGIN_ROUTE_RE.test(r))) return true;
+  if (LOGIN_HELPER_CALL_RE.test(content)) return true;
+  if (PASSWORD_INTERACTION_RE.test(content) && LOGIN_BUTTON_RE.test(content)) return true;
+  return false;
+}
+const LOCAL_IMPORT_RE = /import\s*(?:\{[^}]*\}|[A-Za-z0-9_$]+|\*\s+as\s+[A-Za-z0-9_$]+)\s*from\s*['"](\.\.?\/[^'"]+)['"]/g;
+
+function resolveLocalTsImport(fromDir, importSpec) {
+  const base = path.resolve(fromDir, importSpec);
+  for (const ext of ['', '.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.jsx']) {
+    const candidate = base + ext;
+    try {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+    } catch { /* ignore */ }
+  }
+  for (const ext of ['.ts', '.js', '.tsx', '.jsx']) {
+    const candidate = path.join(base, `index${ext}`);
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
+// Map each exported helper function name → { routes, selfAuth } by slicing its
+// body up to the next top-level `export`. Coarse but sufficient: we only need
+// the goto routes and whether the function logs in.
+function parseHelperFunctions(content) {
+  const map = new Map();
+  const text = String(content || '');
+  const fnRe = /export\s+(?:async\s+)?(?:function\s+([A-Za-z0-9_$]+)|const\s+([A-Za-z0-9_$]+)\s*=)/g;
+  const marks = [];
+  let m;
+  while ((m = fnRe.exec(text)) !== null) {
+    marks.push({ name: m[1] || m[2], index: m.index });
+  }
+  for (let i = 0; i < marks.length; i += 1) {
+    const start = marks[i].index;
+    const end = i + 1 < marks.length ? marks[i + 1].index : text.length;
+    const body = text.slice(start, end);
+    const routes = extractGotoRoutes(body).map(normalizeRouteForAudit).filter(Boolean);
+    map.set(marks[i].name, {
+      routes,
+      selfAuth: contentLooksSelfAuth(body, routes),
+    });
+  }
+  return map;
+}
+
+// Locate the first string-literal argument of a test(...) block (its title).
+function extractTitleLiteral(blockContent) {
+  const text = String(blockContent || '');
+  const openParen = text.indexOf('(');
+  if (openParen < 0) return null;
+  let i = openParen + 1;
+  while (i < text.length && /\s/.test(text[i])) i += 1;
+  const quote = text[i];
+  if (quote !== '"' && quote !== "'" && quote !== '`') return null;
+  let escaped = false;
+  let j = i + 1;
+  for (; j < text.length; j += 1) {
+    const ch = text[j];
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === quote) break;
+  }
+  if (j >= text.length) return null;
+  return { quote, start: i, end: j + 1, value: text.slice(i + 1, j) };
+}
+
+function stripAuthRoleTags(title) {
+  return String(title)
+    .replace(/\s*@role:[A-Za-z0-9_-]+/g, '')
+    .replace(/\s*@auth\b/g, '')
+    .replace(/\s*@tierB\b/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+$/g, '');
+}
+
+function ensureAuthRoleTags(title, roleLabel) {
+  let next = String(title).replace(/\s*@role:[A-Za-z0-9_-]+/g, '');
+  const additions = [];
+  if (!/@auth\b/.test(next)) additions.push('@auth');
+  additions.push(`@role:${roleLabel}`);
+  return `${next.replace(/[ \t]+$/g, '')} ${additions.join(' ')}`;
+}
+
+/**
+ * Retag generated specs with role-scoped auth tags. Returns
+ * { applied, taggedBlocks, files, classifications }.
+ */
+function applyRoleScopedAuthTags({ projectPath, routeAccessSummary, roles = [] } = {}) {
+  const generatedDir = path.join(projectPath, 'tests', 'generated');
+  if (!fs.existsSync(generatedDir)) {
+    return { applied: false, reason: 'generated_dir_missing', taggedBlocks: 0, files: [] };
+  }
+
+  const detail = Array.isArray(routeAccessSummary?.protectedRoutesDetail)
+    ? routeAccessSummary.protectedRoutesDetail
+    : [];
+  const protectedMap = new Map();
+  for (const entry of detail) {
+    const routePath = normalizeRouteForAudit(entry?.path);
+    if (!routePath) continue;
+    protectedMap.set(routePath, entry?.requiredRole ? normalizeRoleLabel(entry.requiredRole) : null);
+  }
+  if (protectedMap.size === 0) {
+    return { applied: false, reason: 'no_protected_routes', taggedBlocks: 0, files: [] };
+  }
+
+  const files = fs.readdirSync(generatedDir).filter((name) => GENERATED_SPEC_FILE_PATTERN.test(name));
+  let taggedBlocks = 0;
+  const touchedFiles = [];
+
+  for (const name of files) {
+    const filePath = path.join(generatedDir, name);
+    if (TierIsolation.isTier0Path(projectPath, filePath)) continue;
+    let content;
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      continue;
+    }
+
+    // Resolve locally-imported helper modules so navigation factored out of the
+    // test block (e.g. openAdminDashboard) still counts toward route detection.
+    const helperFns = new Map();
+    const dir = path.dirname(filePath);
+    LOCAL_IMPORT_RE.lastIndex = 0;
+    let im;
+    while ((im = LOCAL_IMPORT_RE.exec(content)) !== null) {
+      const spec = im[1];
+      if (!spec || /__healix-fixture/.test(spec)) continue;
+      const resolved = resolveLocalTsImport(dir, spec);
+      if (!resolved || resolved === filePath) continue;
+      let helperContent;
+      try {
+        helperContent = fs.readFileSync(resolved, 'utf8');
+      } catch {
+        continue;
+      }
+      for (const [fn, info] of parseHelperFunctions(helperContent)) helperFns.set(fn, info);
+    }
+
+    const blocks = findGeneratedTestBlocks(content);
+    if (blocks.length === 0) continue;
+    const edits = [];
+
+    for (const block of blocks) {
+      const routes = new Set(extractGotoRoutes(block.content).map(normalizeRouteForAudit).filter(Boolean));
+      let selfAuth = false;
+      for (const [fn, info] of helperFns) {
+        const callRe = new RegExp(`\\b${fn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(`);
+        if (callRe.test(block.content)) {
+          for (const r of info.routes) routes.add(r);
+          if (info.selfAuth) selfAuth = true;
+        }
+      }
+      if (!selfAuth) selfAuth = contentLooksSelfAuth(block.content, [...routes]);
+      const protectedHits = [...routes].filter((r) => protectedMap.has(r));
+
+      const title = extractTitleLiteral(block.content);
+      if (!title) continue;
+
+      let newValue = null;
+      if (selfAuth) {
+        // Login/self-auth test: must run unauthenticated.
+        const stripped = stripAuthRoleTags(title.value);
+        if (stripped !== title.value) newValue = stripped;
+      } else if (protectedHits.length > 0) {
+        const roleLabels = protectedHits.map((r) => protectedMap.get(r)).filter(Boolean);
+        const desiredRole = roleLabels.length > 0 ? roleLabels[0] : 'any';
+        const retagged = ensureAuthRoleTags(title.value, desiredRole);
+        if (retagged !== title.value) newValue = retagged;
+      }
+
+      if (newValue !== null && newValue !== title.value) {
+        edits.push({
+          start: block.start + title.start,
+          end: block.start + title.end,
+          text: title.quote + newValue + title.quote,
+        });
+        taggedBlocks += 1;
+      }
+    }
+
+    if (edits.length === 0) continue;
+    edits.sort((a, b) => b.start - a.start);
+    let next = content;
+    for (const edit of edits) {
+      next = next.slice(0, edit.start) + edit.text + next.slice(edit.end);
+    }
+    try {
+      fs.writeFileSync(filePath, next, 'utf8');
+      touchedFiles.push(name);
+    } catch (err) {
+      Logger.warn('PipelineWorker', 'Failed to write role-scoped auth tags', { filename: name, error: err?.message });
+    }
+  }
+
+  return { applied: taggedBlocks > 0, taggedBlocks, files: touchedFiles };
+}
+
+/**
+ * Build the Playwright `grep` regex source for a tier-B role project. Each role
+ * runs only its own `@role:<role>` tests; the primary role additionally runs
+ * role-agnostic `@role:any` tests (so they execute exactly once) plus a legacy
+ * fallback for bare `@auth`/`@tierB` tests that predate role tagging.
+ */
+function tierBGrepSource(roleLabel, primaryLabel) {
+  const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const boundary = '(?![A-Za-z0-9_-])';
+  const self = `@role:${esc(roleLabel)}${boundary}`;
+  if (roleLabel === primaryLabel) {
+    return `/${self}|@role:any${boundary}|@auth\\b|@tierB\\b/`;
+  }
+  return `/${self}/`;
 }
 
 function synthesizeExplorationArtifactFromContext(context = {}, previousArtifact = null) {
@@ -935,6 +1353,45 @@ function mergeCredentialInjectionRoles({ freshRoles = [], preAuthRoles = [] } = 
     reusedPreAuthRoles: [...new Set(reusedPreAuthRoles)],
     failedFreshRoles,
   };
+}
+
+/**
+ * Append roles whose pre-auth login failed to the verified-roles list so they
+ * stay VISIBLE in the auth_decision (as loginVerified:false with a reason)
+ * instead of being silently dropped.
+ *
+ * The deferred-auth path keeps only successfully verified pre-auth roles
+ * (`safePreAuthRoles`). Without this merge, a role that failed pre-auth — e.g. an
+ * admin account that was deleted from the app's database (observed in run
+ * 1780939686499-wu4w1a) — simply disappears from the dashboard and reads as
+ * "never attempted". Surfacing it also lets generationMeta.blockedAuthRoles and
+ * the RC2 blocked-role test gate account for the failed role.
+ *
+ * Failed roles are appended only when not already present (verified roles win),
+ * and always with loginVerified:false / storageStatePath:null so downstream
+ * verified-role filters (Tier B projects, verifiedRoleCount) are unaffected.
+ * Returns a NEW array; the input is not mutated.
+ */
+function mergeFailedPreAuthRoles(roles = [], preAuthFailedRoles = []) {
+  const merged = Array.isArray(roles) ? [...roles] : [];
+  if (!Array.isArray(preAuthFailedRoles) || preAuthFailedRoles.length === 0) {
+    return merged;
+  }
+  const presentRoleKeys = new Set(merged.map((r) => roleKeyForAuth(r)));
+  for (const failed of preAuthFailedRoles) {
+    const key = roleKeyForAuth(failed);
+    if (presentRoleKeys.has(key)) continue;
+    presentRoleKeys.add(key);
+    merged.push({
+      role: key,
+      name: key,
+      storageStatePath: null,
+      loginVerified: false,
+      reason: failed?.reason || 'pre-auth login failed',
+      ...(failed?.noLoginForm ? { noLoginForm: true } : {}),
+    });
+  }
+  return merged;
 }
 
 function summarizeAuthRoles(roles = []) {
@@ -2368,6 +2825,13 @@ function collectGenerationQuality(projectPath, options = {}) {
   let filesWithPreferredSelectors = 0;
   let uiFiles = 0;
   const expectedOrigin = originFromUrl(options.baseURL);
+  // When the backend runs on a distinct origin, API specs must target it. An
+  // API spec that hardcodes the FRONTEND origin (== expectedOrigin) would
+  // currently pass the actualOrigin !== expectedOrigin check below, so we need
+  // apiBaseURL to catch it. See run 1780925226135-3xfian: API specs hardcoded
+  // :3001 (frontend) when the backend was on :5000.
+  const expectedApiOrigin = originFromUrl(options.apiBaseURL);
+  const apiOriginDiffers = !!(expectedApiOrigin && expectedOrigin && expectedApiOrigin !== expectedOrigin);
   const hardcodedBaseUrlMismatches = [];
 
   for (const filePath of files) {
@@ -2401,16 +2865,31 @@ function collectGenerationQuality(projectPath, options = {}) {
       seenUrls.add(url);
       const actualOrigin = originFromUrl(url);
       const isPlaceholderExternalUrl = /https?:\/\/(?:www\.)?(?:example\.(?:com|org|net)|httpbin\.org|jsonplaceholder\.typicode\.com|reqres\.in)\b/i.test(url);
+      // An API spec hardcoding the frontend origin while a distinct backend
+      // origin exists: the request resolves against the frontend and fails.
+      const apiTargetsFrontendOrigin =
+        isApiSuite && apiOriginDiffers && actualOrigin && actualOrigin === expectedOrigin;
+      // An API spec that correctly hardcodes the distinct backend origin is NOT a
+      // mismatch — without this exclusion the generic actualOrigin !== frontend
+      // check would flag the very specs the RC1 apiBaseURL fix produces.
+      const apiTargetsCorrectBackend =
+        isApiSuite && apiOriginDiffers && actualOrigin && actualOrigin === expectedApiOrigin;
+      const genericOriginMismatch =
+        actualOrigin && expectedOrigin && actualOrigin !== expectedOrigin && !apiTargetsCorrectBackend;
       if (
         isPlaceholderExternalUrl ||
-        (actualOrigin && expectedOrigin && actualOrigin !== expectedOrigin)
+        genericOriginMismatch ||
+        apiTargetsFrontendOrigin
       ) {
         hardcodedBaseUrlMismatches.push({
           file: path.basename(filePath),
           url,
-          expectedOrigin: expectedOrigin || 'configured baseURL',
+          expectedOrigin: apiTargetsFrontendOrigin
+            ? expectedApiOrigin
+            : (expectedOrigin || 'configured baseURL'),
           actualOrigin,
           placeholderExternalUrl: isPlaceholderExternalUrl,
+          ...(apiTargetsFrontendOrigin ? { apiOriginMismatch: true } : {}),
         });
       }
     }
@@ -2956,13 +3435,28 @@ function buildGenerationRepairContext({
     const mismatches = Array.isArray(quality?.hardcodedBaseUrlMismatches)
       ? quality.hardcodedBaseUrlMismatches
       : [];
-    const expectedOrigin = mismatches.find((item) => item?.expectedOrigin)?.expectedOrigin;
-    instructions.push(
-      expectedOrigin
-        ? `Use only the configured baseURL origin ${expectedOrigin}; remove all page.goto() calls to other localhost ports or origins.`
-        : 'Use only the configured baseURL; remove all page.goto() calls to other localhost ports or origins.'
-    );
-    instructions.push('Prefer relative page.goto("/route") calls or construct URLs from CONTEXT_JSON.project.baseURL instead of guessing Vite/localhost ports.');
+    const apiMismatches = mismatches.filter((item) => item?.apiOriginMismatch);
+    const nonApiMismatches = mismatches.filter((item) => !item?.apiOriginMismatch);
+    if (apiMismatches.length > 0) {
+      // API specs hit the frontend origin while the backend is on a distinct
+      // origin. Steer the repair toward the API base URL rather than telling it
+      // to drop page.goto (which is correct for UI specs but wrong here).
+      const apiOrigin = apiMismatches.find((item) => item?.expectedOrigin)?.expectedOrigin;
+      instructions.push(
+        apiOrigin
+          ? `API spec files must send request() calls to the backend origin ${apiOrigin} (CONTEXT_JSON.meta.projectInfo.apiBaseURL), NOT the frontend baseURL. Prefix every request.get/post/put/patch/delete URL with ${apiOrigin}.`
+          : 'API spec files must send request() calls to the backend API base URL (CONTEXT_JSON.meta.projectInfo.apiBaseURL), not the frontend baseURL.'
+      );
+    }
+    if (nonApiMismatches.length > 0) {
+      const expectedOrigin = nonApiMismatches.find((item) => item?.expectedOrigin)?.expectedOrigin;
+      instructions.push(
+        expectedOrigin
+          ? `Use only the configured baseURL origin ${expectedOrigin}; remove all page.goto() calls to other localhost ports or origins.`
+          : 'Use only the configured baseURL; remove all page.goto() calls to other localhost ports or origins.'
+      );
+      instructions.push('Prefer relative page.goto("/route") calls or construct URLs from CONTEXT_JSON.project.baseURL instead of guessing Vite/localhost ports.');
+    }
   }
   if (errors.some((item) => String(item).startsWith('brittle_'))) {
     instructions.push('Remove brittle generated assertions: no DOM checkValidity(), no raw getComputedStyle assertions, no exact concatenated card accessible names, and no toContainText([...]) on a single container. Replace them with user-visible behavior assertions grounded in source text.');
@@ -4413,15 +4907,22 @@ function removeHealixOwnedSupplementalAuthConfig(projectPath, reason = 'stale') 
 
 function writeSupplementalAuthConfig(projectPath, baseURL, verifiedRoles) {
   if (!verifiedRoles || verifiedRoles.length === 0) return null;
-  const tierBProjects = verifiedRoles.map((r) => `    {
-      name: 'tierB-auth-${normalizeRoleLabel(r.role || r.name || 'user')}',
-      grep: /@auth|@tierB/,
+  // Role-scoped grep: each role runs only its own @role:<role> tests so an admin
+  // test never executes under the user session (and vice-versa). The first
+  // verified role is "primary" and also runs role-agnostic @role:any tests.
+  const primaryLabel = normalizeRoleLabel(verifiedRoles[0].role || verifiedRoles[0].name || 'user');
+  const tierBProjects = verifiedRoles.map((r) => {
+    const label = normalizeRoleLabel(r.role || r.name || 'user');
+    return `    {
+      name: 'tierB-auth-${label}',
+      grep: ${tierBGrepSource(label, primaryLabel)},
       retries: 2,
       use: {
         ...devices['Desktop Chrome'],
         storageState: ${JSON.stringify(r.storageStatePath)},
       },
-    }`).join(',\n');
+    }`;
+  }).join(',\n');
 
   const body = `// Generated by Healix — supplemental Playwright config for the tierB-auth projects.
 // Your own playwright.config.* remains the source of truth for the default run.
@@ -4542,20 +5043,26 @@ function ensurePlaywrightConfig(projectPath, projectInfo = {}, roles = []) {
   // Per-tier retries live on the individual project so UI flakes don't get masked
   // as hard failures and so tierC (backend) doesn't waste budget on retryable HTTP
   // assertion bugs that are genuinely deterministic.
-  const tierBProjects = verifiedRoles.map((r) => `    {
-      name: 'tierB-auth-${normalizeRoleLabel(r.role || r.name || 'user')}',
-      grep: /@auth|@tierB/,
+  const primaryLabel = verifiedRoles.length > 0
+    ? normalizeRoleLabel(verifiedRoles[0].role || verifiedRoles[0].name || 'user')
+    : 'user';
+  const tierBProjects = verifiedRoles.map((r) => {
+    const label = normalizeRoleLabel(r.role || r.name || 'user');
+    return `    {
+      name: 'tierB-auth-${label}',
+      grep: ${tierBGrepSource(label, primaryLabel)},
       retries: 2,
       use: {
         ...devices['Desktop Chrome'],
         storageState: ${JSON.stringify(r.storageStatePath)},
       },
-    }`).join(',\n');
+    }`;
+  }).join(',\n');
 
   const projectsBlock = [
     `    {
       name: 'tierA-public',
-      grepInvert: /@auth|@tierB|@api|@tierC/,
+      grepInvert: /@auth|@tierB|@api|@tierC|@role:/,
       retries: 2,
       use: { ...devices['Desktop Chrome'] },
     }`,
@@ -6114,6 +6621,10 @@ function auditGeneratedTestQuality({ projectPath, testType, context, exploration
             .filter(Boolean);
           if (!blockRoutes.some((route) => protectedRoutes.has(route))) return false;
           if (/\btest\.skip\s*\(/.test(block.content) || /@auth|@tierB/i.test(block.content)) return false;
+          // NB: we do NOT exempt self-auth tests here. With no verified
+          // credentials this run, a test that logs in with hardcoded/unverified
+          // creds and expects to reach a protected route is exactly the
+          // anti-pattern this gate catches — it cannot pass.
           const expectsProtectedDestination = [...protectedRoutes].some((route) => {
             const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\/$/, '');
             return new RegExp(`toHaveURL\\([\\s\\S]{0,160}${escaped}`, 'i').test(block.content);
@@ -6134,6 +6645,10 @@ function auditGeneratedTestQuality({ projectPath, testType, context, exploration
             .filter(Boolean);
           if (!blockRoutes.some((route) => protectedRoutes.has(route))) return false;
           if (hasAuthTag(block.content) || /\btest\.skip\s*\(/.test(block.content)) return false;
+          // Self-auth (login) tests establish their own session and are correctly
+          // left untagged — applyRoleScopedAuthTags strips @auth from them on
+          // purpose, so they must not trip the missing-auth-tag hard gate.
+          if (contentLooksSelfAuth(block.content, blockRoutes)) return false;
           return true;
         });
         if (untaggedAuthBlocks.length > 0) {
@@ -6597,6 +7112,7 @@ async function maybeRunCoverageTopUp({
 }) {
   const before = collectGenerationQuality(config.projectPath, {
     baseURL: config.baseURL || sharedPayload?.projectInfo?.baseURL,
+    apiBaseURL: config.apiBaseURL || sharedPayload?.projectInfo?.apiBaseURL,
   });
   const decision = shouldAttemptCoverageTopUp({ config, quality: before });
   if (!decision.attempt) return null;
@@ -6761,6 +7277,7 @@ async function maybeRunCoverageTopUp({
 
     const after = collectGenerationQuality(config.projectPath, {
       baseURL: config.baseURL || sharedPayload?.projectInfo?.baseURL,
+      apiBaseURL: config.apiBaseURL || sharedPayload?.projectInfo?.apiBaseURL,
     });
     event.after = after;
     event.status = after.runnableTests > before.runnableTests
@@ -8731,6 +9248,7 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
       const validationBeforeQualityRecovery = validation;
       const beforeRecoveryQuality = collectGenerationQuality(config.projectPath, {
         baseURL: config.baseURL || projectInfo?.baseURL,
+        apiBaseURL: config.apiBaseURL || projectInfo?.apiBaseURL,
       });
       const beforeRecoverySnapshot = snapshotGeneratedSpecFiles(config.projectPath);
       const rollbackQualityRecovery = ({ recovery, assessment, demoteIfSoft = true } = {}) => {
@@ -8852,6 +9370,7 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
         });
         const afterPruningQuality = collectGenerationQuality(config.projectPath, {
           baseURL: config.baseURL || projectInfo?.baseURL,
+          apiBaseURL: config.apiBaseURL || projectInfo?.apiBaseURL,
         });
         const pruningAssessment = assessQualityRecoveryNetBenefit({
           config,
@@ -8948,6 +9467,7 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
         qualityAudit.qualityRecovery = quarantine;
         const afterQuarantineQuality = collectGenerationQuality(config.projectPath, {
           baseURL: config.baseURL || projectInfo?.baseURL,
+          apiBaseURL: config.apiBaseURL || projectInfo?.apiBaseURL,
         });
         const retainedSuite = buildRetainedSuiteRecoveryMeta({
           config,
@@ -11363,9 +11883,14 @@ async function runPipeline(config, runId) {
     // frontend. Derive it from the detected backend/fullstack service; leave it
     // equal to baseURL for single-service / fullstack / api-only repos so the
     // generator keeps emitting clean relative paths.
-    const backendService = (Array.isArray(config.services) ? config.services : [])
-      .find((service) => service && (service.role === 'backend' || service.role === 'fullstack'));
-    const apiBaseURL = backendService?.baseURL || config.baseURL;
+    // Backfills any missing per-service baseURL from host+port and resolves the
+    // backend origin for API specs. The config form drops per-service baseURL
+    // for non-primary services, so without the backfill apiBaseURL would fall
+    // through to the frontend baseURL and API specs would hit the wrong port.
+    const apiBaseURL = resolveApiBaseURL(config);
+    // Surface the resolved value on config so it is recorded in
+    // pipeline-config.json and can be verified post-run.
+    config.apiBaseURL = apiBaseURL;
 
     const projectInfo = {
       name: config.projectName,
@@ -11766,6 +12291,12 @@ async function runPipeline(config, runId) {
             });
           }
         }
+
+        // Surface roles whose pre-auth login failed so the dashboard shows them
+        // as loginVerified:false (with a reason) instead of silently omitting
+        // them — see mergeFailedPreAuthRoles.
+        roles = mergeFailedPreAuthRoles(roles, preAuthFailedRoles);
+
         updateStatus(statusDir, 'auth_injected', {
           runId,
           message: `${roles.length} role(s) configured — auth handled by generated auth-setup.ts`,
@@ -11877,6 +12408,32 @@ async function runPipeline(config, runId) {
               .map((r) => ({ role: normalizeRoleLabel(r.role || r.name || 'user'), reason: r.reason || null }));
           }
 
+          // RC-A/RC-B: retag generated specs with role-scoped auth tags BEFORE
+          // the Playwright config is written, so each tier-B project greps only
+          // its own role's tests (no cross-role redirects) and protected-route
+          // tests whose navigation hides in a helper still get @auth.
+          try {
+            const roleTagResult = applyRoleScopedAuthTags({
+              projectPath: config.projectPath,
+              routeAccessSummary,
+              roles,
+            });
+            if (roleTagResult.applied) {
+              if (generationMeta) {
+                generationMeta.roleScopedAuthTags = {
+                  taggedBlocks: roleTagResult.taggedBlocks,
+                  files: roleTagResult.files,
+                };
+              }
+              Logger.info('PipelineWorker', 'Applied role-scoped auth tags to generated specs', {
+                taggedBlocks: roleTagResult.taggedBlocks,
+                files: roleTagResult.files.length,
+              });
+            }
+          } catch (err) {
+            Logger.warn('PipelineWorker', 'Role-scoped auth tagging failed', { error: err?.message });
+          }
+
           // Ensure playwright.config.ts exists after test generation
           const playwrightConfigResult = ensurePlaywrightConfig(config.projectPath, projectInfo, roles);
           const currentRunAuthConfigPath = playwrightConfigResult?.supplementalAuthConfigPath || null;
@@ -11894,8 +12451,36 @@ async function runPipeline(config, runId) {
             generationMeta.tierBRoles = currentRunTierBRoles;
           }
 
+          // RC2: gate role-dependent tests whose required role never verified a
+          // session this run, so they report as skipped (blocked) instead of
+          // executing against the wrong session and failing red.
+          try {
+            const roleGate = gateBlockedRoleSpecs({
+              projectPath: config.projectPath,
+              routeAccessSummary,
+              roles,
+            });
+            if (roleGate.applied) {
+              if (generationMeta) {
+                generationMeta.blockedRoleGate = {
+                  gatedFiles: roleGate.gatedFiles,
+                  gatedBlocks: roleGate.gatedBlocks,
+                  blockedRoles: roleGate.blockedRoles,
+                };
+              }
+              Logger.info('PipelineWorker', 'Gated role-dependent tests with no verified session', {
+                gatedBlocks: roleGate.gatedBlocks,
+                gatedFiles: roleGate.gatedFiles.length,
+                blockedRoles: roleGate.blockedRoles,
+              });
+            }
+          } catch (err) {
+            Logger.warn('PipelineWorker', 'Blocked-role test gating failed', { error: err?.message });
+          }
+
           const qualityScan = collectGenerationQuality(config.projectPath, {
             baseURL: config.baseURL || projectInfo.baseURL,
+            apiBaseURL: config.apiBaseURL || projectInfo.apiBaseURL,
           });
           if (generationMeta?.retainedSuite) {
             qualityScan.retainedSuite = generationMeta.retainedSuite;
@@ -12021,6 +12606,7 @@ async function runPipeline(config, runId) {
           generationAttempt += 1;
           const failureQuality = extractGenerationFailureQuality(generationError) || collectGenerationQuality(config.projectPath, {
             baseURL: config.baseURL || projectInfo.baseURL,
+            apiBaseURL: config.apiBaseURL || projectInfo.apiBaseURL,
           });
           const repairRecord = {
             attempt: generationAttempt,
@@ -13205,6 +13791,11 @@ module.exports = {
   countTestsInContent,
   countSkippedTestsInContent,
   buildRouteAccessSummary,
+  resolveApiBaseURL,
+  gateBlockedRoleSpecs,
+  mergeFailedPreAuthRoles,
+  applyRoleScopedAuthTags,
+  tierBGrepSource,
   synthesizeExplorationArtifactFromContext,
   allCredentialsCoveredByPreAuth,
   hasVerifiedStorageState,

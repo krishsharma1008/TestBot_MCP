@@ -493,6 +493,26 @@
                 </div>
             </div>
 
+            <!-- Section 5: Time Budget -->
+            <div>
+                <span class="section-badge">06 — Optional</span>
+                <h3 style="font-size:1.1rem;font-weight:700;margin:4px 0 4px;color:#ffffff;">Time Budget</h3>
+                <p style="font-size:13px;color:#a0a0a0;margin-bottom:14px;">Maximum wall-clock time allowed for the full test suite (exploration → generation → execution). Increase for large codebases or <code style="font-family:'Space Mono',monospace;font-size:12px;color:#a0a0a0;">exhaustive</code> coverage profiles.</p>
+                <div class="brutal-card p-6">
+                    <div class="field-row flex items-center gap-4">
+                        <div class="field-label">Max Run Time</div>
+                        <div style="flex:1;">
+                            <select id="timeBudgetMinutes" class="input-glass" style="cursor:pointer;">
+                                <option value="30">30 minutes</option>
+                                <option value="60">60 minutes</option>
+                                <option value="90" selected>90 minutes (recommended)</option>
+                                <option value="120">120 minutes</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Footer Actions -->
             <div id="formError" class="hidden" style="font-size:13px;font-weight:700;"></div>
             <div class="flex justify-end gap-4" style="margin-top:32px;padding-bottom:80px;">
@@ -1298,6 +1318,8 @@
 
             const validCredentials = state.credentials.filter(c => c.username && c.password);
 
+            const timeBudgetMinutes = parseInt(document.getElementById('timeBudgetMinutes')?.value || '90', 10);
+
             const payload = {
                 testType: state.mode,
                 scope: 'codebase',
@@ -1305,6 +1327,7 @@
                 startCommand,
                 generateTests: state.generateTests,
                 openDashboard: true,
+                timeBudgetMinutes,
                 ...(servicesPayload ? { services: servicesPayload } : {}),
                 ...(validCredentials.length > 0 ? { credentials: validCredentials } : {}),
                 prdFiles: state.prdFiles.length > 0 ? state.prdFiles : null,

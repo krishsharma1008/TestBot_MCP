@@ -835,6 +835,33 @@ ${baseURLSection}
 ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
   }
 
+  /**
+   * Hard endpoint-grounding rules for API agents. The API agent (and the
+   * scenario planner before it) tends to map UI-centric ACs to API tests that
+   * hit frontend SPA routes (/login, /admindashboard) instead of the real
+   * backend surface — those trip the ungrounded_api_endpoint gate and get the
+   * whole file quarantined (run 1780943240194-599omu). These rules force every
+   * request() onto a real endpoint and forbid treating page routes as endpoints.
+   */
+  apiEndpointGroundingRules(context: CapturedContext): string[] {
+    const isSyntheticHealth = (e: ApiEndpoint) =>
+      String(e?.method || 'GET').toUpperCase() === 'GET' &&
+      e?.path === '/api/health' &&
+      (e?.synthetic === true || e?.source === 'healix_fallback' || !e?.source)
+    const endpoints = (context.apiEndpoints || []).filter((e) => !isSyntheticHealth(e))
+    const rules = [
+      'Every request() call MUST target a path present in CONTEXT_JSON.context.apiEndpoints[] (same METHOD + path). That list is the COMPLETE backend surface — never call a path outside it.',
+      'NEVER call a frontend page route as an API endpoint. Routes like /login, /admindashboard, /userdashboard, /dashboard are SPA pages served by the frontend — hitting them returns HTML or 404. The real auth endpoint is in apiEndpoints (e.g. POST /api/auth/login), NOT /login.',
+      'Do NOT assert content-type text/html for an API request — backend endpoints return JSON. Expecting HTML means you are hitting a frontend page, which is wrong.',
+      'If an acceptance criterion is UI-only with no matching backend endpoint, SKIP it (the UI agent covers it) instead of inventing an endpoint.',
+    ]
+    if (endpoints.length > 0) {
+      const list = [...new Set(endpoints.map((e) => `${String(e.method || 'GET').toUpperCase()} ${e.path}`))]
+      rules.push(`The ONLY valid endpoints to test are: ${list.join(', ')}.`)
+    }
+    return rules
+  }
+
   buildFeatureAPIUserPrompt(
     context: CapturedContext,
     prd: string | undefined,
@@ -858,6 +885,7 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
       'Add negative-path checks using bounded assertions when exact codes are unknown.',
       'Include a lightweight burst test (Promise.all with small N) and assert no 5xx responses.',
       'Cover and tag all API categories: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].',
+      ...this.apiEndpointGroundingRules(context),
     ]
     if (apiBaseURL !== baseURL) {
       requirements.push(
@@ -924,6 +952,7 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
           `The backend is on a separate origin. Prefix every request() URL with the API base URL "${apiBaseURL}" (CONTEXT_JSON.meta.projectInfo.apiBaseURL). Do NOT use relative paths or the frontend base URL — they would resolve against the frontend port and fail.`,
         )
       }
+      requirements.push(...this.apiEndpointGroundingRules(context))
     }
 
     return this.buildStructuredUserPrompt({
@@ -1783,10 +1812,12 @@ NEVER invent heading text, link labels, button names, status text, or dashboard/
 
     if (prefix === 'api') {
       return `${shared}
+- Every request() call MUST target a path present in CONTEXT_JSON.context.apiEndpoints[] (same METHOD + path) — that list is the COMPLETE backend surface. NEVER call a frontend page route (/login, /admindashboard, /userdashboard, /dashboard) as an API endpoint; those are SPA pages that return HTML/404. Do not assert content-type text/html for any API request.
+- If an acceptance criterion is UI-only with no matching backend endpoint, skip it (the UI agent covers it) rather than inventing an endpoint.
 - Do not invent undocumented API status codes or response keys.
 - Do not assume missing collection resources return 4xx. Endpoints like GET /api/reviews/:productId may legitimately return 200 [] for an unknown id unless source/API contract proves otherwise.
 - If an API success path requires authentication, obtain tokens/sessions only from CONTEXT_JSON.meta.authContext.credentialFixtures or from a documented source-backed helper endpoint. Do not fabricate emails, passwords, bearer tokens, or seed identities.
-- When an endpoint in CONTEXT_JSON.context.apiEndpoints has requiresAuth:true, acquire a JWT token before the request: POST to the auth login endpoint (check authPatterns for the login URL; fall back to /api/auth/login, /api/login, or /login) with the matching credentialFixture username and password, extract the token from the response body (common keys: token, accessToken, access_token), then set the Authorization: Bearer <token> header on every subsequent request to that endpoint.
+- When an endpoint in CONTEXT_JSON.context.apiEndpoints has requiresAuth:true, acquire a JWT token before the request: POST to the auth login endpoint named in CONTEXT_JSON.context.apiEndpoints (e.g. /api/auth/login — use the actual login endpoint from that list, never the frontend /login page) with the matching credentialFixture username and password, extract the token from the response body (common keys: token, accessToken, access_token), then set the Authorization: Bearer <token> header on every subsequent request to that endpoint.
 - When an endpoint has requiredRole set (e.g. "admin"), select the credentialFixture whose role or originalRole matches that value. If no credentialFixture matches the requiredRole, wrap the test in: test.skip('Requires <requiredRole> credential — not provided in this run'). For endpoints with requiresAuth:true but no requiredRole, use any available credentialFixture.
 - At least one API test file must include a lightweight stress/burst check using Promise.all with small N.
 - Prefer bounded assertions for unknown error codes (example: status >= 400 && status < 500).
