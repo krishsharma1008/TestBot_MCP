@@ -266,8 +266,14 @@ function formatApiEndpoints(apiEndpoints: ApiEndpoint[] | undefined | null): str
   return [...new Set(
     apiEndpoints.map((ep) => {
       const method = (ep.method || 'GET').toUpperCase()
-      const auth = ep.requiresAuth || ep.authRequired ? ' (auth)' : ''
-      return `${method} ${ep.path}${auth}`
+      const hasBackendAuth = ep.requiresAuth || ep.authRequired ||
+        (ep.authEnforcement && ep.authEnforcement !== 'none' && ep.authEnforcement !== 'client-only')
+      const authTag = hasBackendAuth
+        ? ` (auth:${ep.authType || 'required'} enforcement:${ep.authEnforcement || 'route'})`
+        : (ep.authEnforcement === 'client-only' ? ' (auth:client-only)' : '')
+      const serviceTag = ep.baseService ? ` [svc:${ep.baseService}]` : ''
+      const versionTag = ep.version ? ` [${ep.version}]` : ''
+      return `${method} ${ep.path}${authTag}${serviceTag}${versionTag}`
     })
   )]
 }

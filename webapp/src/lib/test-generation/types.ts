@@ -95,6 +95,38 @@ export interface ApiEndpoint {
   statuses?: number[]
   description?: string
   errorScenarios?: string[]
+  // Normalized contract enrichment (context-gatherer).
+  authType?: string | null
+  authEnforcement?: 'none' | 'route' | 'global' | 'gateway' | 'client-only' | null
+  authCarrier?: { in: string; name: string; scheme?: string } | null
+  loginEndpoint?: string | null
+  tokenField?: string | null
+  baseService?: string | null
+  version?: string | null
+  responseCodes?: number[]
+  responses?: {
+    success?: ApiResponseContract[]
+    failure?: ApiResponseContract[]
+  }
+  discrepancies?: ApiContractDiscrepancy[]
+  completeness?: number
+}
+
+export interface ApiResponseContract {
+  status: number
+  bodyShape?: Record<string, string> | null
+  errorMessage?: string | null
+  example?: unknown
+  category?: 'expected' | 'observed'
+  provenance?: string
+}
+
+export interface ApiContractDiscrepancy {
+  field: string
+  spec?: unknown
+  code?: unknown
+  specSource?: string
+  note?: string
 }
 
 export interface WorkflowInfo {

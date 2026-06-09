@@ -901,10 +901,18 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
     const requirements = [
       `Emit a single file named ${slug}-api.spec.ts.`,
       'Use only statuses/fields that are present in CONTEXT_JSON endpoint contracts or schemas.',
+      'Response-body grounding: each endpoint.responses entry is labeled category:"expected" (from a spec — assert its exact bodyShape/fields) or category:"observed" (from code — do NOT assert exact fields; the code may be wrong). When responses is null/empty or only "observed", assert ONLY at the bounded/contract level: status < 500, content-type is JSON, and the body is an object or array. NEVER invent response fields (e.g. a `token`) that are not in an "expected" responses entry.',
+      'Auth grounding: only add authentication/Authorization-header/401/403 checks when endpoint.requiresAuth is true OR endpoint.authEnforcement is a value other than "none"/"client-only". If endpoint.requiresAuth is false, the backend does not gate this endpoint — do NOT send Authorization headers, do NOT assert 401/403, and do NOT assume a login returns a token unless an "expected" response says so.',
       'For auth-protected endpoints include unauthenticated checks and authenticated success checks when token is available.',
       'Add negative-path checks using bounded assertions when exact codes are unknown.',
+      'Discrepancy awareness: when endpoint.discrepancies is non-null, it records conflicts between the spec (expected) and the code (observed). Trust the code for interface (request fields/auth), trust the spec for expected behavior (response shapes). Do NOT assert any discrepancy field as if it is definitely present or absent — use a bounded assertion for that field instead.',
+      'Spec-only endpoints: when endpoint.specOnly is true, the endpoint is documented in a spec but no matching controller was found. Generate tests using ONLY the spec contract fields, and mark each test with a comment noting the implementation may not yet be deployed.',
       'Include a lightweight burst test (Promise.all with small N) and assert no 5xx responses.',
-      'Cover and tag all API categories: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].',
+      ...(context?.apiEndpoints?.some(
+        (ep) => ep.requiresAuth || (ep.authEnforcement && ep.authEnforcement !== 'none' && ep.authEnforcement !== 'client-only')
+      )
+        ? ['Cover and tag all API categories: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].']
+        : ['Cover and tag applicable API categories: [CAT:api_contract], [CAT:api_negative], [CAT:api_stress]. Omit [CAT:api_auth] — no backend auth enforcement was detected on any endpoint.']),
       ...this.apiEndpointGroundingRules(context),
     ]
     if (apiBaseURL !== baseURL) {
@@ -1080,12 +1088,24 @@ ${this.buildOutputFormatSection('e2e-workflows.spec.ts')}`
       path: endpoint.path,
       requiresAuth: !!(endpoint.requiresAuth || endpoint.authRequired),
       requiredRole: endpoint.requiredRole || null,
+      authType: endpoint.authType || null,
+      authEnforcement: endpoint.authEnforcement || null,
+      authCarrier: (endpoint as ApiEndpoint).authCarrier || null,
+      loginEndpoint: (endpoint as ApiEndpoint).loginEndpoint || null,
+      tokenField: (endpoint as ApiEndpoint).tokenField || null,
       requestSchema: endpoint.requestSchema || null,
       requestBody: endpoint.requestBody || null,
       responseSchema: endpoint.responseSchema || null,
       responseShape: endpoint.responseShape || null,
+      responses: endpoint.responses || null,
       expectedStatuses: endpoint.expectedStatuses || null,
       status: endpoint.status || null,
+      discrepancies: (endpoint as ApiEndpoint).discrepancies?.length
+        ? (endpoint as ApiEndpoint).discrepancies
+        : null,
+      specOnly: (endpoint as ApiEndpoint & { specOnly?: boolean }).specOnly || false,
+      baseService: (endpoint as ApiEndpoint).baseService || null,
+      version: (endpoint as ApiEndpoint).version || null,
     }))
 
     const apiContracts = realApiContracts.slice(0, 25).map((contract) => ({
@@ -1621,7 +1641,7 @@ Return only the JSON array of generated files.`
     const maxAttempts = Math.max(1, Number(this.config.maxRetries) + 1)
     const baseDelay = Math.max(200, Number(this.config.retryBackoffMs) || 1200)
     const hardenedSystemPrompt = this.sanitizePromptText(
-      `${systemPrompt}\n\n${this.buildGenerationContract(prefix)}`
+      `${systemPrompt}\n\n${this.buildGenerationContract(prefix, generationContext.context)}`
     )
     const hardenedUserPrompt = this.sanitizePromptText(userPrompt)
     const adaptiveMaxTokens = this.computeAdaptiveMaxTokens(hardenedSystemPrompt, hardenedUserPrompt)
@@ -1761,7 +1781,83 @@ Return only the JSON array of generated files.`
     return []
   }
 
-  buildGenerationContract(prefix: string): string {
+  /**
+   * Derive how API tests should authenticate, grounded in what the gatherer
+   * actually extracted — NOT a hardcoded JWT/Bearer assumption.
+   *
+   *   mode 'token'   → a login endpoint returns a token in its response body
+   *                    (tokenField set): acquire it and send Authorization: Bearer.
+   *   mode 'session' → backend enforces auth but login returns no body token
+   *                    (cookie/session auth): rely on the injected storageState
+   *                    cookies; never extract a token or send a Bearer header.
+   *   mode 'none'    → no backend enforcement: no auth setup at all.
+   */
+  deriveApiAuthGrounding(context?: CapturedContext): {
+    enforced: boolean
+    mode: 'token' | 'session' | 'none'
+    loginEndpoint: string | null
+    tokenField: string | null
+  } {
+    const endpoints = (context?.apiEndpoints || []) as ApiEndpoint[]
+    const isEnforced = (e: ApiEndpoint) =>
+      e?.requiresAuth === true ||
+      e?.authRequired === true ||
+      (!!e?.authEnforcement && e.authEnforcement !== 'none' && e.authEnforcement !== 'client-only')
+
+    const enforced = endpoints.some(isEnforced)
+    const sessionCookie = endpoints.some((e) => e?.authType === 'sessionCookie')
+
+    // Locate the login endpoint and inspect whether its analyzed response body
+    // actually carries a token. This is the ground-truth discriminator: sending
+    // Bearer against a backend whose login returns {user} (no token) is the bug
+    // we are fixing.
+    const tokenEp = endpoints.find((e) => !!e?.tokenField)
+    const loginEp = endpoints.find(
+      (e) =>
+        String(e?.method || 'GET').toUpperCase() === 'POST' &&
+        /\/(login|signin|auth\/login|auth\/token|token)\b/i.test(String(e?.path || '')),
+    )
+    const loginShape: Record<string, unknown> | null =
+      (loginEp?.responseShape && typeof loginEp.responseShape === 'object'
+        ? (loginEp.responseShape as Record<string, unknown>)
+        : null) ||
+      (loginEp?.responses?.success?.find((r) => r?.bodyShape)?.bodyShape as
+        | Record<string, unknown>
+        | undefined) ||
+      null
+
+    const tokenKeyRe = /token|jwt|accessToken|access_token|id_token/i
+    const loginHasToken = !!tokenEp || (!!loginShape && Object.keys(loginShape).some((k) => tokenKeyRe.test(k)))
+    const loginAnalyzedNoToken = !!loginShape && !loginHasToken
+
+    let mode: 'token' | 'session' | 'none' = 'none'
+    if (enforced || sessionCookie) {
+      if (loginHasToken) {
+        mode = 'token'
+      } else if (loginAnalyzedNoToken || sessionCookie) {
+        // We have positive evidence the login returns no body token (cookie/session).
+        mode = 'session'
+      } else {
+        // Enforced but the login response was never analyzed — fall back to the
+        // carrier hint so a genuine Bearer API isn't downgraded to session.
+        const headerCarried = endpoints.some(
+          (e) =>
+            isEnforced(e) &&
+            ['bearerJWT', 'oauth2', 'apiKey', 'customHeader', 'basic'].includes(String(e?.authType)),
+        )
+        mode = headerCarried ? 'token' : 'session'
+      }
+    }
+
+    return {
+      enforced: enforced || sessionCookie,
+      mode,
+      loginEndpoint: tokenEp?.loginEndpoint || endpoints.find((e) => e?.loginEndpoint)?.loginEndpoint || (loginEp ? `POST ${loginEp.path}` : null),
+      tokenField: tokenEp?.tokenField || null,
+    }
+  }
+
+  buildGenerationContract(prefix: string, context?: CapturedContext): string {
     const shared = `## HIGHEST-PRIORITY RULE — Hallucination Prevention
 NEVER invent heading text, link labels, button names, status text, or dashboard/admin widget labels from PRD wording, role names, or domain knowledge. If a specific literal is NOT present in CONTEXT_JSON.context.routeAccess.observedRoutes or CONTEXT_JSON.context.sourceContext.assertableText, you MUST NOT use it as a selector name/text argument.
 - Forbidden invented examples (these failed in prior runs): /log in/i heading, /access denied/i heading, /dashboard|admin/i heading, /low stock/i link, /unread enquiries/i link, /critical/i text, /admin panel/i heading. The PRD mentioning a feature does NOT prove the UI label exists.
@@ -1831,17 +1927,39 @@ NEVER invent heading text, link labels, button names, status text, or dashboard/
 - Heading-grounding rule: before asserting page.getByRole('heading', { name: ... }) on any protected or admin route, check route.headings in CONTEXT_JSON for that route. If route.headings is empty or does not contain the asserted text, do not assert a heading — assert visible structural elements, landmark regions, or stable buttons/links observed in context instead.`
 
     if (prefix === 'api') {
+      const auth = this.deriveApiAuthGrounding(context)
+      const loginRef = auth.loginEndpoint
+        ? `the login endpoint "${auth.loginEndpoint}"`
+        : 'the auth login endpoint in CONTEXT_JSON.context.apiEndpoints'
+
+      // Auth instruction is GROUNDED in the detected login contract, not a
+      // hardcoded JWT/Bearer assumption. Sending Bearer tokens against a
+      // cookie/session backend (login returns {user} with no token) makes
+      // `expect(token).toBeTruthy()` fail — the exact bug this replaces.
+      let authRule: string
+      if (auth.mode === 'token') {
+        authRule = `- AUTH MODE = TOKEN. For an endpoint with requiresAuth:true, acquire a token: POST to ${loginRef} with a CONTEXT_JSON.meta.authContext.credentialFixtures entry, read the token from the response body field "${auth.tokenField || 'token'}" (fallbacks: token, accessToken, access_token), then set Authorization: Bearer <token> on subsequent requests. Never fabricate credentials or tokens.`
+      } else if (auth.mode === 'session') {
+        authRule = `- AUTH MODE = COOKIE/SESSION. The login response does NOT return a token in its body — it sets a session cookie. For endpoints with requiresAuth:true, rely on the authenticated session Healix already injected via storageState for @auth/@tierB tests; the shared \`request\` fixture carries those cookies automatically. Do NOT read a token from the login body, do NOT assert a body token field is truthy (e.g. never \`expect(token).toBeTruthy()\`), and do NOT set an Authorization: Bearer header. If you call the login endpoint directly, assert only bounded success (status < 500, content-type JSON, body is an object). Never fabricate credentials.`
+      } else {
+        authRule = `- AUTH MODE = NONE. No backend auth enforcement was detected on any endpoint. Do NOT acquire tokens, do NOT send Authorization headers, and do NOT assert 401/403. Call endpoints directly and assert bounded success (status < 500, content-type JSON, body is an object or array).`
+      }
+
+      const categoryRule = auth.enforced
+        ? '- Include explicit category tags across suite: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].'
+        : '- Include explicit category tags across suite: [CAT:api_contract], [CAT:api_negative], [CAT:api_stress]. Omit [CAT:api_auth] — no backend auth enforcement was detected.'
+
       return `${shared}
 - Every request() call MUST target a path present in CONTEXT_JSON.context.apiEndpoints[] (same METHOD + path) — that list is the COMPLETE backend surface. NEVER call a frontend page route (/login, /admindashboard, /userdashboard, /dashboard) as an API endpoint; those are SPA pages that return HTML/404. Do not assert content-type text/html for any API request.
 - If an acceptance criterion is UI-only with no matching backend endpoint, skip it (the UI agent covers it) rather than inventing an endpoint.
 - Do not invent undocumented API status codes or response keys.
 - Do not assume missing collection resources return 4xx. Endpoints like GET /api/reviews/:productId may legitimately return 200 [] for an unknown id unless source/API contract proves otherwise.
 - If an API success path requires authentication, obtain tokens/sessions only from CONTEXT_JSON.meta.authContext.credentialFixtures or from a documented source-backed helper endpoint. Do not fabricate emails, passwords, bearer tokens, or seed identities.
-- When an endpoint in CONTEXT_JSON.context.apiEndpoints has requiresAuth:true, acquire a JWT token before the request: POST to the auth login endpoint named in CONTEXT_JSON.context.apiEndpoints (e.g. /api/auth/login — use the actual login endpoint from that list, never the frontend /login page) with the matching credentialFixture username and password, extract the token from the response body (common keys: token, accessToken, access_token), then set the Authorization: Bearer <token> header on every subsequent request to that endpoint.
+${authRule}
 - When an endpoint has requiredRole set (e.g. "admin"), select the credentialFixture whose role or originalRole matches that value. If no credentialFixture matches the requiredRole, wrap the test in: test.skip('Requires <requiredRole> credential — not provided in this run'). For endpoints with requiresAuth:true but no requiredRole, use any available credentialFixture.
 - At least one API test file must include a lightweight stress/burst check using Promise.all with small N.
 - Prefer bounded assertions for unknown error codes (example: status >= 400 && status < 500).
-- Include explicit category tags across suite: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].`
+${categoryRule}`
     }
 
     if (['ui', 'auth', 'e2e', 'frontend', 'workflow', 'smoke', 'error'].includes(prefix)) {
@@ -3363,13 +3481,20 @@ test.describe('Fallback error handling checks', () => {
         && (endpoint.synthetic === true || endpoint.source === 'healix_fallback' || !endpoint.source))
     )
     const apiCount = apiEndpoints.length
-    const authPatternCount = (context.authPatterns || []).length
-    const apiAuthSignals = apiEndpoints.filter(
+    // api_auth is only meaningful when the BACKEND enforces auth on at least one
+    // endpoint. A login PATH (e.g. /api/auth/login) or a frontend-only auth pattern
+    // is NOT backend enforcement. The old path-regex/authPattern heuristic forced
+    // api_auth on open backends (e.g. an RBAC app whose login returns {user} with no
+    // token), which then failed the coverage gate once the grounded prompt correctly
+    // omitted api_auth. This now matches the buildFeatureAPIUserPrompt condition.
+    const backendAuthEnforced = apiEndpoints.some(
       (endpoint) =>
         endpoint?.authRequired === true ||
         endpoint?.requiresAuth === true ||
-        /auth|token|login|logout|session|bearer/i.test(String(endpoint?.path || ''))
-    ).length
+        (endpoint?.authEnforcement &&
+          endpoint.authEnforcement !== 'none' &&
+          endpoint.authEnforcement !== 'client-only')
+    )
 
     const explicitFrontend = normalizedType === 'frontend'
     const explicitBackend = normalizedType === 'backend'
@@ -3389,7 +3514,7 @@ test.describe('Fallback error handling checks', () => {
 
     if (hasApiSurface) {
       required.push('api_contract', 'api_negative', 'api_stress')
-      if (apiAuthSignals > 0 || authPatternCount > 0) required.push('api_auth')
+      if (backendAuthEnforced) required.push('api_auth')
     }
 
     if (required.length === 0) return this.requiredCategoriesForTestType(testType)
