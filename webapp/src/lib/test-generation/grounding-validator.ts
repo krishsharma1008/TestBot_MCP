@@ -41,6 +41,7 @@ export type SelectorKind =
   | 'test-id'
   | 'to-have-text'
   | 'to-contain-text'
+  | 'structural-landmark'
 
 export interface UngroundedLiteral {
   literal: string
@@ -68,6 +69,16 @@ export interface GroundingOptions {
    * patterns are passed through). Default: true.
    */
   resolveRegex?: boolean
+  /**
+   * Caller-supplied "does this app expose a `main` landmark" determination.
+   * The generator computes this once from context + the exploration artifact
+   * (a richer source than `context` alone), so passing it here keeps the
+   * structural-landmark check consistent with the normalizer's main→body
+   * rewrite — otherwise the two could disagree (validator flags `main` that
+   * the normalizer legitimately kept). When omitted, falls back to
+   * `contextHasMainLandmark(context)`.
+   */
+  appHasMainLandmark?: boolean
 }
 
 // Thresholds are deliberately lenient — the validator's value is signal +
@@ -328,6 +339,109 @@ function getRoleAwareElements(context: CapturedContext | undefined | null): Role
   })
 }
 
+/** A captured selector/markup string references a `main` ARIA landmark. */
+const MAIN_SELECTOR_RE =
+  /(?:^|[\s,>(])main(?=[\s.#:[>)]|$)|\[role=["']?main["']?\]|getByRole\(\s*["']main["']/i
+const MAIN_MARKUP_RE =
+  /<main[\s/>]|role=["']main["']|component=\{?["']main["']/i
+
+/**
+ * Detects whether the explored app actually exposes a `main` ARIA landmark
+ * (a `<main>` element or `[role="main"]`).
+ *
+ * Many SPA stacks — Create React App, plain MUI/`<div>` layouts — render NO
+ * `main` landmark. On those apps a generated `page.locator('main')` matches
+ * zero elements, so every scoped `toBeVisible()`/`click()` silently waits the
+ * full test timeout and then fails. The generator's normalizer and this
+ * validator use this signal to decide whether `main` scoping is safe or must
+ * be rewritten / flagged.
+ *
+ * Returns `true` only on POSITIVE evidence; absence of evidence returns
+ * `false` (treat as "no main landmark"), which is the safe default — we would
+ * rather rewrite an unnecessary `main` than ship one that dead-hangs.
+ */
+export function contextHasMainLandmark(
+  context?: CapturedContext | null,
+  explorationArtifact?: {
+    routes?: Array<{ elements?: Array<{ role?: unknown; selector?: unknown }> }>
+  } | null,
+): boolean {
+  // 1. Role-aware elements captured by the source extractor.
+  for (const el of getRoleAwareElements(context)) {
+    if (String(el.role || '').toLowerCase() === 'main') return true
+  }
+
+  // 2. Exploration-artifact route elements (role or selector).
+  for (const route of explorationArtifact?.routes || []) {
+    for (const el of route?.elements || []) {
+      if (String(el?.role || '').toLowerCase() === 'main') return true
+      if (typeof el?.selector === 'string' && MAIN_SELECTOR_RE.test(el.selector)) return true
+    }
+  }
+
+  // 3. Selector hints.
+  for (const hint of context?.selectorHints || []) {
+    if (typeof hint === 'string' && MAIN_SELECTOR_RE.test(hint)) return true
+  }
+
+  // 4. Captured source/markup.
+  const blobs: string[] = []
+  const fc = (context?.fileContents || {}) as Record<string, unknown>
+  for (const v of Object.values(fc)) if (typeof v === 'string') blobs.push(v)
+  for (const f of context?.sourceContext?.files || []) {
+    const c = (f as { content?: unknown }).content
+    if (typeof c === 'string') blobs.push(c)
+  }
+  for (const blob of blobs) {
+    if (MAIN_MARKUP_RE.test(blob)) return true
+  }
+
+  return false
+}
+
+/**
+ * Builds a map of accessible-name → set of observed ARIA roles, from the
+ * role-aware element corpus (source extractor) plus the exploration artifact's
+ * browser-observed route elements.
+ *
+ * Used to reconcile role mismatches in generated selectors. The classic case:
+ * MUI `<Tab>` controls are observed as `role: tab`, but the exploration
+ * artifact's flat `buttons` list *also* surfaces their labels, so the generator
+ * emits `getByRole('button', { name: 'User Management' })` — which matches
+ * nothing and hangs for the full timeout. With this map the normalizer can
+ * rewrite such a query to `getByRole('tab', …)` when the name is observed as a
+ * tab and never as a button.
+ *
+ * Names are normalized to trimmed lower-case for case-insensitive lookup.
+ */
+export function buildObservedRoleMap(
+  context?: CapturedContext | null,
+  explorationArtifact?: {
+    routes?: Array<{ elements?: Array<{ role?: unknown; name?: unknown; accessibleName?: unknown }> }>
+  } | null,
+): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>()
+  const add = (name: unknown, role: unknown) => {
+    const n = typeof name === 'string' ? name.trim().toLowerCase() : ''
+    const r = typeof role === 'string' ? role.trim().toLowerCase() : ''
+    if (!n || !r) return
+    let roles = map.get(n)
+    if (!roles) {
+      roles = new Set<string>()
+      map.set(n, roles)
+    }
+    roles.add(r)
+  }
+
+  for (const el of getRoleAwareElements(context)) add(el.accessibleName, el.role)
+  for (const route of explorationArtifact?.routes || []) {
+    for (const el of route?.elements || []) {
+      add((el as { name?: unknown }).name ?? (el as { accessibleName?: unknown }).accessibleName, (el as { role?: unknown }).role)
+    }
+  }
+  return map
+}
+
 // Map JSX/Playwright role names to the canonical roles produced by the
 // extractor. Playwright accepts a broader vocabulary (e.g. 'menuitem',
 // 'option') but for our purposes we only need the common UI control roles.
@@ -403,6 +517,7 @@ const KIND_TO_ROLE: Record<SelectorKind, string | null> = {
   'test-id':         null,
   'to-have-text':    null,
   'to-contain-text': null,
+  'structural-landmark': null,  // landmark scope, not a role-bearing literal
 }
 
 function literalIsGrounded(
@@ -493,6 +608,8 @@ function suggestFix(kind: SelectorKind, literal: string): string {
       return `Replace toContainText("${literal}") with \`not.toBeEmpty()\` — the text is not proven in CONTEXT_JSON.`
     case 'test-id':
       return `data-testid "${literal}" not in sourceContext.testIds. Use a proven testId or fall back to role-based locator.`
+    case 'structural-landmark':
+      return `No \`main\` landmark was observed for this app — \`page.locator('main')\` matches nothing and hangs. Scope to \`page.locator('body')\` or a container proven in CONTEXT_JSON instead.`
   }
 }
 
@@ -537,6 +654,33 @@ export function validateGrounding(
         kind: l.kind,
         snippet: l.snippet,
         suggestedFix: suggestFix(l.kind, l.literal),
+      })
+    }
+  }
+
+  // Structural-landmark grounding: `page.locator('main')` / `getByRole('main')`
+  // / `[role="main"]` match zero elements (and dead-hang every scoped
+  // assertion/click for the full timeout) on apps with no main landmark. The
+  // text-literal corpus above can't catch these — they carry no asserted text
+  // — so flag them explicitly when the captured context shows no `main`. This
+  // keeps the grounding audit honest (it otherwise reported 100% grounded
+  // while shipping selectors that always hang) and lets `enforce` mode reject.
+  const hasMainLandmark = options.appHasMainLandmark ?? contextHasMainLandmark(context)
+  if (!hasMainLandmark) {
+    const mainScope =
+      /\.locator\(\s*['"`]\s*main\b|\.locator\(\s*['"`]\[role=["']main["']\]|getByRole\(\s*['"`]main['"`]/g
+    const seen = new Set<string>()
+    let m: RegExpExecArray | null
+    while ((m = mainScope.exec(content)) !== null) {
+      const snippet = content.slice(Math.max(0, m.index - 12), m.index + 48).replace(/\s+/g, ' ').trim()
+      if (seen.has(snippet)) continue
+      seen.add(snippet)
+      ungrounded.push({
+        literal: 'main',
+        kind: 'structural-landmark',
+        snippet,
+        suggestedFix:
+          "No `main` landmark was observed for this app — `page.locator('main')` matches nothing and hangs. Scope to `page.locator('body')` or a container proven in CONTEXT_JSON instead.",
       })
     }
   }

@@ -16,6 +16,8 @@ import {
   validateGrounding,
   renderGroundingErrors,
   buildGroundingCorrection,
+  contextHasMainLandmark,
+  buildObservedRoleMap,
 } from './grounding-validator'
 import type {
   AgentName,
@@ -150,6 +152,19 @@ export class OpenAITestGenerator {
   // Feature manifest passed to the e2e agent so it knows which action functions
   // are available from sibling *-actions.ts files.
   private featureManifest: FeatureManifest[] = []
+  // Whether the explored app exposes a `main` ARIA landmark. Set per-run in
+  // generateTests() from the captured context + exploration artifact. When
+  // false, normalizeGeneratedContent() rewrites `page.locator('main')` (and
+  // `[role="main"]` / `getByRole('main')`) to `body` so scoped assertions
+  // resolve instead of dead-hanging for the full test timeout on apps (CRA,
+  // plain MUI/<div> layouts) that have no <main> element.
+  private appHasMainLandmark = false
+  // Accessible-name → observed ARIA roles, computed per-run from context + the
+  // exploration artifact. normalizeGeneratedContent() uses it to reconcile
+  // `getByRole('button', { name: X })` to `getByRole('tab', …)` when X is
+  // observed only as a tab (e.g. MUI <Tab> labels the artifact also lists as
+  // "buttons") — otherwise the button query matches nothing and hangs.
+  private observedRoleMap: Map<string, Set<string>> = new Map()
 
   constructor(config: OpenAITestGeneratorConfig = {}) {
     const envMaxTokens = Number.parseInt(process.env.OPENAI_MAX_TOKENS || '', 10)
@@ -249,6 +264,11 @@ export class OpenAITestGenerator {
     // Track the structured inputs so downstream prompt builders can reference them.
     this.parsedPRD = parsedPRD
     this.explorationArtifact = explorationArtifact
+    // Decide once whether `main`-scoped selectors are safe for this app. Drives
+    // the normalizer's main→body rewrite (see normalizeGeneratedContent).
+    this.appHasMainLandmark = contextHasMainLandmark(context, explorationArtifact)
+    // Observed accessible-name → roles, for tab-as-button reconciliation.
+    this.observedRoleMap = buildObservedRoleMap(context, explorationArtifact)
     this.roles = roles
     this.agentRuns = []
     this.activeFeature = resolvedFeature
@@ -637,9 +657,9 @@ Some apps render an error state inside the current page instead of server-redire
 - RIGHT: \`await expect(page.getByText(/not found/i)).toBeVisible()\`
 
 ### 7. Selectors that match both page body and persistent chrome (header/footer)
-Elements that appear in both the page body and a site-wide header/footer cause strict-mode violations. Always scope to \`main\`.
+Elements that appear in both the page body and a site-wide header/footer cause strict-mode violations. Scope to a container, but pick one that actually exists: use \`main\` ONLY when a \`main\` landmark appears in CONTEXT_JSON for the route — many apps (Create React App, plain MUI/\`<div>\` layouts) have NO \`<main>\`, and \`page.locator('main')\` then matches nothing and hangs the assertion for the full timeout. When no \`main\` landmark is present, scope to \`body\` or a proven container instead.
 - WRONG: \`await expect(page.locator('a[href*="/contact"]')).toBeVisible()\`
-- RIGHT: \`await expect(page.locator('main a[href*="/contact"]').first()).toBeVisible()\`
+- RIGHT (no main landmark): \`await expect(page.locator('body').getByRole('link', { name: 'Contact' }).first()).toBeVisible()\`
 
 ### 8. State-conditional elements asserted in the wrong application state
 Ensure the app is in the correct state before asserting. Navigate or interact to reach that state.
@@ -654,12 +674,12 @@ Never construct a detail-page URL by embedding a hardcoded UUID or numeric ID. N
     return `## Abstention Rule — Do Not Invent
 If a specific route, UI element, button name, or data state is NOT explicitly present in \`CONTEXT_JSON\`, you MUST NOT invent or assume it exists. When grounding fails, fall back in this priority order:
 1. **URL reachability** (always works, never strict-mode issues): \`await expect(page).toHaveURL(/\\/expected-path/)\`
-2. **Single-element structural locator**: \`await expect(page.locator('main').first()).toBeVisible()\` — use ONE landmark, not a list. If \`main\` may not exist, use \`page.locator('[role="main"]').first()\` instead. Picking a single tag avoids the strict-mode failure mode of multi-match selectors.
+2. **Single-element structural locator**: \`await expect(page.locator('body').first()).toBeVisible()\` — \`body\` always exists. Do NOT fall back to \`page.locator('main')\` or \`page.locator('[role="main"]')\` unless a \`main\` landmark is present in CONTEXT_JSON; on apps without one (CRA, plain MUI/\`<div>\` layouts) those match nothing and hang for the full timeout. Picking a single tag avoids the strict-mode failure mode of multi-match selectors.
 3. **Console error absence** (already covered by listeners)
 
 HARD BANS in abstention fallbacks:
-- **Never use comma-separated CSS** like \`locator('main, form, body')\` or \`locator('nav, header')\` with \`toBeVisible()\`. Comma CSS matches multiple elements → strict-mode violation → test fails. If you genuinely need either-or, use \`.or()\` chaining: \`page.locator('main').or(page.locator('[role="main"]')).first()\`.
-- **Never use raw \`.first()\` on broad selectors** like \`locator('a, button').first()\` or \`getByRole('link').first()\` — \`.first()\` picks DOM order, often a hidden header/logo. If you must use \`.first()\`, scope it tightly: \`page.locator('main').getByRole('link').first()\` AND/OR chain \`.filter({ visible: true })\` when the framework supports it. For visibility checks, prefer a scoped landmark over a generic-element \`.first()\`.
+- **Never use comma-separated CSS** like \`locator('main, form, body')\` or \`locator('nav, header')\` with \`toBeVisible()\`. Comma CSS matches multiple elements → strict-mode violation → test fails. If you genuinely need either-or, use \`.or()\` chaining with a guaranteed-present fallback: \`page.locator('main').or(page.locator('body')).first()\`.
+- **Never use raw \`.first()\` on broad selectors** like \`locator('a, button').first()\` or \`getByRole('link').first()\` — \`.first()\` picks DOM order, often a hidden header/logo. If you must use \`.first()\`, scope it tightly to a container that exists (e.g. \`page.locator('body').getByRole('link').first()\` — use \`main\` only when a \`main\` landmark is present in CONTEXT_JSON) AND/OR chain \`.filter({ visible: true })\` when the framework supports it. For visibility checks, prefer a scoped container over a generic-element \`.first()\`.
 - **Never** fall back to \`getByRole('heading', { name: /something/i })\` with invented text — that re-introduces the hallucination this rule is meant to prevent.
 
 Silence (no assertion) is better than a hallucinated or strict-mode-violating selector.
@@ -1747,8 +1767,8 @@ NEVER invent heading text, link labels, button names, status text, or dashboard/
 - Forbidden invented examples (these failed in prior runs): /log in/i heading, /access denied/i heading, /dashboard|admin/i heading, /low stock/i link, /unread enquiries/i link, /critical/i text, /admin panel/i heading. The PRD mentioning a feature does NOT prove the UI label exists.
 - When you don't have proven text for what you want to assert: assert structural presence only (e.g., \`await expect(page.locator('h1').first()).toBeVisible()\` or \`await expect(page).toHaveURL(/\\/expected-path/)\`) and add a \`// Grounded in: structural fallback - exact text not in CONTEXT_JSON\` comment. Do NOT make up plausible-looking text.
 - Bounded-assertion rule: never use \`toHaveText('literal')\`, exact \`toHaveCount(N)\` for N>1, or \`getByText('literal', { exact: true })\` unless that exact literal appears verbatim in CONTEXT_JSON.context.sourceContext.assertableText or routeAccess.observedRoutes. For potentially dynamic content prefer \`not.toBeEmpty()\`, \`toBeVisible()\`, or regex-based partial matches.
-- Strict-mode safety: NEVER write \`locator('a, b, c')\` (comma-separated CSS) followed by \`toBeVisible()\` / \`toBeHidden()\`. Comma CSS matches multiple DOM nodes; Playwright's strict mode requires exactly one. Use a single tag (\`locator('main')\`), use \`.or()\` chaining when you genuinely need either-or fallback, or scope to a container first. Same rule for \`locator('nav, header')\`, \`locator('main, form, body')\`, etc. — every example of comma CSS with toBeVisible is a guaranteed strict-mode failure.
-- Visible \`.first()\` rule: \`.first()\` picks DOM order, not visible-element order. Broad-selector \`.first()\` calls like \`page.locator('a, button').first()\`, \`page.getByRole('link').first()\`, or \`page.locator('main').locator('a').first()\` frequently land on hidden header/logo/skip-link elements and fail with "received: hidden". When you need a representative element: (a) scope to a meaningful container first (e.g. \`page.locator('main')\`), (b) prefer role+name with proven text, or (c) skip the assertion entirely.
+- Strict-mode safety: NEVER write \`locator('a, b, c')\` (comma-separated CSS) followed by \`toBeVisible()\` / \`toBeHidden()\`. Comma CSS matches multiple DOM nodes; Playwright's strict mode requires exactly one. Use a single tag (\`locator('body')\`), use \`.or()\` chaining when you genuinely need either-or fallback, or scope to a container first. Same rule for \`locator('nav, header')\`, \`locator('main, form, body')\`, etc. — every example of comma CSS with toBeVisible is a guaranteed strict-mode failure.
+- Visible \`.first()\` rule: \`.first()\` picks DOM order, not visible-element order. Broad-selector \`.first()\` calls like \`page.locator('a, button').first()\`, \`page.getByRole('link').first()\`, or \`page.locator('main').locator('a').first()\` frequently land on hidden header/logo/skip-link elements and fail with "received: hidden". When you need a representative element: (a) scope to a meaningful container first (e.g. \`page.locator('body')\`, or \`main\` only when a \`main\` landmark exists in CONTEXT_JSON), (b) prefer role+name with proven text, or (c) skip the assertion entirely.
 
 ## Mandatory Response Contract
 - Return a strict JSON array as the full response. A single fenced json block is tolerated only if there is no text outside it.
@@ -1914,7 +1934,11 @@ Return JSON array only.`
         : { valid: true, errors: [] }
       const syntaxCheck = this.validateTypeScriptSyntax(normalizedContent, filename)
       const groundingCheck = groundingEnabled
-        ? validateGrounding(normalizedContent, generationContext.context, prefix)
+        ? validateGrounding(normalizedContent, generationContext.context, prefix, {
+            // Reuse the run-level determination so the structural-landmark check
+            // stays consistent with normalizeGeneratedContent's main→body rewrite.
+            appHasMainLandmark: this.appHasMainLandmark,
+          })
         : { valid: true, confidence: 1, totalLiterals: 0, groundedLiterals: 0, ungrounded: [] }
 
       // Always record grounding telemetry (even in report mode) so the
@@ -2168,6 +2192,59 @@ Return JSON array only.`
         },
       )
     }
+
+    // Main-landmark safety rewrite: on apps with no <main> landmark (CRA, plain
+    // MUI/<div> layouts), `page.locator('main')` — and the `[role="main"]` /
+    // `getByRole('main')` variants — match zero elements, so every scoped
+    // toBeVisible()/click() dead-hangs for the full test timeout, then fails and
+    // retries. This is the single largest cause of execution-budget timeouts on
+    // such apps. When exploration found no main landmark, rewrite the scope to
+    // `body` (which always exists) so assertions resolve instead of hanging.
+    // Apps that genuinely expose <main> keep their scoping (appHasMainLandmark
+    // is true), preserving the strict-mode header/footer de-duplication intent.
+    if (!this.appHasMainLandmark) {
+      // .locator('main') / .locator('main ...') / .locator('main, ...') → body.
+      // The lookahead only matches the bare `main` element token (followed by a
+      // quote, whitespace, comma or combinator) so identifiers like
+      // `main-content` or `maintenance` are left untouched.
+      normalized = normalized.replace(
+        /(\.locator\(\s*['"`])main(?=['"`]|\s|,|>)/g,
+        '$1body',
+      )
+      // .locator('[role="main"]') → .locator('body')
+      normalized = normalized.replace(
+        /\.locator\(\s*['"`]\[role=["']main["']\]['"`]\s*\)/g,
+        ".locator('body')",
+      )
+      // getByRole('main' [, { ... }]) → locator('body')
+      normalized = normalized.replace(
+        /getByRole\(\s*['"`]main['"`]\s*(?:,\s*\{[^}]*\})?\s*\)/g,
+        "locator('body')",
+      )
+    }
+
+    // Tab-as-button reconciliation: the generator sometimes emits
+    // `getByRole('button', { name: X })` for elements that are actually tabs
+    // (MUI <Tab> labels leak into the exploration artifact's flat `buttons`
+    // list). A `button` query for a `tab` matches nothing and hangs for the
+    // full timeout. When the observed-role map says X is a tab and never a
+    // button, rewrite the role to `tab`. Conservative: only fires on names we
+    // observed exclusively as tabs, so real buttons are never touched.
+    if (this.observedRoleMap.size > 0) {
+      normalized = normalized.replace(
+        /getByRole\(\s*(['"`])button\1\s*,\s*(\{[^}]*\})\s*\)/g,
+        (match: string, _quote: string, opts: string) => {
+          const nameMatch = opts.match(/name\s*:\s*['"`]([^'"`]+)['"`]/)
+          if (!nameMatch) return match
+          const roles = this.observedRoleMap.get(nameMatch[1].trim().toLowerCase())
+          if (roles && roles.has('tab') && !roles.has('button')) {
+            return match.replace(/^(getByRole\(\s*['"`])button/, '$1tab')
+          }
+          return match
+        },
+      )
+    }
+
     return normalized
   }
 
