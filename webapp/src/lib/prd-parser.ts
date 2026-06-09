@@ -168,12 +168,35 @@ function splitPRDIntoChunks(text: string, maxChars = 5000): string[] {
   return chunks.length > 0 ? chunks : [text]
 }
 
+// README boilerplate sections frequently get mis-parsed as "features" — e.g. a
+// repo's "Technologies Used" or "Local Setup Instructions" heading becomes a
+// feature with a hallucinated user story (run 1780925226135-3xfian). These are
+// never testable product behaviour, so we drop any feature whose name matches a
+// known non-feature section heading.
+//
+// PHRASE_RE matches strongly-indicative phrases anywhere in the heading (so
+// "Technologies Used" and "Local Setup Instructions" are caught, not just exact
+// matches). EXACT_RE matches ambiguous single words ("setup", "build") ONLY when
+// they are the entire heading, so legitimate features like "Account Setup" or
+// "Build a Workflow" survive.
+const NON_FEATURE_PHRASE_RE =
+  /\b(?:technolog(?:y|ies)|tech\s*stack|installation|getting\s*started|prerequisites?|folder\s*structure|project\s*structure|directory\s*structure|table\s*of\s*contents?|changelog|licen[sc]e|contributing|acknowledg(?:e?ments?)|local\s*setup|setup\s*instructions?|steps?\s*to\s*set\s*?up|how\s*to\s*(?:run|install|use|set\s*?up))\b/i
+const NON_FEATURE_EXACT_RE =
+  /^\s*(?:setup|build(?:ing)?|deployment|configuration|credits|references?|resources?|dependenc(?:y|ies))\s*$/i
+
+function isNonFeatureSection(name?: string): boolean {
+  if (!name) return false
+  const trimmed = name.trim()
+  return NON_FEATURE_PHRASE_RE.test(trimmed) || NON_FEATURE_EXACT_RE.test(trimmed)
+}
+
 function mergeParsedPRDChunks(chunks: ParsedPRD[]): ParsedPRD {
   const personas = new Map<string, { name: string; description: string }>()
   const nonFunctional = new Map<string, { kind: 'perf' | 'a11y' | 'i18n' | 'security'; text: string }>()
   const features: PRDFeature[] = []
   for (const chunk of chunks) {
     for (const feature of chunk.features || []) {
+      if (isNonFeatureSection(feature?.name)) continue
       if ((feature.userStories || []).some((story) => (story.acceptanceCriteria || []).length > 0)) {
         features.push(feature)
       }

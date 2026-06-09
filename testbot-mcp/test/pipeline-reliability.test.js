@@ -1774,6 +1774,47 @@ test('quality gates reject hardcoded origins that do not match configured baseUR
   });
 });
 
+// RC1b (run 1780925226135-3xfian): when the backend runs on a distinct origin,
+// API specs must target it. The validator must (a) NOT flag a spec that correctly
+// hardcodes the backend apiBaseURL, and (b) DO flag a spec that hardcodes the
+// frontend origin instead — with an apiOriginMismatch marker so the repair steers
+// toward the API base URL rather than telling it to drop page.goto.
+test('API spec correctly targeting the distinct backend apiBaseURL is not flagged', () => {
+  withGeneratedSuite(`
+    import { test, expect, request } from '@playwright/test';
+
+    test('users api returns json', async ({ request }) => {
+      const r = await request.get('http://localhost:5000/api/users');
+      expect(r.status()).toBe(200);
+    });
+  `, (projectPath) => {
+    const quality = collectGenerationQuality(projectPath, {
+      baseURL: 'http://localhost:3001',
+      apiBaseURL: 'http://localhost:5000',
+    });
+    assert.equal(quality.hardcodedBaseUrlMismatches.length, 0);
+  });
+});
+
+test('API spec hardcoding the frontend origin when backend differs is flagged as apiOriginMismatch', () => {
+  withGeneratedSuite(`
+    import { test, expect, request } from '@playwright/test';
+
+    test('users api returns json', async ({ request }) => {
+      const r = await request.get('http://localhost:3001/api/users');
+      expect(r.status()).toBe(200);
+    });
+  `, (projectPath) => {
+    const quality = collectGenerationQuality(projectPath, {
+      baseURL: 'http://localhost:3001',
+      apiBaseURL: 'http://localhost:5000',
+    });
+    assert.equal(quality.hardcodedBaseUrlMismatches.length, 1);
+    assert.equal(quality.hardcodedBaseUrlMismatches[0].apiOriginMismatch, true);
+    assert.equal(quality.hardcodedBaseUrlMismatches[0].expectedOrigin, 'http://localhost:5000');
+  });
+});
+
 test('pipeline error classifier treats hardcoded baseURL mismatch as generation quality failure', () => {
   const classified = classifyPipelineErrorFromStderr({
     stderr: 'Generated suite hardcoded a different app origin than baseURL (api-suite.spec.ts:https://example.com).',

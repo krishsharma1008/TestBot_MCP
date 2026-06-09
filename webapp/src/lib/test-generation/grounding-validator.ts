@@ -478,7 +478,11 @@ function suggestFix(kind: SelectorKind, literal: string): string {
     case 'role-name':
       return `Drop the {name} filter — use structural locator like \`page.getByRole('heading').first()\` or \`page.locator('h1').first()\`. The literal "${literal}" is not in CONTEXT_JSON.`
     case 'text':
-      return `Replace getByText("${literal}") with a structural assertion (e.g. \`page.locator('main').toBeVisible()\`) or use a literal proven in sourceContext.assertableText.`
+      // Do NOT recommend page.locator('main') — many apps (MUI, CRA, etc.) have
+      // no <main> landmark, so that assertion fails on the very pages we are
+      // trying to keep green. Anchor to a literal proven in assertableText, or
+      // fall back to a heading / always-present <body>.
+      return `Replace getByText("${literal}") with an assertion on a literal proven in sourceContext.assertableText, or a structural locator that is guaranteed to exist (e.g. \`page.getByRole('heading').first()\` or \`page.locator('body')\`). Never use \`page.locator('main')\` — it is not guaranteed to exist.`
     case 'label':
       return `getByLabel("${literal}") is unproven. Switch to \`page.locator('input[name="..."]')\` using a field name from forms[*].fields, or use a proven label.`
     case 'placeholder':

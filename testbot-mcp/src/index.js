@@ -74,6 +74,7 @@ const UI_SUBMISSION_SCHEMA = z.object({
   ]).optional(),
   prd: PRD_FILE_SCHEMA.optional().nullable(),
   prdFiles: z.array(PRD_FILE_SCHEMA).max(5).optional().nullable(),
+  timeBudgetMinutes: z.number().int().min(10).max(360).optional(),
 });
 
 const WORKFLOW_OBJECT_SCHEMA = z.object({
@@ -870,6 +871,9 @@ class HealixMCPServer {
         configAutoFixes: allAutoFixes,
         prdFile: prdFile || (prdFiles.length > 0 ? prdFiles[0] : undefined),
         prdFiles: prdFiles.length > 0 ? prdFiles : (prdFile ? [prdFile] : []),
+        ...(validatedConfig.timeBudgetMinutes
+          ? { maxRunMs: validatedConfig.timeBudgetMinutes * 60 * 1000 }
+          : {}),
       };
 
       if (normalizedCredentials && normalizedCredentials.length > 0) {
@@ -1107,7 +1111,7 @@ class HealixMCPServer {
    * Keeps the MCP tool call open so the Windsurf chat stays active and
    * the AI can show the user real results once testing completes.
    */
-  async waitForPipelineCompletion(statusFile, maxWaitMs = 1800000) {
+  async waitForPipelineCompletion(statusFile, maxWaitMs = 7200000) {
     const TERMINAL_PHASES = new Set(['completed', 'error', 'error_reported', 'failed']);
     const POLL_INTERVAL_MS = 4000;
     const startedAt = Date.now();
@@ -1130,7 +1134,7 @@ class HealixMCPServer {
         // File mid-write or not yet created — try again on next poll
       }
     }
-    return { phase: 'timeout', message: 'Healix test run monitoring timed out after 30 minutes.' };
+    return { phase: 'timeout', message: 'Healix test run monitoring timed out after 120 minutes.' };
   }
 
   registerTools() {

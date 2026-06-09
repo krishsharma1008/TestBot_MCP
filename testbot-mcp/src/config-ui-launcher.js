@@ -181,6 +181,10 @@ class ConfigUILauncher {
         path: svc.path || null,
         startCommand: svc.startCommand || '',
         framework: svc.framework || null,
+        // Carry the detected per-service baseURL through the form round-trip.
+        // SERVICE_SCHEMA is .passthrough(), so it survives submission and the
+        // pipeline keeps the correct backend origin for API-spec generation.
+        baseURL: svc.baseURL || null,
         // The detector doesn't set isPrimary today; the form picks a default
         // (frontend / fullstack first, else first row) and the user can change it.
         isPrimary: !!svc.isPrimary,
