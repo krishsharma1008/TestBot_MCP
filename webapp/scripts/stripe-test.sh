@@ -23,7 +23,7 @@ set -euo pipefail
 # Config & defaults
 # ---------------------------------------------------------------------------
 
-BASE_URL="http://localhost:3000"
+BASE_URL="http://localhost:3030"
 USER_ID=""
 SKIP_DB=false
 STRIPE_CLI=""

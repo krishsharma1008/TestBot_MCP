@@ -724,7 +724,7 @@ setup('authenticate as admin', async ({ page }) => {
 ${this.buildAntiPatternsSection()}
 
 ## Framework: ${projectInfo.framework || 'React/Next.js'}
-## Base URL: ${projectInfo.baseURL || 'http://localhost:3000'}
+## Base URL: ${projectInfo.baseURL || 'http://localhost:3030'}
 
 ${this.buildOutputFormatSection('auth-ui.spec.ts')}`
   }
@@ -773,7 +773,7 @@ ${this.buildOutputFormatSection('auth-ui.spec.ts')}`
 ${this.buildAntiPatternsSection()}
 
 ## Framework: ${projectInfo.framework || 'React/Next.js'}
-## Base URL: ${projectInfo.baseURL || 'http://localhost:3000'}
+## Base URL: ${projectInfo.baseURL || 'http://localhost:3030'}
 
 ${this.buildOutputFormatSection(`${slug}-ui.spec.ts`)}`
   }
@@ -815,7 +815,7 @@ ${this.buildOutputFormatSection(`${slug}-ui.spec.ts`)}`
    * is no separate backend (single-service / fullstack / api-only repos).
    */
   resolveApiBaseURL(projectInfo: ProjectInfo): string {
-    const fallback = projectInfo.baseURL || 'http://localhost:3000'
+    const fallback = projectInfo.baseURL || 'http://localhost:3030'
     if (projectInfo.apiBaseURL) return projectInfo.apiBaseURL
     const backend = (projectInfo.services || []).find(
       (s) => s && (s.role === 'backend' || s.role === 'fullstack')
@@ -825,7 +825,7 @@ ${this.buildOutputFormatSection(`${slug}-ui.spec.ts`)}`
 
   buildFeatureAPISystemPrompt(projectInfo: ProjectInfo): string {
     const slug = this.getFeatureSlug()
-    const baseURL = projectInfo.baseURL || 'http://localhost:3000'
+    const baseURL = projectInfo.baseURL || 'http://localhost:3030'
     const apiBaseURL = this.resolveApiBaseURL(projectInfo)
     // Only force absolute backend URLs when the API origin actually differs
     // from the frontend. Same-origin repos keep clean relative paths so there
@@ -896,7 +896,7 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
       testKind: 'api',
     })
 
-    const baseURL = projectInfo.baseURL || 'http://localhost:3000'
+    const baseURL = projectInfo.baseURL || 'http://localhost:3030'
     const apiBaseURL = this.resolveApiBaseURL(projectInfo)
     const requirements = [
       `Emit a single file named ${slug}-api.spec.ts.`,
@@ -973,7 +973,7 @@ ${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
       'Do not invent additional test cases beyond those listed.',
     ]
     if (agentType === 'api') {
-      const baseURL = projectInfo.baseURL || 'http://localhost:3000'
+      const baseURL = projectInfo.baseURL || 'http://localhost:3030'
       const apiBaseURL = this.resolveApiBaseURL(projectInfo)
       if (apiBaseURL !== baseURL) {
         requirements.push(
@@ -1015,7 +1015,7 @@ ${manifestSummary}
 
 ${this.buildAntiPatternsSection()}
 
-## Base URL: ${projectInfo.baseURL || 'http://localhost:3000'}
+## Base URL: ${projectInfo.baseURL || 'http://localhost:3030'}
 
 ${this.buildOutputFormatSection('e2e-workflows.spec.ts')}`
   }
@@ -1317,7 +1317,7 @@ ${this.buildOutputFormatSection('e2e-workflows.spec.ts')}`
       meta: {
         projectInfo: {
           name: projectInfo.name || 'App',
-          baseURL: projectInfo.baseURL || 'http://localhost:3000',
+          baseURL: projectInfo.baseURL || 'http://localhost:3030',
           apiBaseURL: this.resolveApiBaseURL(projectInfo),
           framework: projectInfo.framework || 'Unknown',
           startCommand: projectInfo.startCommand || null,

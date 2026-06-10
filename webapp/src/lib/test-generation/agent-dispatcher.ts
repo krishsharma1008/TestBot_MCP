@@ -237,7 +237,7 @@ export function generatePlaywrightConfig({
   authFeatureId,
   roles,
   testType,
-  baseURL = 'http://localhost:3000',
+  baseURL = 'http://localhost:3030',
 }: {
   features: PRDFeature[]
   authFeatureId: string | null

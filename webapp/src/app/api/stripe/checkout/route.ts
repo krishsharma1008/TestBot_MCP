@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = getStripe()
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3030'
     const profile = result.profile
 
     // Reuse existing Stripe customer to preserve payment methods and billing history.
