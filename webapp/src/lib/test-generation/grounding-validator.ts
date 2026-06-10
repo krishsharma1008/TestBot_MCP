@@ -81,16 +81,15 @@ export interface GroundingOptions {
   appHasMainLandmark?: boolean
 }
 
-// Thresholds are deliberately lenient — the validator's value is signal +
-// targeted correction, not aggressive rejection. We let weak suites through
-// rather than starve the floor.
+// Thresholds are set to enforce a high bar for grounding. Files that fail
+// are rejected and trigger the correction retry loop.
 const DEFAULTS_BY_PREFIX: Record<string, { minConfidence: number; maxUngrounded: number }> = {
-  smoke:    { minConfidence: 0.3,  maxUngrounded: 6 },
-  frontend: { minConfidence: 0.25, maxUngrounded: 10 },
-  workflow: { minConfidence: 0.2,  maxUngrounded: 12 },
-  error:    { minConfidence: 0.2,  maxUngrounded: 12 },
-  api:      { minConfidence: 0.15, maxUngrounded: 20 },
-  expansion:{ minConfidence: 0.2,  maxUngrounded: 12 },
+  smoke:    { minConfidence: 0.55, maxUngrounded: 2 },
+  frontend: { minConfidence: 0.50, maxUngrounded: 4 },
+  workflow: { minConfidence: 0.45, maxUngrounded: 4 },
+  error:    { minConfidence: 0.45, maxUngrounded: 4 },
+  api:      { minConfidence: 0.35, maxUngrounded: 8 },
+  expansion:{ minConfidence: 0.45, maxUngrounded: 4 },
 }
 
 const FALLBACK_DEFAULTS = { minConfidence: 0.2, maxUngrounded: 12 }
@@ -720,8 +719,11 @@ export function renderGroundingErrors(result: GroundingResult): string[] {
  * Build a correction-prompt fragment that the model can use to fix the
  * specific ungrounded literals on retry. Returned text is appended to the
  * existing buildCorrectionPrompt() output.
+ *
+ * When a corpus is provided, the top proven strings are inlined so the model
+ * can pick replacements without having to guess what is valid.
  */
-export function buildGroundingCorrection(result: GroundingResult): string {
+export function buildGroundingCorrection(result: GroundingResult, corpus?: Set<string>): string {
   if (result.valid || result.ungrounded.length === 0) return ''
   const lines = [
     '',
@@ -732,5 +734,22 @@ export function buildGroundingCorrection(result: GroundingResult): string {
     '',
     'Use only literals that appear verbatim in CONTEXT_JSON.context.sourceContext.assertableText or routeAccess.observedRoutes. When in doubt, drop the {name} filter and assert structurally.',
   ]
+
+  if (corpus && corpus.size > 0) {
+    // Include a sample of provable strings so the model has concrete replacements.
+    // Prefer text-like entries (not route paths) that are short enough to be useful.
+    const proven = [...corpus]
+      .filter((s) => !s.startsWith('/') && s.length >= 3 && s.length <= 80)
+      .slice(0, 25)
+    if (proven.length > 0) {
+      lines.push(
+        '',
+        'PROVEN STRINGS you may use verbatim as selector names or text assertions:',
+        ...proven.map((s) => `  - "${s}"`),
+        'If the element you need is not in this list, use a structural locator (getByRole without name, not.toBeEmpty(), etc.).',
+      )
+    }
+  }
+
   return lines.join('\n')
 }
