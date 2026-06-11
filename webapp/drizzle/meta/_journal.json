@@ -15,6 +15,13 @@
       "when": 1773750407695,
       "tag": "0001_broad_puff_adder",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781195000000,
+      "tag": "0017_token_ledger_auth_agent",
+      "breakpoints": true
     }
   ]
 }

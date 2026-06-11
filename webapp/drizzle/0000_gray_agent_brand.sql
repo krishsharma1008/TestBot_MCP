@@ -1,0 +1,1 @@
+-- initial migration (file restored as stub; already applied to database)

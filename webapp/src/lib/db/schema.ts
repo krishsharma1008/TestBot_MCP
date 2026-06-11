@@ -616,7 +616,7 @@ export const tokenLedger = pgTable(
     ),
     check(
       'token_ledger_agent_check',
-      sql`agent IS NULL OR agent IN ('smoke','frontend','api','workflow','error','expansion','planner','parse_prd','analyze_failures')`
+      sql`agent IS NULL OR agent IN ('smoke','frontend','api','workflow','error','expansion','planner','parse_prd','analyze_failures','auth','ui','e2e','scenario-planner')`
     ),
   ]
 )
