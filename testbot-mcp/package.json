@@ -1,6 +1,6 @@
 {
   "name": "@zapminds/mcp",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Healix MCP Server — thin client, billing via Healix webapp (HEALIX_API_KEY only)",
   "main": "dist/index.js",
   "bin": {
