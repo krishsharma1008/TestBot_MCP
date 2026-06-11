@@ -287,4 +287,9 @@ function resolveTracePath(artifacts, projectPath) {
 module.exports = {
   parseTrace,
   resolveTracePath,
+  // Exported for unit tests only — not part of the public API
+  _parseTraceEvents: parseTraceEvents,
+  _summariseEvents: summariseEvents,
+  _extractBodyText: extractBodyText,
+  _extractByTag: extractByTag,
 };

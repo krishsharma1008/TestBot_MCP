@@ -529,3 +529,5 @@ class ArtifactUploader {
 }
 
 module.exports = ArtifactUploader;
+// Exported for unit tests — not part of the public API
+module.exports.isCredentialFile = isCredentialFile;

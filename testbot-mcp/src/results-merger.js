@@ -478,8 +478,8 @@ class ResultsMerger {
       const items = prioritized[type] || [];
       
       prioritized[type] = items.sort((a, b) => {
-        const aIsMCP = a.path?.includes('playwright-mcp') || a.fullPath?.includes('playwright-mcp');
-        const bIsMCP = b.path?.includes('playwright-mcp') || b.fullPath?.includes('playwright-mcp');
+        const aIsMCP = !!(a.path?.includes('playwright-mcp') || a.fullPath?.includes('playwright-mcp'));
+        const bIsMCP = !!(b.path?.includes('playwright-mcp') || b.fullPath?.includes('playwright-mcp'));
         
         if (preference === 'playwright-mcp') {
           return bIsMCP - aIsMCP;

@@ -10,3 +10,4 @@ node_modules/
 logs/
 *.log
 scripts/__pycache__/
+coverage/

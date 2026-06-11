@@ -34,7 +34,9 @@
     "mcp-launcher.js"
   ],
   "devDependencies": {
-    "esbuild": "^0.25.12"
+    "c8": "^11.0.0",
+    "esbuild": "^0.25.12",
+    "mocha": "^11.7.6"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
