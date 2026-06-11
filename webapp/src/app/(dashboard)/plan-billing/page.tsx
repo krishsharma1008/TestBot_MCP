@@ -9,6 +9,9 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { toDisplayUnits } from '@/lib/token-units'
 
+// Set to false once payment wiring is complete and Stripe is production-ready.
+const UPGRADES_DISABLED = true
+
 type PlanId = 'free' | 'starter' | 'team' | 'enterprise'
 
 const PLAN_RANK: Record<PlanId, number> = { free: 0, starter: 1, team: 2, enterprise: 3 }
@@ -190,6 +193,8 @@ export default function PlanBillingPage() {
       return
     }
 
+    if (UPGRADES_DISABLED) return
+
     void executeUpgrade(plan)
   }
 
@@ -363,11 +368,29 @@ export default function PlanBillingPage() {
 
         {/* Plan comparison */}
         <h2 className="text-lg font-semibold text-text-primary mb-4">Available Plans</h2>
+
+        {UPGRADES_DISABLED && (
+          <div className="flex items-center gap-3 px-4 py-3 mb-4 rounded-none border border-blue-500/30 bg-blue-500/10 text-blue-300 text-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>
+              Paid plan upgrades are <span className="font-semibold">temporarily unavailable</span> while we finalise payment processing. They will be enabled shortly. In the meantime, reach out to{' '}
+              <a href="mailto:Swathi.Dharshna@zapcg.com" className="underline hover:text-blue-200">Swathi.Dharshna@zapcg.com</a>{' '}
+              if you need expanded access.
+            </span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {PLANS.map((plan, i) => {
             const isCurrent = plan.id === currentPlan
             const isLoading = checkingOut === plan.id
             const isAnyLoading = checkingOut !== null
+            const isUpgrade = PLAN_RANK[plan.id] > PLAN_RANK[currentPlan]
+            const isUpgradeBlocked = UPGRADES_DISABLED && isUpgrade && !plan.ctaHref
             return (
               <Card
                 key={plan.id}
@@ -402,11 +425,11 @@ export default function PlanBillingPage() {
                   variant={isCurrent ? 'secondary' : plan.highlighted ? 'primary' : 'secondary'}
                   size="md"
                   className="w-full"
-                  disabled={isCurrent || isAnyLoading}
+                  disabled={isCurrent || isAnyLoading || isUpgradeBlocked}
                   loading={isLoading}
                   onClick={() => handlePlanAction(plan)}
                 >
-                  {isCurrent ? 'Current Plan' : plan.cta}
+                  {isCurrent ? 'Current Plan' : isUpgradeBlocked ? 'Coming Soon' : plan.cta}
                 </Button>
               </Card>
             )
