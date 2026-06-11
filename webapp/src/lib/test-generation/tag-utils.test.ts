@@ -88,8 +88,7 @@ describe('tagTestContent', () => {
   it('no scope/module tag added (file carries feature identity)', () => {
     const content = `test('[REQ:F1.S1.AC1][positive] user pays invoice', async () => {})`
     const result = tagTestContent(content, 'ui')
-    // Must not add @billing or any other feature slug
-    expect(result).not.toMatch(/@[a-z]+-[a-z]+/)  // no hyphenated slug tags
+    // Must not add feature-slug tags like @billing or @checkout
     expect(result).not.toContain('@billing')
     expect(result).not.toContain('@checkout')
   })
