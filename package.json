@@ -5,10 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev:webapp": "npm run dev -w webapp",
-    "start:testbot": "npm start -w @zapminds/mcp",
-    "dev:testbot": "npm run dev -w @zapminds/mcp",
+    "start:testbot": "npm start -w @zapminds/healix-mcp",
+    "dev:testbot": "npm run dev -w @zapminds/healix-mcp",
     "test:webapp": "npm run test -w webapp",
-    "test:testbot": "npm run test -w @zapminds/mcp",
+    "test:testbot": "npm run test -w @zapminds/healix-mcp",
     "compat:matrix": "node scripts/run-compat-matrix.mjs",
     "docker:build": "./webapp/docker/build.sh",
     "docker:run": "./webapp/docker/build.sh --run",

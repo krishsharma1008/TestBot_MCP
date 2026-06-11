@@ -1,5 +1,5 @@
 {
-  "name": "@zapminds/mcp",
+  "name": "@zapminds/healix-mcp",
   "version": "2.0.3",
   "description": "Healix MCP Server — thin client, billing via Healix webapp (HEALIX_API_KEY only)",
   "main": "dist/index.js",

@@ -1,4 +1,4 @@
-# @zapminds/mcp
+# @zapminds/healix-mcp
 
 **AI-powered end-to-end test generation and execution for any web app — directly from your IDE or Agentic CLI.**
 
@@ -32,7 +32,7 @@ Paste this into your IDE's MCP config file:
   "mcpServers": {
     "healix": {
       "command": "npx",
-      "args": ["-y", "@zapminds/mcp"],
+      "args": ["-y", "@zapminds/healix-mcp"],
       "env": {
         "HEALIX_API_KEY": "your-api-key-here",
         "HEALIX_API_URL": "https://your-healix-webapp-url.com"

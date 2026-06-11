@@ -1,6 +1,6 @@
 # MCP Publishing & Release Guide
 
-Developer reference for publishing, versioning, and managing `@zapminds/mcp` on npm.
+Developer reference for publishing, versioning, and managing `@zapminds/healix-mcp` on npm.
 
 ---
 
@@ -10,7 +10,7 @@ This monorepo contains two packages:
 
 ```
 TestBot_MCP/
-├── testbot-mcp/    ← npm package (@zapminds/mcp) — runs on the user's machine
+├── testbot-mcp/    ← npm package (@zapminds/healix-mcp) — runs on the user's machine
 └── webapp/         ← Next.js backend — runs on Vercel/RemoteServer
 ```
 
@@ -82,20 +82,20 @@ npm publish --tag next
 ### Test it yourself
 
 ```bash
-npx @zapminds/mcp@next
+npx @zapminds/healix-mcp@next
 ```
 
-Configure your IDE to use `@zapminds/mcp@next` temporarily and verify the new version works end-to-end.
+Configure your IDE to use `@zapminds/healix-mcp@next` temporarily and verify the new version works end-to-end.
 
 ### Promote to latest (if it works)
 
 ```bash
-npm dist-tag add @zapminds/mcp@2.0.2 latest
-npm dist-tag rm @zapminds/mcp next
+npm dist-tag add @zapminds/healix-mcp@2.0.2 latest
+npm dist-tag rm @zapminds/healix-mcp next
 
 # Commit and tag
 git add testbot-mcp/package.json
-git commit -m "chore: release @zapminds/mcp v2.0.2"
+git commit -m "chore: release @zapminds/healix-mcp v2.0.2"
 git tag mcp-v2.0.2
 git push && git push --tags
 ```
@@ -103,7 +103,7 @@ git push && git push --tags
 ### Discard if it breaks
 
 ```bash
-npm deprecate @zapminds/mcp@2.0.2 "bad release, do not use"
+npm deprecate @zapminds/healix-mcp@2.0.2 "bad release, do not use"
 # latest tag was never changed — existing users are unaffected
 ```
 
@@ -116,15 +116,15 @@ If a bad version was already promoted to `latest`:
 ### Step 1 — Point `latest` back to the working version
 
 ```bash
-npm dist-tag add @zapminds/mcp@2.0.1 latest
+npm dist-tag add @zapminds/healix-mcp@2.0.1 latest
 ```
 
-Users running `npx @zapminds/mcp` (no version pinned) immediately get `2.0.1` again.
+Users running `npx @zapminds/healix-mcp` (no version pinned) immediately get `2.0.1` again.
 
 ### Step 2 — Deprecate the bad version
 
 ```bash
-npm deprecate @zapminds/mcp@2.0.2 "broken release, reverted to 2.0.1"
+npm deprecate @zapminds/healix-mcp@2.0.2 "broken release, reverted to 2.0.1"
 ```
 
 Users who somehow have `2.0.2` will see a warning when they next install.
@@ -137,12 +137,12 @@ Users who somehow have `2.0.2` will see a warning when they next install.
 
 | Command | What it does |
 |---------|-------------|
-| `npm dist-tag ls @zapminds/mcp` | List all tags and which version they point to |
-| `npm dist-tag add @zapminds/mcp@X.Y.Z latest` | Promote a version to latest |
-| `npm dist-tag add @zapminds/mcp@X.Y.Z next` | Tag a version as next |
-| `npm dist-tag rm @zapminds/mcp next` | Remove the next tag |
-| `npm deprecate @zapminds/mcp@X.Y.Z "reason"` | Warn users off a version |
-| `npm info @zapminds/mcp` | Inspect published package metadata |
+| `npm dist-tag ls @zapminds/healix-mcp` | List all tags and which version they point to |
+| `npm dist-tag add @zapminds/healix-mcp@X.Y.Z latest` | Promote a version to latest |
+| `npm dist-tag add @zapminds/healix-mcp@X.Y.Z next` | Tag a version as next |
+| `npm dist-tag rm @zapminds/healix-mcp next` | Remove the next tag |
+| `npm deprecate @zapminds/healix-mcp@X.Y.Z "reason"` | Warn users off a version |
+| `npm info @zapminds/healix-mcp` | Inspect published package metadata |
 | `npm pack --dry-run` | Preview what will be uploaded without publishing |
 
 ---
@@ -156,7 +156,7 @@ Since `webapp/` and `testbot-mcp/` share one repo, prefix tags to avoid ambiguit
 npm version patch --no-git-tag-version
 
 git add testbot-mcp/package.json
-git commit -m "chore: bump @zapminds/mcp to 2.0.2"
+git commit -m "chore: bump @zapminds/healix-mcp to 2.0.2"
 git tag mcp-v2.0.2        # ← prefixed tag, clearly scoped to MCP
 git push && git push --tags
 npm publish
@@ -186,7 +186,7 @@ Users add this block to their IDE config (e.g. `claude_desktop_config.json` for 
   "mcpServers": {
     "healix": {
       "command": "npx",
-      "args": ["-y", "@zapminds/mcp"],
+      "args": ["-y", "@zapminds/healix-mcp"],
       "env": {
         "HEALIX_API_KEY": "their-key-here",
         "HEALIX_API_URL": "https://your-vercel-app.vercel.app"
@@ -221,7 +221,7 @@ Users add this block to their IDE config (e.g. `claude_desktop_config.json` for 
 | New feature | `npm version minor` → `npm publish` → `git push --tags` |
 | Breaking change | `npm version major` → `npm publish` → update user docs |
 | Risky / uncertain release | `npm publish --tag next` → test → `npm dist-tag add ... latest` |
-| Roll back latest | `npm dist-tag add @zapminds/mcp@<good-version> latest` |
-| Warn users off a version | `npm deprecate @zapminds/mcp@<bad-version> "reason"` |
-| Check what's live | `npm info @zapminds/mcp` |
-| Check all tags | `npm dist-tag ls @zapminds/mcp` |
+| Roll back latest | `npm dist-tag add @zapminds/healix-mcp@<good-version> latest` |
+| Warn users off a version | `npm deprecate @zapminds/healix-mcp@<bad-version> "reason"` |
+| Check what's live | `npm info @zapminds/healix-mcp` |
+| Check all tags | `npm dist-tag ls @zapminds/healix-mcp` |
