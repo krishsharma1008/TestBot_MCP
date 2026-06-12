@@ -11,7 +11,7 @@
 
 import { z } from 'zod'
 import { OpenAIClient } from './openai-client'
-import { resolveConfiguredOpenAIModel } from '@/lib/model-defaults'
+import { resolveApiAgentModel, resolveConfiguredOpenAIModel } from '@/lib/model-defaults'
 import {
   validateGrounding,
   renderGroundingErrors,
@@ -526,6 +526,7 @@ export class OpenAITestGenerator {
       context,
       prd,
       projectInfo,
+      model: resolveApiAgentModel(),
     })
 
     if (apiSpecs?.length && tests.length > 0 && this.generationMeta) {
@@ -1651,6 +1652,8 @@ Return only the JSON array of generated files.`
       context?: CapturedContext
       prd?: string
       projectInfo?: ProjectInfo
+      /** Override the model for this agent call only. */
+      model?: string
     } = {}
   ): Promise<GeneratedTestFile[]> {
     if (!this.openaiClient) return []
@@ -1678,6 +1681,7 @@ Return only the JSON array of generated files.`
 
     const previousMaxTokens = this.openaiClient.config.maxTokens
     const previousTemperature = this.openaiClient.config.temperature
+    const previousModel = this.openaiClient.config.model
 
     let lastError: Error | null = null
     let correctionPrompt = ''
@@ -1702,6 +1706,7 @@ Return only the JSON array of generated files.`
         try {
           this.openaiClient.config.maxTokens = adaptiveMaxTokens
           this.openaiClient.config.temperature = attempt === 0 ? this.config.temperature : 0
+          if (generationContext.model) this.openaiClient.config.model = generationContext.model
 
           const messages: OpenAIMessage[] = [
             { role: 'system', content: hardenedSystemPrompt },
@@ -1783,6 +1788,7 @@ Return only the JSON array of generated files.`
     } finally {
       this.openaiClient.config.maxTokens = previousMaxTokens
       this.openaiClient.config.temperature = previousTemperature
+      this.openaiClient.config.model = previousModel
 
       const aborted = this.abortSignal?.aborted ||
         (lastError ? /aborted by caller/i.test(lastError.message) : false)

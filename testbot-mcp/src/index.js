@@ -536,6 +536,7 @@ class HealixMCPServer {
   saveLastConfig(projectPath, validatedConfig) {
     try {
       const lastConfigPath = path.join(projectPath, '.healix', 'last-config.json');
+      const savedCredentials = this.normalizeCredentials(validatedConfig.credentials);
       const toSave = {
         testType: validatedConfig.testType,
         scope: validatedConfig.scope,
@@ -544,6 +545,7 @@ class HealixMCPServer {
         services: validatedConfig.services,
         generateTests: validatedConfig.generateTests,
         openDashboard: validatedConfig.openDashboard,
+        ...(savedCredentials && savedCredentials.length > 0 ? { credentials: savedCredentials } : {}),
       };
       fs.mkdirSync(path.dirname(lastConfigPath), { recursive: true });
       fs.writeFileSync(lastConfigPath, JSON.stringify(toSave, null, 2), 'utf-8');
@@ -2036,6 +2038,7 @@ Return the JSON structure above based on what you find in the codebase.
           scope: lastConfig.scope,
           generateTests: lastConfig.generateTests ?? baseConfig.generateTests,
           openDashboard: lastConfig.openDashboard ?? baseConfig.openDashboard,
+          credentials: lastConfig.credentials,
           strictAIGeneration: baseConfig.strictAIGeneration !== false,
           minGeneratedTests: Number(baseConfig.minGeneratedTests || 50),
           coverageProfile: baseConfig.coverageProfile || 'qa-max',

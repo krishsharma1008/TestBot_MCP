@@ -314,6 +314,9 @@ class ConfigUILauncher {
    * Start the HTTP server
    */
   startServer(projectInfo) {
+    // Stash last-run credentials so the /api/last-config endpoint can serve them.
+    this._lastCredentials = Array.isArray(projectInfo.credentials) ? projectInfo.credentials : [];
+
     return new Promise((resolve, reject) => {
       // Hard timeout: if we never bind after 30 s (e.g. close() callback never
       // fires on Windows for a never-bound server) fail fast instead of hanging.
@@ -366,6 +369,15 @@ class ConfigUILauncher {
         if (pathname === '/api/health' && req.method === 'GET') {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ status: 'ok', sessionActive: true }));
+          return;
+        }
+
+        // Last-config endpoint — returns persisted credentials from the previous
+        // run so the form can pre-fill them. Served over localhost only; never
+        // put credentials in query params.
+        if (pathname === '/api/last-config' && req.method === 'GET') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ credentials: this._lastCredentials || [] }));
           return;
         }
 

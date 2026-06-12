@@ -93,7 +93,8 @@ Copy `.env.example` to `webapp/.env.local`:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (public). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only — never expose). |
 | `OPENAI_API_KEY` | OpenAI API key. Used only by webapp API routes — never by the MCP. |
-| `OPENAI_MODEL` | Model override (default: `gpt-5.5-mini`). |
+| `OPENAI_MODEL` | Model override for all agents (default: `gpt-5.5-mini`). |
+| `OPENAI_API_AGENT_MODEL` | Model override for API contract test agent only (default: `gpt-5`). Overrides `OPENAI_MODEL` for this agent. |
 | `HEALIX_GEN_ASYNC` | `true` routes `/api/generate-tests` through Inngest background jobs. Default: `false`. |
 | `INNGEST_EVENT_KEY` | Inngest event key (required only when `HEALIX_GEN_ASYNC=true`). |
 | `INNGEST_SIGNING_KEY` | Inngest webhook signing key (required only when `HEALIX_GEN_ASYNC=true`). |

@@ -42,6 +42,7 @@ export type SelectorKind =
   | 'to-have-text'
   | 'to-contain-text'
   | 'structural-landmark'
+  | 'api-field'
 
 export interface UngroundedLiteral {
   literal: string
@@ -88,7 +89,10 @@ const DEFAULTS_BY_PREFIX: Record<string, { minConfidence: number; maxUngrounded:
   frontend: { minConfidence: 0.50, maxUngrounded: 4 },
   workflow: { minConfidence: 0.45, maxUngrounded: 4 },
   error:    { minConfidence: 0.45, maxUngrounded: 4 },
-  api:      { minConfidence: 0.35, maxUngrounded: 8 },
+  // Tighter: previously 0.35/8 which matched the 8-invalid-test symptom exactly.
+  // Now that api-field literals are extracted and contract fields seed the corpus,
+  // 3 ungrounded literals is the practical noise floor for API files.
+  api:      { minConfidence: 0.50, maxUngrounded: 3 },
   expansion:{ minConfidence: 0.45, maxUngrounded: 4 },
 }
 
@@ -215,6 +219,28 @@ export function buildGroundTruthCorpus(context: CapturedContext | undefined | nu
     }
   }
 
+  // API endpoints: seed response body field names and request field names so
+  // the api-field grounding check can validate toHaveProperty() assertions.
+  // Only "expected" category entries are trusted as real contracts; "observed"
+  // entries come from code analysis and may be wrong.
+  for (const ep of context.apiEndpoints || []) {
+    add(ep.path)
+    for (const contract of [...(ep.responses?.success || []), ...(ep.responses?.failure || [])]) {
+      if (contract.category === 'expected' && contract.bodyShape) {
+        for (const key of Object.keys(contract.bodyShape)) add(key)
+      }
+    }
+    if (ep.requestSchema && typeof ep.requestSchema === 'object') {
+      for (const key of Object.keys(ep.requestSchema)) add(key)
+    }
+  }
+
+  // MockableApiContract request fields (simpler contract list used by API agent)
+  for (const contract of context.mockableApiContracts || []) {
+    add(contract.path)
+    for (const field of contract.request?.fields || []) add(field)
+  }
+
   return corpus
 }
 
@@ -314,6 +340,21 @@ export function extractSelectorLiterals(content: string): ExtractedLiteral[] {
     literals.push({
       literal: m[1].trim(),
       kind: 'to-contain-text',
+      snippet: m[0].slice(0, 160),
+      isRegex: false,
+    })
+  }
+
+  // toHaveProperty('fieldName') / toHaveProperty('fieldName', value)
+  // Validates that response body field names exist in contract bodyShape.
+  // Dot-path forms like 'user.id' are split; only the root key is checked
+  // since nested paths depend on runtime shape.
+  const havePropRe = /toHaveProperty\(\s*['"`]([^'"`]+)['"`]/g
+  for (const m of stripped.matchAll(havePropRe)) {
+    const rootKey = m[1].split('.')[0].trim()
+    literals.push({
+      literal: rootKey,
+      kind: 'api-field',
       snippet: m[0].slice(0, 160),
       isRegex: false,
     })
@@ -517,6 +558,7 @@ const KIND_TO_ROLE: Record<SelectorKind, string | null> = {
   'to-have-text':    null,
   'to-contain-text': null,
   'structural-landmark': null,  // landmark scope, not a role-bearing literal
+  'api-field':       null,      // response body field name from toHaveProperty()
 }
 
 function literalIsGrounded(
@@ -609,6 +651,8 @@ function suggestFix(kind: SelectorKind, literal: string): string {
       return `data-testid "${literal}" not in sourceContext.testIds. Use a proven testId or fall back to role-based locator.`
     case 'structural-landmark':
       return `No \`main\` landmark was observed for this app — \`page.locator('main')\` matches nothing and hangs. Scope to \`page.locator('body')\` or a container proven in CONTEXT_JSON instead.`
+    case 'api-field':
+      return `Field "${literal}" is not in any "expected" response contract in CONTEXT_JSON.apiEndpoints. Use only fields from endpoint.responses[*].bodyShape where category is "expected", or use a bounded assertion (e.g. \`expect(body).toBeDefined()\` or \`expect(typeof body).toBe('object')\`) instead of asserting a specific field name.`
   }
 }
 

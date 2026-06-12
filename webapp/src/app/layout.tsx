@@ -32,6 +32,7 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${spaceMono.variable} antialiased bg-black text-white`}
         style={{ fontFamily: "var(--font-space-grotesk), 'Space Grotesk', sans-serif" }}
+        suppressHydrationWarning
       >
         {children}
       </body>

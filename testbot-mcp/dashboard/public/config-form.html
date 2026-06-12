@@ -472,6 +472,29 @@
                 </div>
             </div>
 
+            <!-- Backend API URL — shown only when mode = "both" in single-service layout -->
+            <div id="backendApiUrlSection" class="hidden">
+                <span class="section-badge-required">04b — Required for "Both"</span>
+                <h3 style="font-size:1.1rem;font-weight:700;margin:4px 0 4px;color:#ffffff;">Backend API URL</h3>
+                <p style="font-size:13px;color:#a0a0a0;margin-bottom:14px;">Base URL of your backend/API server. Healix will run API tests against this endpoint separately from the frontend.</p>
+                <div class="brutal-card p-6">
+                    <div class="field-row flex items-start gap-4">
+                        <div class="field-label" style="padding-top:11px;">API URL</div>
+                        <div style="flex:1;">
+                            <input type="text" id="backendApiUrl" class="input-glass" placeholder="http://localhost:8000">
+                            <p style="font-size:12px;color:#505050;margin-top:8px;">Leave empty if your frontend and backend share the same origin.</p>
+                        </div>
+                    </div>
+                    <div class="field-row flex items-start gap-4" style="margin-top:20px;">
+                        <div class="field-label" style="padding-top:11px;">Start Command</div>
+                        <div style="flex:1;">
+                            <input type="text" id="backendStartCommand" class="input-glass" placeholder="optional — leave empty if already running">
+                            <p style="font-size:12px;color:#505050;margin-top:8px;">Command to start the backend. Leave empty if it's already running.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Section 4 -->
             <div>
                 <span class="section-badge">05 — Optional</span>
@@ -838,7 +861,13 @@
                     </div>
                     <div style="flex:1;">
                         <label style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#505050;text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:6px;">Password</label>
-                        <input type="password" class="input-glass cred-password" placeholder="••••••••" value="${password}">
+                        <div style="position:relative;">
+                            <input type="password" class="input-glass cred-password" placeholder="••••••••" value="${password}" style="padding-right:36px;">
+                            <button type="button" class="toggle-pw-btn" tabindex="-1" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:#505050;line-height:1;" aria-label="Toggle password visibility">
+                                <svg class="pw-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg class="pw-eye-off-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -869,6 +898,15 @@
                 });
                 row.querySelector('.cred-password').addEventListener('input', (e) => {
                     state.credentials[idx].password = e.target.value;
+                });
+                row.querySelector('.toggle-pw-btn')?.addEventListener('click', () => {
+                    const input = row.querySelector('.cred-password');
+                    const eyeOn = row.querySelector('.pw-eye-icon');
+                    const eyeOff = row.querySelector('.pw-eye-off-icon');
+                    const showing = input.type === 'text';
+                    input.type = showing ? 'password' : 'text';
+                    eyeOn.style.display = showing ? '' : 'none';
+                    eyeOff.style.display = showing ? 'none' : '';
                 });
             });
         }
@@ -901,9 +939,8 @@
             if (multiServiceMode) initMultiService();
             initBackendDependency();
             initComposeStack();
-            // Probe the single-service port on load (no-op when hidden because
-            // the badge element still exists; result is just never seen).
             if (!multiServiceMode) probeSinglePort();
+            updateBackendUrlSectionVisibility();
         }
 
         // ── Docker Compose note (single-service layout) ────────────────────
@@ -1214,6 +1251,7 @@
             });
             document.getElementById('singleServiceSection')?.classList.add('hidden');
             document.getElementById('singleServerPortSection')?.classList.add('hidden');
+            document.getElementById('backendApiUrlSection')?.classList.add('hidden');
             document.getElementById('multiServiceSection')?.classList.remove('hidden');
             setActiveToggle('generate-group-multi', String(state.generateTests));
             setupToggle('generate-group-multi', 'generateTests', (value) => value === 'true');
@@ -1236,7 +1274,22 @@
             renderServices();
         }
 
+        function updateBackendUrlSectionVisibility() {
+            const section = document.getElementById('backendApiUrlSection');
+            if (!section) return;
+            // Only show in single-service mode when "both" is selected.
+            if (state.mode === 'both' && state.services.length === 0) {
+                section.classList.remove('hidden');
+            } else {
+                section.classList.add('hidden');
+            }
+        }
+
         setupToggle('mode-group', 'mode');
+        // Extend the mode toggle to show/hide the backend URL field.
+        document.getElementById('mode-group')?.querySelectorAll('.toggle-btn').forEach((btn) => {
+            btn.addEventListener('click', () => { updateBackendUrlSectionVisibility(); });
+        });
         setupToggle('generate-group', 'generateTests', (value) => value === 'true');
 
         hostInput.addEventListener('input', updateBaseURLPreview);
@@ -1274,6 +1327,36 @@
 
         document.getElementById('submitBtn').addEventListener('click', async () => {
             clearError();
+
+            // If "both" mode is selected and a backend URL was provided, promote
+            // to multi-service before building the payload. This avoids forcing
+            // the user to manually click "+ Add external service".
+            if (state.mode === 'both' && state.services.length === 0) {
+                const rawBackendUrl = (document.getElementById('backendApiUrl')?.value || '').trim();
+                if (rawBackendUrl) {
+                    let parsedHost = 'localhost';
+                    let parsedPort = '';
+                    try {
+                        const u = new URL(rawBackendUrl);
+                        parsedHost = u.hostname || 'localhost';
+                        parsedPort = u.port || (u.protocol === 'https:' ? '443' : '80');
+                    } catch {
+                        showError('Backend API URL is not a valid URL (e.g. http://localhost:8000).');
+                        return;
+                    }
+                    ensureMultiMode();
+                    state.services.push({
+                        role: 'backend',
+                        host: parsedHost,
+                        port: parsedPort,
+                        startCommand: (document.getElementById('backendStartCommand')?.value || '').trim(),
+                        path: '',
+                        framework: '',
+                        isPrimary: false,
+                        isExternal: true,
+                    });
+                }
+            }
 
             let baseURL;
             let startCommand;
@@ -1403,6 +1486,21 @@
         });
 
         initDefaults();
+
+        // Pre-fill credentials from the last run. Fetched after initDefaults so
+        // the empty credential list is already rendered before we overwrite it.
+        fetch('/api/last-config')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data || !Array.isArray(data.credentials) || data.credentials.length === 0) return;
+                state.credentials = data.credentials.map(c => ({
+                    role: c.role || '',
+                    username: c.username || '',
+                    password: c.password || '',
+                }));
+                renderCredentials();
+            })
+            .catch(() => { /* non-fatal — form works fine without pre-fill */ });
     </script>
 </body>
 </html>

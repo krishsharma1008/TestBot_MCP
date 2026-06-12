@@ -183,7 +183,8 @@ CONFIGURATION:
 --------------
 Add to .env:
   OPENAI_API_KEY=sk-proj-...
-  OPENAI_MODEL=gpt-5.5-mini (optional, defaults to gpt-5.5-mini)
+  OPENAI_MODEL=gpt-5.5-mini (optional, defaults to gpt-5.5-mini — used by all agents)
+  OPENAI_API_AGENT_MODEL=gpt-5 (optional, defaults to gpt-5 — API contract agent only, overrides OPENAI_MODEL)
   OPENAI_MAX_TOKENS=4000 (optional)
 
 USAGE FLOW:
