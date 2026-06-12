@@ -108,6 +108,18 @@ async function loadLatestGenerationJob(
   }
 }
 
+function extractExplorationMeta(reportJson: unknown): { explorationPhaseRouteCount: number | null; explorationPhaseSource: string | null; staticRoutesAdded: number | null } | null {
+  if (!reportJson || typeof reportJson !== 'object') return null
+  const meta = (reportJson as Record<string, unknown>).metadata
+  if (!meta || typeof meta !== 'object') return null
+  const m = meta as Record<string, unknown>
+  const routeCount = m.explorationPhaseRouteCount != null ? Number(m.explorationPhaseRouteCount) : null
+  const source = typeof m.explorationPhaseSource === 'string' ? m.explorationPhaseSource : null
+  const added = m.staticRoutesAdded != null ? Number(m.staticRoutesAdded) : null
+  if (routeCount == null && source == null) return null
+  return { explorationPhaseRouteCount: routeCount, explorationPhaseSource: source, staticRoutesAdded: added }
+}
+
 async function loadFailuresForRun(runId: string, ownerUserId: string) {
   const rows = await db
     .select()
@@ -201,6 +213,7 @@ export async function GET(
           error_code: null,
           is_live: false,
           generationJob,
+          exploration_meta: extractExplorationMeta(ingestedRow.reportJson),
         }
         return NextResponse.json({ data })
       }
@@ -269,6 +282,7 @@ export async function GET(
       error_code: null,
       is_live: false,
       generationJob,
+      exploration_meta: extractExplorationMeta(row.reportJson),
     }
 
     return NextResponse.json({ data })

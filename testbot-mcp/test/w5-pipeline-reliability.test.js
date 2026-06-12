@@ -43,8 +43,9 @@ test('W5-T1: ensureTierDirs creates both tier dirs and the legacy view', () => {
   assert.ok(fs.existsSync(dirs.tier0), 'tier-0 dir should exist');
   assert.ok(fs.existsSync(dirs.tier1), 'tier-1 dir should exist');
   assert.ok(fs.existsSync(dirs.legacy), 'legacy tests/generated should exist');
-  assert.match(dirs.tier0, /tests\/healix-persistent\/tier-0$/);
-  assert.match(dirs.tier1, /tests\/healix-ephemeral\/tier-1$/);
+  // Normalise Windows backslashes so the regex works on all OSes.
+  assert.match(dirs.tier0.replace(/\\/g, '/'), /tests\/healix-persistent\/tier-0$/);
+  assert.match(dirs.tier1.replace(/\\/g, '/'), /tests\/healix-ephemeral\/tier-1$/);
 });
 
 test('W5-T1: resetTier1Dir wipes Tier-1 but NEVER touches Tier-0', () => {

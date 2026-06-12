@@ -1,157 +1,101 @@
-# @healix/mcp
+# @zapminds/healix-mcp
 
-**Version:** 2.0.0 | **Node:** ≥18.0.0
+**AI-powered end-to-end test generation and execution for any web app — directly from your IDE or Agentic CLI.**
 
-Thin-client MCP server for AI-powered end-to-end test generation and execution. Installed in developer IDEs (Cursor, Claude Code, Windsurf) — requires only a `HEALIX_API_KEY`. All AI calls are proxied through the Healix webapp; no OpenAI key needed on user machines.
+Healix MCP connects your IDE (Cursor, Windsurf, Claude Code(cli,desktop)) to the Healix platform. Point it at your running app, and it automatically explores, generates, and runs a full  test suite — then surfaces results in the Healix dashboard.
 
-See the [top-level README](../README.md) for the full product overview and architecture diagram.
+---
 
-## Install
+## What it does
 
-```bash
-npm install -g @healix/mcp
-```
+- **Explores your app** — automatically discovers pages, forms, user flows, and authentication patterns
+- **Generates a full test suite** — produces Playwright tests covering public flows, authenticated flows per role, and backend/API contracts
+- **Runs the tests** — executes tests in three tiers: unauthenticated, per-role authenticated, and API/backend
+- **Triages failures** — classifies each failure with a root cause and suggested fix
+- **generates artifacts** — screenshots, videos, and traces are stored and linked in your dashboard
+- **Opens your results** — after every run, a deep-link takes you straight to the run report
 
-## MCP Configuration
+---
 
-Add to your IDE's MCP settings (`~/.cursor/mcp.json`, Claude Code config, or Windsurf):
+## Setup
+
+### 1. Get an API key
+
+Sign in to the Healix dashboard and generate an API key from your account settings.
+
+### 2. Add to your IDE
+
+Paste this into your IDE's MCP config file:
 
 ```json
 {
   "mcpServers": {
     "healix": {
       "command": "npx",
-      "args": ["@healix/mcp"],
+      "args": ["-y", "@zapminds/healix-mcp"],
       "env": {
-        "HEALIX_API_KEY": "hlx_..."
+        "HEALIX_API_KEY": "your-api-key-here",
+        "HEALIX_API_URL": "https://your-healix-webapp-url.com"
       }
     }
   }
 }
 ```
 
-## MCP Tools
+| IDE | Config file |
+|-----|-------------|
+| Cursor | `~/.cursor/mcp.json` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| Claude Desktop (Mac) | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json` |
+| VS Code | `.vscode/mcp.json` in your workspace |
 
-### `healix_test_my_app`
+### 3. Run
 
-Runs the full end-to-end testing pipeline. Key parameters:
+In your IDE, ask the AI assistant:
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `projectPath` | string | Path to the project under test (default: workspace root) |
-| `baseURL` | string | App base URL |
-| `port` | number | App port |
-| `startCommand` | string | Command to start the app |
-| `testType` | `frontend` \| `backend` \| `both` | Test scope |
-| `generateTests` | boolean | Whether to generate new tests (default: `true`) |
-| `openDashboard` | boolean | Whether to open dashboard after run (default: `true`) |
-| `prdFile` | string | Path to PRD/requirements file for AC extraction |
-| `credentials` | object \| array | Role credentials for authenticated flows |
-| `codebaseContext` | object | `{ pages, apiEndpoints, workflows }` passed to the generator |
-| `playwrightMcp` | object | Options for `@playwright/mcp` integration |
-| `force` | boolean | `true` to start fresh even if a recent run exists (default: `false`) |
+> "Test this project using Healix mcp"
 
-### `healix_configure`
+Healix will auto-detect your app's port and framework, then kick off the full process.
 
-Opens the config UI form and returns validated settings without running the pipeline. Use for pre-flight validation or when you want to inspect auto-detected settings before committing to a run.
+---
 
-## Pipeline
-
-`pipeline-worker.js` orchestrates these steps:
-
-1. **Auto-detect** (`auto-detector.js`) — infers port, framework, and start command from the project
-2. **App launch** (`multi-service-starter.js`) — starts the app under test
-3. **Browser exploration** — `browser-use-driver.js` runs a Python subprocess (`scripts/browser_use_runner.py`) to discover real routes, forms, and auth flows; falls back to `playwright-explorer.js` (zero-dependency Playwright heuristic) if browser-use is unavailable
-4. **PRD parse** — POSTs to `/api/parse-prd` for structured AC extraction; when AC count < 3, exploration `keyFlows` are promoted to primary generation input
-5. **Test generation** — POSTs to `/api/generate-tests`; multi-agent fan-out via GPT; each test tagged `[REQ:F#.S#.AC#]`; validates that every generated spec contains at least one `expect()` call
-6. **Credential injection** (`credentials-injector.js`) — per-role Playwright `storageState` written to `.healix/auth-state-{role}.json`
-7. **Tiered execution** (`playwright-integration.js`):
-   - `tierA-public` — unauthenticated flows
-   - `tierB-auth-{role}` — one project per role; login failure → `blocked` (A + C still run)
-   - `tierC-backend` — API/backend contract tests
-8. **Artifact upload** (`artifact-uploader.js`) — screenshots, videos, traces → Supabase Storage (`.healix/auth-state-*.json` is blocklisted)
-9. **Results merge** (`results-merger.js`) — combines tier results, adds `blocked` status
-10. **Report + ingest** (`report-generator.js`) — builds payload and POSTs to `/api/test-runs/ingest`
-11. **Dashboard** (`dashboard-launcher.js`) — opens the run page deep-link
-
-### Failure triage (`failure-triage/`)
-
-After execution, failures are processed through a three-layer pipeline:
-
-- `classifier.js` — deterministic first-match rules (selector errors, network, timeout, etc.)
-- `evidence-bundler.js` — bundles test source + AC + Playwright trace (`trace-parser.js` unpacks `trace.zip`)
-- `pipeline-error-classifier.js` — classifies pipeline-level errors (generation, runner config, deps, env, app)
-- `agent-response.js` — parses AI triage response
-- `error-remediations.js` — maps verdicts to patch suggestions
-
-### Retry loop guard
-
-`index.js` checks `healix-reports/.runs/` for a recent run (< 10 min old). If found and errored, the tool returns an `isError` response telling the agent to fix the root cause rather than re-entering config. Pass `force: true` to bypass.
-
-## Environment Variables
-
-Set these in the `env` block of your MCP client config, or in a `.env` file adjacent to the package:
-
-| Variable | Required | Description | Default |
-|----------|----------|-------------|---------|
-| `HEALIX_API_KEY` | **Yes** | Authenticates MCP → webapp; meters token usage. | — |
-| `HEALIX_DASHBOARD_URL` | No | Webapp base URL for all API calls and dashboard deep-links. | Production Vercel URL |
-| `HEALIX_RUN_BUDGET_MS` | No | Overall pipeline timeout (ms). | `7200000` (120 min) |
-| `HEALIX_GEN_BUDGET_MS` | No | Test-generation stage timeout (ms). Raise for large codebases; otherwise Healix expands it for large/xlarge discovered apps. | `1800000` (30 min) |
-| `HEALIX_GENERATION_AGENT_CONCURRENCY` | No | Number of generation agents to run at once. Lower for fragile local webapps, raise for stable production webapps. | `3` |
-| `HEALIX_GENERATION_AGENT_TIMEOUT_MS` | No | Explicit per-agent generation transport timeout. By default Healix derives this from the remaining generation budget and codebase complexity. | derived |
-| `HEALIX_SKIP_PLANNER` | No | Set `1` to bypass the pre-fan-out planner pass (emergency circuit breaker). | unset |
-
-**Never set `OPENAI_API_KEY` in MCP config.** All AI calls proxy through the webapp. v2.0.0 removed every local AI client.
-
-## Tests
-
-26 test files using Node.js built-in `node:test` (no Jest, no Vitest):
-
-```bash
-# Run all tests
-node --test test/*.test.js test/**/*.test.js
-
-# Run a single file
-node --test test/classifier.test.js
-```
-
-Coverage: pipeline phases, async job polling, failure triage classifier, AI response parsing, trace parsing, port pre-flight, credentials injection, artifact upload, planner, evidence bundler, flake detection, generation budget, report generator.
-
-## Source Layout
+## How it works
 
 ```
-src/
-├── index.js                  # MCP server + tool registration (healix_test_my_app, healix_configure)
-├── pipeline-worker.js        # End-to-end orchestration
-├── auto-detector.js          # Port/framework/start-cmd detection
-├── webapp-client.js          # All webapp API calls
-├── config-ui-launcher.js     # Local HTTP config form
-├── multi-service-starter.js  # App-under-test launcher
-├── context-gatherer.js       # Codebase context extraction
-├── browser-use-driver.js     # Python browser-use subprocess
-├── playwright-explorer.js    # Zero-dep Playwright heuristic fallback
-├── exploration-phase.js      # Exploration orchestration + auth probe
-├── playwright-integration.js # Tier A/B/C Playwright project config
-├── playwright-mcp-client.js  # @playwright/mcp integration
-├── playwright-mcp-integration.js
-├── credentials-injector.js   # Per-role storageState
-├── artifact-uploader.js      # Supabase Storage upload
-├── results-merger.js         # Merge tier results + blocked status
-├── report-generator.js       # Build ingest payload
-├── mcp-telemetry.js          # Background telemetry events
-├── dashboard-launcher.js     # Open dashboard deep-link
-├── logger.js
-├── port-preflight.js
-├── agent-context-requester.js
-├── ai-providers/
-│   ├── index.js
-│   └── saas-client.js        # Proxy → Healix webapp
-└── failure-triage/
-    ├── classifier.js
-    ├── agent-response.js
-    ├── error-remediations.js
-    ├── evidence-bundler.js
-    ├── pipeline-error-classifier.js
-    └── trace-parser.js
+Your IDE
+   └─► healix_test_my_app
+            │
+            ├─ 1. Auto-detect your app (port, framework, start command)
+            ├─ 2. Launch your app
+            ├─ 3. Explore — discover pages, flows, and auth patterns
+            ├─ 4. Generate tests — full Playwright suite via Healix AI
+            ├─ 5. Inject credentials — per-role auth state
+            ├─ 6. Run tests
+            │       ├─ Tier A: Public (no auth)
+            │       ├─ Tier B: Authenticated (one project per role)
+            │       └─ Tier C: API / backend
+            ├─ 7. Triage failures — classify root cause + suggest fixes
+            ├─ 8. Generate artifacts — screenshots, videos, traces
+            └─ 9. Open dashboard → your run report
 ```
+
+All AI processing happens on the Healix platform. The MCP package installed in your IDE is a thin client — it only needs your `HEALIX_API_KEY`.
+
+---
+
+## Environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `HEALIX_API_KEY` | Yes | Your API key from the Healix dashboard |
+| `HEALIX_API_URL` | Yes | Base URL of the Healix webapp instance |
+
+---
+
+## Requirements
+
+- Node.js ≥ 18
+- python (optional for better exploration)
+- A running web app to test
+- A Healix API key

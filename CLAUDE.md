@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Webapp (from repo root or webapp/)
-npm run dev:webapp          # Start Next.js dev server on port 3000
+npm run dev:webapp          # Start Next.js dev server on port 3030
 cd webapp && npm run build  # Production build
 cd webapp && npm start      # Serve production build
 

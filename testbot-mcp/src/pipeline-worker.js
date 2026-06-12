@@ -34,9 +34,9 @@ const DashboardLauncher = require('./dashboard-launcher');
 const AIAnalyzer = require('./ai-providers/index');
 const WebappClient = require('./webapp-client');
 const QACorpusWriter = require('./qa-corpus-writer');
-const { startSecondaryServices, stopSecondaryServices, probeHttpReady, waitForServiceReady, splitServices, spawnService } = require('./multi-service-starter');
+const { startSecondaryServices, stopSecondaryServices, probeHttpReady, waitForServiceReady, splitServices, spawnService, normalizeCommandForPlatform } = require('./multi-service-starter');
 const { runExplorationPhase, EMPTY_ARTIFACT, artifactHasUsefulContext } = require('./exploration-phase');
-const { injectCredentials, normalizeRoleLabel } = require('./credentials-injector');
+const { normalizeRoleLabel, probeStorageState, injectCredentials } = require('./credentials-injector');
 const { isUnsafeAuthFlow, sanitizeAuthFlow } = require('./auth-flow-utils');
 const {
   ensureQaContractSpec,
@@ -738,9 +738,19 @@ function buildRouteAccessSummary(explorationArtifact) {
   const publicRoutes = routes
     .filter((route) => route && route.requiresAuth === false)
     .map((route) => String(route.path || '/'));
-  const protectedRoutes = routes
-    .filter((route) => route && route.requiresAuth === true)
-    .map((route) => String(route.path || '/'));
+  const protectedRouteEntries = routes.filter((route) => route && route.requiresAuth === true);
+  const protectedRoutes = protectedRouteEntries.map((route) => String(route.path || '/'));
+  // Keep the per-route requiredRole alongside the path so downstream tier
+  // gating can tell which protected routes need a specific role (e.g. an
+  // /admindashboard route gated on `admin`) versus generic authentication.
+  const protectedRoutesDetail = [];
+  const seenProtected = new Set();
+  for (const route of protectedRouteEntries) {
+    const routePath = String(route.path || '/');
+    if (seenProtected.has(routePath)) continue;
+    seenProtected.add(routePath);
+    protectedRoutesDetail.push({ path: routePath, requiredRole: route.requiredRole || null });
+  }
   return {
     authMode: explorationArtifact?.authFlow
       ? 'auth_flow_detected'
@@ -748,9 +758,417 @@ function buildRouteAccessSummary(explorationArtifact) {
     authFlowDetected: !!explorationArtifact?.authFlow,
     publicRoutes: [...new Set(publicRoutes)],
     protectedRoutes: [...new Set(protectedRoutes)],
+    protectedRoutesDetail,
     totalObservedRoutes: routes.length,
     authFlowRejected: explorationArtifact?.authFlowRejected || null,
   };
+}
+
+/**
+ * Resolve the API base URL for direct `request()` calls in generated specs.
+ *
+ * When a repo splits frontend + backend, `config.baseURL` points at the primary
+ * (frontend) service; API specs need the backend origin so requests hit the
+ * right port instead of resolving against the frontend.
+ *
+ * The config form (config-ui-launcher.js) only round-trips host+port for
+ * non-primary services and drops the detector's per-service `baseURL`, so the
+ * backend service often arrives with no `baseURL`. This helper backfills a
+ * baseURL for every service from its host+port (mutating `config.services` in
+ * place so all downstream consumers and the persisted pipeline-config.json get
+ * the complete value), then returns the backend/fullstack service's baseURL —
+ * falling back to `config.baseURL` for single-service / fullstack / api-only
+ * repos so the generator keeps emitting clean relative paths.
+ *
+ * Regression: run 1780931739696-dzd39m had a backend service with port:5000 but
+ * no baseURL, so apiBaseURL resolved to the frontend :3001 and every API test
+ * failed against the wrong origin.
+ */
+function resolveApiBaseURL(config = {}) {
+  const services = Array.isArray(config?.services) ? config.services : [];
+  for (const service of services) {
+    if (service && !service.baseURL && service.port) {
+      service.baseURL = `http://${service.host || 'localhost'}:${service.port}`;
+    }
+  }
+  const backendService = services.find(
+    (service) => service && (service.role === 'backend' || service.role === 'fullstack'),
+  );
+  return backendService?.baseURL || config?.baseURL;
+}
+
+/**
+ * Gate role-dependent tests when their required role has no verified session.
+ *
+ * RC2 (run 1780925226135-3xfian): admin pre-auth failed environmentally, so no
+ * `.healix/auth-state-admin.json` existed, yet 10 admin-dashboard tests
+ * (`toHaveURL(/admindashboard/)`) were still generated and executed against the
+ * user session → guaranteed redirect to login → 10 red failures that should
+ * have been reported as *blocked*, not *failed*.
+ *
+ * This pass scans the generated specs and converts any test block that targets a
+ * protected route whose `requiredRole` is NOT among the verified roles into a
+ * `test.skip(...)` with an annotation, so the run reports them as skipped rather
+ * than failing. It is conservative: a block is gated only when it both navigates
+ * to the blocked-role route AND asserts arriving there (toHaveURL) or claims an
+ * authenticated/role success — the same heuristic the quality auditor uses.
+ *
+ * Returns { applied, gatedFiles, gatedBlocks, blockedRoles }.
+ */
+function gateBlockedRoleSpecs({ projectPath, routeAccessSummary, roles = [] } = {}) {
+  const generatedDir = path.join(projectPath, 'tests', 'generated');
+  if (!fs.existsSync(generatedDir)) {
+    return { applied: false, reason: 'generated_dir_missing', gatedFiles: [], gatedBlocks: 0, blockedRoles: [] };
+  }
+
+  const verifiedRoleLabels = new Set(
+    (roles || [])
+      .filter((r) => r && r.loginVerified && r.storageStatePath)
+      .map((r) => normalizeRoleLabel(r.role || r.name || 'user')),
+  );
+
+  // Protected routes whose requiredRole has no verified session this run.
+  const detail = Array.isArray(routeAccessSummary?.protectedRoutesDetail)
+    ? routeAccessSummary.protectedRoutesDetail
+    : [];
+  const blockedRoutes = [];
+  const blockedRoles = new Set();
+  for (const entry of detail) {
+    if (!entry || !entry.requiredRole) continue;
+    const roleLabel = normalizeRoleLabel(entry.requiredRole);
+    if (verifiedRoleLabels.has(roleLabel)) continue;
+    const normalizedPath = normalizeRouteForAudit(entry.path);
+    if (!normalizedPath) continue;
+    blockedRoutes.push({ path: normalizedPath, role: roleLabel });
+    blockedRoles.add(roleLabel);
+  }
+
+  if (blockedRoutes.length === 0) {
+    return { applied: false, reason: 'no_blocked_role_routes', gatedFiles: [], gatedBlocks: 0, blockedRoles: [] };
+  }
+
+  const gatedFiles = [];
+  let gatedBlocks = 0;
+  const files = fs.readdirSync(generatedDir).filter((name) => GENERATED_SPEC_FILE_PATTERN.test(name));
+
+  for (const name of files) {
+    const filePath = path.join(generatedDir, name);
+    // Tier-0 smoke specs are the last line of defense and must always run.
+    if (TierIsolation.isTier0Path(projectPath, filePath)) continue;
+
+    let content;
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      continue;
+    }
+
+    const blocks = findGeneratedTestBlocks(content);
+    if (blocks.length === 0) continue;
+
+    // Rewrite from the end so earlier offsets stay valid.
+    const edits = [];
+    for (const block of blocks) {
+      if (/\btest\.(?:skip|fixme)\s*\(/.test(block.content)) continue;
+
+      // Primary signal: an explicit @role:<role> tag for an unverified role.
+      // applyRoleScopedAuthTags runs first and resolves the role even when the
+      // protected-route navigation lives in an imported helper, so this catches
+      // cases the inline goto scan below misses.
+      let matchedRole = null;
+      for (const role of blockedRoles) {
+        const tagRe = new RegExp(`@role:${role.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9_-])`);
+        if (tagRe.test(block.content)) { matchedRole = role; break; }
+      }
+
+      // Fallback signal: inline goto to the blocked route + a destination/auth
+      // assertion (covers specs that weren't role-tagged for any reason).
+      if (!matchedRole) {
+        const blockRoutes = extractGotoRoutes(block.content).map(normalizeRouteForAudit).filter(Boolean);
+        const matched = blockedRoutes.find((r) => blockRoutes.includes(r.path));
+        if (!matched) continue;
+        const escaped = matched.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\/$/, '');
+        const expectsDestination = new RegExp(`toHaveURL\\([\\s\\S]{0,160}${escaped}`, 'i').test(block.content);
+        const claimsAuthSuccess = /\b(authenticated|signed[- ]?in|admin\s+(?:dashboard|panel)|role[- ]?based\s+redirect)/i.test(block.content);
+        if (!expectsDestination && !claimsAuthSuccess) continue;
+        matchedRole = matched.role;
+      }
+
+      // Convert `test(` / `test.only(` etc. into `test.skip(` and prepend an
+      // annotation so the report explains why it was blocked.
+      const replaced = block.content.replace(/^\btest(?:\.(?:only|fixme|fail|slow))?\s*\(/, 'test.skip(');
+      if (replaced === block.content) continue;
+      const annotation = `// [HEALIX:BLOCKED_ROLE] requires "${matchedRole}" session (pre-auth not verified) — gated to skip, not fail.\n`;
+      edits.push({ start: block.start, end: block.end, text: annotation + replaced });
+    }
+
+    if (edits.length === 0) continue;
+    edits.sort((a, b) => b.start - a.start);
+    let next = content;
+    for (const edit of edits) {
+      next = next.slice(0, edit.start) + edit.text + next.slice(edit.end);
+    }
+    try {
+      fs.writeFileSync(filePath, next, 'utf8');
+      gatedFiles.push(name);
+      gatedBlocks += edits.length;
+    } catch (err) {
+      Logger.warn('PipelineWorker', 'Failed to gate blocked-role spec', { filename: name, error: err?.message });
+    }
+  }
+
+  return {
+    applied: gatedBlocks > 0,
+    gatedFiles,
+    gatedBlocks,
+    blockedRoles: [...blockedRoles],
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Role-scoped auth tagging (RC-A / RC-B, run 1780943240194-599omu)
+//
+// Generated specs carried a single undifferentiated `@auth` tag (only on the
+// auth agent's file), while every tier-B project grepped the identical
+// /@auth|@tierB/. Result: each authenticated test ran under BOTH role sessions,
+// and the app's role guard redirected whichever role didn't match — guaranteeing
+// ~half failed. Tests that hit a protected route via an imported helper weren't
+// tagged @auth at all and ran unauthenticated.
+//
+// This pass deterministically (re)tags every generated test based on the routes
+// it actually exercises — following page.goto() into locally-imported helper
+// modules — so the tier-B config can scope each role to its own tests.
+// ───────────────────────────────────────────────────────────────────────────
+
+// A test that performs login itself must run UNAUTHENTICATED — injecting a
+// session would redirect it away from the login form. Such tests are stripped of
+// auth/role tags so they run in tierA. Detection is intentionally PRECISE
+// (login route, a login helper call, or a password field next to a login-labelled
+// button) so an authenticated "change password" / "settings" test that merely
+// fills a password is NOT mistaken for a login test and stripped.
+const LOGIN_ROUTE_RE = /^\/(?:login|signin|sign-?in|auth(?:\/.*)?|account\/login|users\/sign_in)$/i;
+const LOGIN_HELPER_CALL_RE = /\b(?:login|logIn|signIn|signin|doLogin|loginAs|signInAs|authenticate)\s*\(/;
+const PASSWORD_INTERACTION_RE = /type\s*=\s*["']password["']|getBy(?:Label|Placeholder)\s*\([^)]*[Pp]assword|\.fill\s*\([^)]*[Pp]assword/;
+const LOGIN_BUTTON_RE = /getByRole\(\s*['"`]button['"`][\s\S]{0,100}name\s*:\s*[^})]*?(?:log\s?in|sign\s?-?in)/i;
+
+function contentLooksSelfAuth(content, routes = []) {
+  if (Array.isArray(routes) && routes.some((r) => LOGIN_ROUTE_RE.test(r))) return true;
+  if (LOGIN_HELPER_CALL_RE.test(content)) return true;
+  if (PASSWORD_INTERACTION_RE.test(content) && LOGIN_BUTTON_RE.test(content)) return true;
+  return false;
+}
+const LOCAL_IMPORT_RE = /import\s*(?:\{[^}]*\}|[A-Za-z0-9_$]+|\*\s+as\s+[A-Za-z0-9_$]+)\s*from\s*['"](\.\.?\/[^'"]+)['"]/g;
+
+function resolveLocalTsImport(fromDir, importSpec) {
+  const base = path.resolve(fromDir, importSpec);
+  for (const ext of ['', '.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.jsx']) {
+    const candidate = base + ext;
+    try {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+    } catch { /* ignore */ }
+  }
+  for (const ext of ['.ts', '.js', '.tsx', '.jsx']) {
+    const candidate = path.join(base, `index${ext}`);
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
+// Map each exported helper function name → { routes, selfAuth } by slicing its
+// body up to the next top-level `export`. Coarse but sufficient: we only need
+// the goto routes and whether the function logs in.
+function parseHelperFunctions(content) {
+  const map = new Map();
+  const text = String(content || '');
+  const fnRe = /export\s+(?:async\s+)?(?:function\s+([A-Za-z0-9_$]+)|const\s+([A-Za-z0-9_$]+)\s*=)/g;
+  const marks = [];
+  let m;
+  while ((m = fnRe.exec(text)) !== null) {
+    marks.push({ name: m[1] || m[2], index: m.index });
+  }
+  for (let i = 0; i < marks.length; i += 1) {
+    const start = marks[i].index;
+    const end = i + 1 < marks.length ? marks[i + 1].index : text.length;
+    const body = text.slice(start, end);
+    const routes = extractGotoRoutes(body).map(normalizeRouteForAudit).filter(Boolean);
+    map.set(marks[i].name, {
+      routes,
+      selfAuth: contentLooksSelfAuth(body, routes),
+    });
+  }
+  return map;
+}
+
+// Locate the first string-literal argument of a test(...) block (its title).
+function extractTitleLiteral(blockContent) {
+  const text = String(blockContent || '');
+  const openParen = text.indexOf('(');
+  if (openParen < 0) return null;
+  let i = openParen + 1;
+  while (i < text.length && /\s/.test(text[i])) i += 1;
+  const quote = text[i];
+  if (quote !== '"' && quote !== "'" && quote !== '`') return null;
+  let escaped = false;
+  let j = i + 1;
+  for (; j < text.length; j += 1) {
+    const ch = text[j];
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === quote) break;
+  }
+  if (j >= text.length) return null;
+  return { quote, start: i, end: j + 1, value: text.slice(i + 1, j) };
+}
+
+function stripAuthRoleTags(title) {
+  return String(title)
+    .replace(/\s*@role:[A-Za-z0-9_-]+/g, '')
+    .replace(/\s*@auth\b/g, '')
+    .replace(/\s*@tierB\b/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+$/g, '');
+}
+
+function ensureAuthRoleTags(title, roleLabel) {
+  let next = String(title).replace(/\s*@role:[A-Za-z0-9_-]+/g, '');
+  const additions = [];
+  if (!/@auth\b/.test(next)) additions.push('@auth');
+  additions.push(`@role:${roleLabel}`);
+  return `${next.replace(/[ \t]+$/g, '')} ${additions.join(' ')}`;
+}
+
+/**
+ * Retag generated specs with role-scoped auth tags. Returns
+ * { applied, taggedBlocks, files, classifications }.
+ */
+function applyRoleScopedAuthTags({ projectPath, routeAccessSummary, roles = [] } = {}) {
+  const generatedDir = path.join(projectPath, 'tests', 'generated');
+  if (!fs.existsSync(generatedDir)) {
+    return { applied: false, reason: 'generated_dir_missing', taggedBlocks: 0, files: [] };
+  }
+
+  const detail = Array.isArray(routeAccessSummary?.protectedRoutesDetail)
+    ? routeAccessSummary.protectedRoutesDetail
+    : [];
+  const protectedMap = new Map();
+  for (const entry of detail) {
+    const routePath = normalizeRouteForAudit(entry?.path);
+    if (!routePath) continue;
+    protectedMap.set(routePath, entry?.requiredRole ? normalizeRoleLabel(entry.requiredRole) : null);
+  }
+  if (protectedMap.size === 0) {
+    return { applied: false, reason: 'no_protected_routes', taggedBlocks: 0, files: [] };
+  }
+
+  const files = fs.readdirSync(generatedDir).filter((name) => GENERATED_SPEC_FILE_PATTERN.test(name));
+  let taggedBlocks = 0;
+  const touchedFiles = [];
+
+  for (const name of files) {
+    const filePath = path.join(generatedDir, name);
+    if (TierIsolation.isTier0Path(projectPath, filePath)) continue;
+    let content;
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      continue;
+    }
+
+    // Resolve locally-imported helper modules so navigation factored out of the
+    // test block (e.g. openAdminDashboard) still counts toward route detection.
+    const helperFns = new Map();
+    const dir = path.dirname(filePath);
+    LOCAL_IMPORT_RE.lastIndex = 0;
+    let im;
+    while ((im = LOCAL_IMPORT_RE.exec(content)) !== null) {
+      const spec = im[1];
+      if (!spec || /__healix-fixture/.test(spec)) continue;
+      const resolved = resolveLocalTsImport(dir, spec);
+      if (!resolved || resolved === filePath) continue;
+      let helperContent;
+      try {
+        helperContent = fs.readFileSync(resolved, 'utf8');
+      } catch {
+        continue;
+      }
+      for (const [fn, info] of parseHelperFunctions(helperContent)) helperFns.set(fn, info);
+    }
+
+    const blocks = findGeneratedTestBlocks(content);
+    if (blocks.length === 0) continue;
+    const edits = [];
+
+    for (const block of blocks) {
+      const routes = new Set(extractGotoRoutes(block.content).map(normalizeRouteForAudit).filter(Boolean));
+      let selfAuth = false;
+      for (const [fn, info] of helperFns) {
+        const callRe = new RegExp(`\\b${fn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(`);
+        if (callRe.test(block.content)) {
+          for (const r of info.routes) routes.add(r);
+          if (info.selfAuth) selfAuth = true;
+        }
+      }
+      if (!selfAuth) selfAuth = contentLooksSelfAuth(block.content, [...routes]);
+      const protectedHits = [...routes].filter((r) => protectedMap.has(r));
+
+      const title = extractTitleLiteral(block.content);
+      if (!title) continue;
+
+      let newValue = null;
+      if (selfAuth) {
+        // Login/self-auth test: must run unauthenticated.
+        const stripped = stripAuthRoleTags(title.value);
+        if (stripped !== title.value) newValue = stripped;
+      } else if (protectedHits.length > 0) {
+        const roleLabels = protectedHits.map((r) => protectedMap.get(r)).filter(Boolean);
+        const desiredRole = roleLabels.length > 0 ? roleLabels[0] : 'any';
+        const retagged = ensureAuthRoleTags(title.value, desiredRole);
+        if (retagged !== title.value) newValue = retagged;
+      }
+
+      if (newValue !== null && newValue !== title.value) {
+        edits.push({
+          start: block.start + title.start,
+          end: block.start + title.end,
+          text: title.quote + newValue + title.quote,
+        });
+        taggedBlocks += 1;
+      }
+    }
+
+    if (edits.length === 0) continue;
+    edits.sort((a, b) => b.start - a.start);
+    let next = content;
+    for (const edit of edits) {
+      next = next.slice(0, edit.start) + edit.text + next.slice(edit.end);
+    }
+    try {
+      fs.writeFileSync(filePath, next, 'utf8');
+      touchedFiles.push(name);
+    } catch (err) {
+      Logger.warn('PipelineWorker', 'Failed to write role-scoped auth tags', { filename: name, error: err?.message });
+    }
+  }
+
+  return { applied: taggedBlocks > 0, taggedBlocks, files: touchedFiles };
+}
+
+/**
+ * Build the Playwright `grep` regex source for a tier-B role project. Each role
+ * runs only its own `@role:<role>` tests; the primary role additionally runs
+ * role-agnostic `@role:any` tests (so they execute exactly once) plus a legacy
+ * fallback for bare `@auth`/`@tierB` tests that predate role tagging.
+ */
+function tierBGrepSource(roleLabel, primaryLabel) {
+  const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const boundary = '(?![A-Za-z0-9_-])';
+  const self = `@role:${esc(roleLabel)}${boundary}`;
+  if (roleLabel === primaryLabel) {
+    return `/${self}|@role:any${boundary}|@auth\\b|@tierB\\b/`;
+  }
+  return `/${self}/`;
 }
 
 function synthesizeExplorationArtifactFromContext(context = {}, previousArtifact = null) {
@@ -761,12 +1179,28 @@ function synthesizeExplorationArtifactFromContext(context = {}, previousArtifact
 
   for (const page of pages) {
     const rawPath = String(page?.path || page?.route || page?.url || '').trim();
-    if (!rawPath || !rawPath.startsWith('/') || rawPath.includes('*') || seen.has(rawPath)) continue;
+    if (!rawPath || !rawPath.startsWith('/') || rawPath.includes('*')) continue;
     const requiresAuth = page?.requiresAuth === true || page?.authRequired === true || page?.protected === true;
+    const requiredRole = page?.requiredRole || null;
+    if (seen.has(rawPath)) {
+      // Static analysis knows whether a route is auth-gated; Playwright defaults
+      // to false because it navigates with a pre-auth storageState and always
+      // sees content. Preserve the static signal — it is more authoritative for
+      // auth-gating than a Playwright observation made under authenticated state.
+      if (requiresAuth || requiredRole) {
+        const existing = routes.find((r) => r?.path === rawPath);
+        if (existing) {
+          existing.requiresAuth = existing.requiresAuth || requiresAuth;
+          existing.requiredRole = existing.requiredRole || requiredRole;
+        }
+      }
+      continue;
+    }
     seen.add(rawPath);
     routes.push({
       path: rawPath,
       requiresAuth,
+      requiredRole,
       source: 'static_context',
       sourceFile: page?.sourceFile || page?.file || null,
       elements: Array.isArray(page?.uiHints?.elements) ? page.uiHints.elements.slice(0, 8) : [],
@@ -826,13 +1260,20 @@ function roleKeyForAuth(role) {
   return normalizeRoleLabel(role?.role || role?.name || role || 'user');
 }
 
-function hasVerifiedStorageState(role) {
-  return !!(
-    role &&
-    role.loginVerified &&
-    role.storageStatePath &&
-    fs.existsSync(role.storageStatePath)
-  );
+function hasVerifiedStorageState(role, maxAgeMs = (Number(process.env.HEALIX_STORAGE_STATE_MAX_AGE_MINUTES) || 55) * 60 * 1000) {
+  if (!role?.loginVerified || !role?.storageStatePath) return false;
+  try {
+    const stat = fs.statSync(role.storageStatePath);
+    return (Date.now() - stat.mtimeMs) < maxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
+function firstProtectedRoute(explorationArtifact) {
+  const routes = Array.isArray(explorationArtifact?.routes) ? explorationArtifact.routes : [];
+  const protected_ = routes.find((r) => r?.requiresAuth === true && r?.path);
+  return protected_?.path || null;
 }
 
 function allCredentialsCoveredByPreAuth(credentials = [], preAuthRoles = []) {
@@ -912,6 +1353,45 @@ function mergeCredentialInjectionRoles({ freshRoles = [], preAuthRoles = [] } = 
     reusedPreAuthRoles: [...new Set(reusedPreAuthRoles)],
     failedFreshRoles,
   };
+}
+
+/**
+ * Append roles whose pre-auth login failed to the verified-roles list so they
+ * stay VISIBLE in the auth_decision (as loginVerified:false with a reason)
+ * instead of being silently dropped.
+ *
+ * The deferred-auth path keeps only successfully verified pre-auth roles
+ * (`safePreAuthRoles`). Without this merge, a role that failed pre-auth — e.g. an
+ * admin account that was deleted from the app's database (observed in run
+ * 1780939686499-wu4w1a) — simply disappears from the dashboard and reads as
+ * "never attempted". Surfacing it also lets generationMeta.blockedAuthRoles and
+ * the RC2 blocked-role test gate account for the failed role.
+ *
+ * Failed roles are appended only when not already present (verified roles win),
+ * and always with loginVerified:false / storageStatePath:null so downstream
+ * verified-role filters (Tier B projects, verifiedRoleCount) are unaffected.
+ * Returns a NEW array; the input is not mutated.
+ */
+function mergeFailedPreAuthRoles(roles = [], preAuthFailedRoles = []) {
+  const merged = Array.isArray(roles) ? [...roles] : [];
+  if (!Array.isArray(preAuthFailedRoles) || preAuthFailedRoles.length === 0) {
+    return merged;
+  }
+  const presentRoleKeys = new Set(merged.map((r) => roleKeyForAuth(r)));
+  for (const failed of preAuthFailedRoles) {
+    const key = roleKeyForAuth(failed);
+    if (presentRoleKeys.has(key)) continue;
+    presentRoleKeys.add(key);
+    merged.push({
+      role: key,
+      name: key,
+      storageStatePath: null,
+      loginVerified: false,
+      reason: failed?.reason || 'pre-auth login failed',
+      ...(failed?.noLoginForm ? { noLoginForm: true } : {}),
+    });
+  }
+  return merged;
 }
 
 function summarizeAuthRoles(roles = []) {
@@ -2167,7 +2647,11 @@ function rewriteStartCommandForPort(startCommand, port, projectPath) {
   const framework = detectProjectStartFramework(projectPath);
   const usesPackageScript = /^(?:npm|pnpm|yarn|bun)(?:\s+run)?\s+\S+/i.test(command);
   if (framework === 'cra') {
-    return `PORT=${nextPort} ${command}`;
+    // On Windows cmd.exe, inline KEY=value assignment is not supported.
+    // Use `set PORT=X && command` on Windows; the Unix prefix elsewhere.
+    return process.platform === 'win32'
+      ? `set PORT=${nextPort} && ${command}`
+      : `PORT=${nextPort} ${command}`;
   }
 
   const flag = framework === 'next' || framework === 'remix'
@@ -2341,6 +2825,13 @@ function collectGenerationQuality(projectPath, options = {}) {
   let filesWithPreferredSelectors = 0;
   let uiFiles = 0;
   const expectedOrigin = originFromUrl(options.baseURL);
+  // When the backend runs on a distinct origin, API specs must target it. An
+  // API spec that hardcodes the FRONTEND origin (== expectedOrigin) would
+  // currently pass the actualOrigin !== expectedOrigin check below, so we need
+  // apiBaseURL to catch it. See run 1780925226135-3xfian: API specs hardcoded
+  // :3001 (frontend) when the backend was on :5000.
+  const expectedApiOrigin = originFromUrl(options.apiBaseURL);
+  const apiOriginDiffers = !!(expectedApiOrigin && expectedOrigin && expectedApiOrigin !== expectedOrigin);
   const hardcodedBaseUrlMismatches = [];
 
   for (const filePath of files) {
@@ -2374,16 +2865,31 @@ function collectGenerationQuality(projectPath, options = {}) {
       seenUrls.add(url);
       const actualOrigin = originFromUrl(url);
       const isPlaceholderExternalUrl = /https?:\/\/(?:www\.)?(?:example\.(?:com|org|net)|httpbin\.org|jsonplaceholder\.typicode\.com|reqres\.in)\b/i.test(url);
+      // An API spec hardcoding the frontend origin while a distinct backend
+      // origin exists: the request resolves against the frontend and fails.
+      const apiTargetsFrontendOrigin =
+        isApiSuite && apiOriginDiffers && actualOrigin && actualOrigin === expectedOrigin;
+      // An API spec that correctly hardcodes the distinct backend origin is NOT a
+      // mismatch — without this exclusion the generic actualOrigin !== frontend
+      // check would flag the very specs the RC1 apiBaseURL fix produces.
+      const apiTargetsCorrectBackend =
+        isApiSuite && apiOriginDiffers && actualOrigin && actualOrigin === expectedApiOrigin;
+      const genericOriginMismatch =
+        actualOrigin && expectedOrigin && actualOrigin !== expectedOrigin && !apiTargetsCorrectBackend;
       if (
         isPlaceholderExternalUrl ||
-        (actualOrigin && expectedOrigin && actualOrigin !== expectedOrigin)
+        genericOriginMismatch ||
+        apiTargetsFrontendOrigin
       ) {
         hardcodedBaseUrlMismatches.push({
           file: path.basename(filePath),
           url,
-          expectedOrigin: expectedOrigin || 'configured baseURL',
+          expectedOrigin: apiTargetsFrontendOrigin
+            ? expectedApiOrigin
+            : (expectedOrigin || 'configured baseURL'),
           actualOrigin,
           placeholderExternalUrl: isPlaceholderExternalUrl,
+          ...(apiTargetsFrontendOrigin ? { apiOriginMismatch: true } : {}),
         });
       }
     }
@@ -2929,13 +3435,28 @@ function buildGenerationRepairContext({
     const mismatches = Array.isArray(quality?.hardcodedBaseUrlMismatches)
       ? quality.hardcodedBaseUrlMismatches
       : [];
-    const expectedOrigin = mismatches.find((item) => item?.expectedOrigin)?.expectedOrigin;
-    instructions.push(
-      expectedOrigin
-        ? `Use only the configured baseURL origin ${expectedOrigin}; remove all page.goto() calls to other localhost ports or origins.`
-        : 'Use only the configured baseURL; remove all page.goto() calls to other localhost ports or origins.'
-    );
-    instructions.push('Prefer relative page.goto("/route") calls or construct URLs from CONTEXT_JSON.project.baseURL instead of guessing Vite/localhost ports.');
+    const apiMismatches = mismatches.filter((item) => item?.apiOriginMismatch);
+    const nonApiMismatches = mismatches.filter((item) => !item?.apiOriginMismatch);
+    if (apiMismatches.length > 0) {
+      // API specs hit the frontend origin while the backend is on a distinct
+      // origin. Steer the repair toward the API base URL rather than telling it
+      // to drop page.goto (which is correct for UI specs but wrong here).
+      const apiOrigin = apiMismatches.find((item) => item?.expectedOrigin)?.expectedOrigin;
+      instructions.push(
+        apiOrigin
+          ? `API spec files must send request() calls to the backend origin ${apiOrigin} (CONTEXT_JSON.meta.projectInfo.apiBaseURL), NOT the frontend baseURL. Prefix every request.get/post/put/patch/delete URL with ${apiOrigin}.`
+          : 'API spec files must send request() calls to the backend API base URL (CONTEXT_JSON.meta.projectInfo.apiBaseURL), not the frontend baseURL.'
+      );
+    }
+    if (nonApiMismatches.length > 0) {
+      const expectedOrigin = nonApiMismatches.find((item) => item?.expectedOrigin)?.expectedOrigin;
+      instructions.push(
+        expectedOrigin
+          ? `Use only the configured baseURL origin ${expectedOrigin}; remove all page.goto() calls to other localhost ports or origins.`
+          : 'Use only the configured baseURL; remove all page.goto() calls to other localhost ports or origins.'
+      );
+      instructions.push('Prefer relative page.goto("/route") calls or construct URLs from CONTEXT_JSON.project.baseURL instead of guessing Vite/localhost ports.');
+    }
   }
   if (errors.some((item) => String(item).startsWith('brittle_'))) {
     instructions.push('Remove brittle generated assertions: no DOM checkValidity(), no raw getComputedStyle assertions, no exact concatenated card accessible names, and no toContainText([...]) on a single container. Replace them with user-visible behavior assertions grounded in source text.');
@@ -4159,6 +4680,14 @@ function sanitizeGeneratedFilename(rawFilename, fallbackPrefix, index) {
     return defaultName;
   }
 
+  // Helper modules (actions, setup, etc.) keep their .ts extension so that spec
+  // files can import them via `./feature-actions` without a module-resolution
+  // mismatch. Only coerce ambiguous or unnamed files into the .spec.ts convention.
+  const HELPER_FILE_PATTERN = /^[\w-]+-(?:actions|setup|helpers?)\.(?:ts|js)$/i;
+  if (HELPER_FILE_PATTERN.test(base)) {
+    return base;
+  }
+
   if (!GENERATED_SPEC_FILE_PATTERN.test(base)) {
     if (/\.(ts|js)$/i.test(base)) {
       base = base.replace(/\.(ts|js)$/i, '.spec.ts');
@@ -4181,10 +4710,17 @@ function safeWriteGeneratedTest(testsDir, test, index, fallbackPrefix, usedFilen
     throw new Error(`Generated file '${filename}' exceeds size limit`);
   }
 
+  const isSpecFilename = GENERATED_SPEC_FILE_PATTERN.test(filename);
   let safeFilename = filename;
   let suffix = 1;
   while (usedFilenames.has(safeFilename.toLowerCase())) {
-    safeFilename = filename.replace(GENERATED_SPEC_FILE_PATTERN, `-${suffix}.spec.ts`);
+    if (isSpecFilename) {
+      safeFilename = filename.replace(GENERATED_SPEC_FILE_PATTERN, `-${suffix}.spec.ts`);
+    } else {
+      // For helper files (e.g. feature-actions.ts) just overwrite — a renamed
+      // actions file (feature-actions-1.ts) would break spec imports.
+      break;
+    }
     suffix += 1;
   }
   usedFilenames.add(safeFilename.toLowerCase());
@@ -4371,15 +4907,22 @@ function removeHealixOwnedSupplementalAuthConfig(projectPath, reason = 'stale') 
 
 function writeSupplementalAuthConfig(projectPath, baseURL, verifiedRoles) {
   if (!verifiedRoles || verifiedRoles.length === 0) return null;
-  const tierBProjects = verifiedRoles.map((r) => `    {
-      name: 'tierB-auth-${normalizeRoleLabel(r.role || r.name || 'user')}',
-      grep: /@auth|@tierB/,
+  // Role-scoped grep: each role runs only its own @role:<role> tests so an admin
+  // test never executes under the user session (and vice-versa). The first
+  // verified role is "primary" and also runs role-agnostic @role:any tests.
+  const primaryLabel = normalizeRoleLabel(verifiedRoles[0].role || verifiedRoles[0].name || 'user');
+  const tierBProjects = verifiedRoles.map((r) => {
+    const label = normalizeRoleLabel(r.role || r.name || 'user');
+    return `    {
+      name: 'tierB-auth-${label}',
+      grep: ${tierBGrepSource(label, primaryLabel)},
       retries: 2,
       use: {
         ...devices['Desktop Chrome'],
         storageState: ${JSON.stringify(r.storageStatePath)},
       },
-    }`).join(',\n');
+    }`;
+  }).join(',\n');
 
   const body = `// Generated by Healix — supplemental Playwright config for the tierB-auth projects.
 // Your own playwright.config.* remains the source of truth for the default run.
@@ -4500,20 +5043,26 @@ function ensurePlaywrightConfig(projectPath, projectInfo = {}, roles = []) {
   // Per-tier retries live on the individual project so UI flakes don't get masked
   // as hard failures and so tierC (backend) doesn't waste budget on retryable HTTP
   // assertion bugs that are genuinely deterministic.
-  const tierBProjects = verifiedRoles.map((r) => `    {
-      name: 'tierB-auth-${normalizeRoleLabel(r.role || r.name || 'user')}',
-      grep: /@auth|@tierB/,
+  const primaryLabel = verifiedRoles.length > 0
+    ? normalizeRoleLabel(verifiedRoles[0].role || verifiedRoles[0].name || 'user')
+    : 'user';
+  const tierBProjects = verifiedRoles.map((r) => {
+    const label = normalizeRoleLabel(r.role || r.name || 'user');
+    return `    {
+      name: 'tierB-auth-${label}',
+      grep: ${tierBGrepSource(label, primaryLabel)},
       retries: 2,
       use: {
         ...devices['Desktop Chrome'],
         storageState: ${JSON.stringify(r.storageStatePath)},
       },
-    }`).join(',\n');
+    }`;
+  }).join(',\n');
 
   const projectsBlock = [
     `    {
       name: 'tierA-public',
-      grepInvert: /@auth|@tierB|@api|@tierC/,
+      grepInvert: /@auth|@tierB|@api|@tierC|@role:/,
       retries: 2,
       use: { ...devices['Desktop Chrome'] },
     }`,
@@ -4813,7 +5362,7 @@ async function validateGeneratedTestsWithList({ projectPath, validateGeneratedTe
     let stderr = '';
 
     const timer = setTimeout(() => {
-      child.kill('SIGTERM');
+      killPreStartedProc(child);
       resolve({ valid: false, reason: 'validation_timeout', stderr: stderr.slice(0, 2000) });
     }, Math.max(1000, timeoutMs));
 
@@ -6072,6 +6621,10 @@ function auditGeneratedTestQuality({ projectPath, testType, context, exploration
             .filter(Boolean);
           if (!blockRoutes.some((route) => protectedRoutes.has(route))) return false;
           if (/\btest\.skip\s*\(/.test(block.content) || /@auth|@tierB/i.test(block.content)) return false;
+          // NB: we do NOT exempt self-auth tests here. With no verified
+          // credentials this run, a test that logs in with hardcoded/unverified
+          // creds and expects to reach a protected route is exactly the
+          // anti-pattern this gate catches — it cannot pass.
           const expectsProtectedDestination = [...protectedRoutes].some((route) => {
             const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\/$/, '');
             return new RegExp(`toHaveURL\\([\\s\\S]{0,160}${escaped}`, 'i').test(block.content);
@@ -6092,6 +6645,10 @@ function auditGeneratedTestQuality({ projectPath, testType, context, exploration
             .filter(Boolean);
           if (!blockRoutes.some((route) => protectedRoutes.has(route))) return false;
           if (hasAuthTag(block.content) || /\btest\.skip\s*\(/.test(block.content)) return false;
+          // Self-auth (login) tests establish their own session and are correctly
+          // left untagged — applyRoleScopedAuthTags strips @auth from them on
+          // purpose, so they must not trip the missing-auth-tag hard gate.
+          if (contentLooksSelfAuth(block.content, blockRoutes)) return false;
           return true;
         });
         if (untaggedAuthBlocks.length > 0) {
@@ -6508,164 +7065,35 @@ async function maybeGenerateViaSaaS({
     } : {}),
   };
 
-  const agents = pickAgentsForRun(config.testType, projectInfo, context);
-  const backendGenerationSkippedReason =
-    String(config.testType || '').toLowerCase() === 'both' && !agents.includes('api')
-      ? 'no_api_or_backend_surface_detected'
-      : null;
-
-  // ── P1.5 planner pre-pass ────────────────────────────────────────────────
-  // One HTTP call to /api/generate-tests/plan BEFORE the fan-out. The plan
-  // gets projected into per-agent slices so each agent's prompt scopes down
-  // to its assigned targets. Gated on !HEALIX_SKIP_PLANNER so an env flip
-  // can disable the new path without redeploying. Any failure (timeout,
-  // network, 5xx, feature-absent 404) degrades cleanly to the legacy
-  // no-plan fan-out.
-  let plan = null;
-  let planMeta = null;
-  if (!process.env.HEALIX_SKIP_PLANNER) {
-    try {
-      const planResult = await client.planGeneration({
-        context,
-        prd: prdContent || '',
-        parsedPRD: parsedPRD || null,
-        explorationArtifact: explorationArtifact || null,
-        roles: roles || [],
-        projectInfo,
-        options: sharedPayload.options,
-      });
-      if (planResult && planResult.fallback) {
-        planMeta = { status: `plan_skipped_${planResult.fallback}` };
-      } else if (planResult && planResult.plan) {
-        plan = planResult.plan;
-        planMeta = {
-          status: 'plan_generated',
-          totalPlannedTests: plan.totalPlannedTests,
-          cache: planResult.cache || null,
-        };
-        const pt = planResult.plannerTokens;
-        if (pt && pt.totalTokens > 0) {
-          Logger.info('PipelineWorker', '[TOKEN USAGE] planner prompt=' + pt.promptTokens + ' completion=' + pt.completionTokens + ' total=' + pt.totalTokens + ' cache=' + (planResult.cache || 'miss'));
-        } else {
-          Logger.info('PipelineWorker', '[TOKEN USAGE] planner — cache=' + (planResult.cache || 'miss') + ' (no tokens charged)');
-        }
-        // Persist the plan to runDir for post-mortem inspection. The MCP
-        // already writes status.json / manifest here, so reusing the same
-        // dir keeps all run telemetry in one place.
-        const runDir = statusDir; // statusDir == runDir when provided
-        if (runDir) {
-          try {
-            fs.writeFileSync(
-              path.join(runDir, 'plan.json'),
-              JSON.stringify(plan, null, 2),
-            );
-          } catch {
-            /* best-effort — never block generation on a disk hiccup */
-          }
-          try {
-            updateStatus(runDir, 'plan_generated', {
-              totalPlannedTests: plan.totalPlannedTests,
-              runId,
-            });
-          } catch {
-            /* noop */
-          }
-        }
-      }
-    } catch (err) {
-      planMeta = {
-        status: err?.code === 'WEBAPP_TIMEOUT' ? 'plan_skipped_timeout' : 'plan_failed_fallback',
-        error: err?.message || String(err),
-      };
-    }
-  } else {
-    planMeta = { status: 'plan_skipped_env_flag' };
-  }
-
-  const planSliceFor = (agent) => {
-    // Expansion sits outside the planner's scope — it's a coverage
-    // gap-filler triggered post-fan-out, so no slice applies.
-    if (agent === 'expansion') return null;
-    if (!plan) return null;
-    const fe = plan.frontendPlan || null;
-    const be = plan.backendPlan || null;
-    switch (agent) {
-      case 'smoke':
-        return {
-          smokeTargets: fe?.smokeTargets || [],
-          plannedTests: fe?.plannedTests || 0,
-        };
-      case 'frontend':
-        return {
-          pages: fe?.pages || [],
-          workflows: fe?.workflows || [],
-        };
-      case 'api':
-        return {
-          endpoints: be?.endpoints || [],
-          apiFlows: be?.apiFlows || [],
-        };
-      case 'workflow':
-        return {
-          workflows: fe?.workflows || [],
-        };
-      case 'error': {
-        const negativeRegex = /not |fail|error|invalid/i;
-        const negativeAssertions = (fe?.pages || []).flatMap((p) =>
-          (p.assertions || []).filter((a) => negativeRegex.test(String(a))),
-        );
-        const errorCases = (be?.endpoints || []).flatMap((e) => e.errorCases || []);
-        return { negativeAssertions, errorCases };
-      }
-      default:
-        return null;
-    }
-  };
-
-  // ── P2-h async branch decision ───────────────────────────────────────────
-  // When HEALIX_GEN_ASYNC=true, skip the per-agent HTTP fan-out and enqueue
-  // a single async generation job instead, progressively polling for partials.
-  // The webapp orchestrator handles per-agent dispatch on the server side.
+  // ── Async branch (Inngest) ───────────────────────────────────────────────
+  // When HEALIX_GEN_ASYNC=true, enqueue a single job on the Inngest
+  // orchestrator. It fans out per-feature agents internally (auth → feature
+  // loop → e2e) and the MCP polls for partials as they arrive.
   const asyncMode = String(process.env.HEALIX_GEN_ASYNC || '').toLowerCase() === 'true';
   if (asyncMode) {
     return await runAsyncGenerationPath({
       client,
-      agents,
       sharedPayload,
       testsDir,
       runId,
       statusDir,
       runBudget,
       telemetryReporter,
-      plan,
-      planMeta,
       config,
-      // Phase-1 sync fallback reuses these to stay DRY:
-      context,
-      prdContent,
-      projectInfo,
-      parsedPRD,
-      explorationArtifact,
-      roles,
-      planSliceFor,
-      backendGenerationSkippedReason,
     });
   }
 
-  return await runPhase1FanOut({
+  // ── Sync feature-based generation ────────────────────────────────────────
+  return await runFeatureBasedGeneration({
     client,
-    agents,
     sharedPayload,
+    parsedPRD: parsedPRD || null,
     testsDir,
     runId,
     statusDir,
     config,
     runBudget,
     telemetryReporter,
-    plan,
-    planMeta,
-    planSliceFor,
-    backendGenerationSkippedReason,
   });
 }
 
@@ -6684,6 +7112,7 @@ async function maybeRunCoverageTopUp({
 }) {
   const before = collectGenerationQuality(config.projectPath, {
     baseURL: config.baseURL || sharedPayload?.projectInfo?.baseURL,
+    apiBaseURL: config.apiBaseURL || sharedPayload?.projectInfo?.apiBaseURL,
   });
   const decision = shouldAttemptCoverageTopUp({ config, quality: before });
   if (!decision.attempt) return null;
@@ -6799,18 +7228,24 @@ async function maybeRunCoverageTopUp({
     const retryBudgetMs = Number.isFinite(remainingMs)
       ? Math.max(15_000, Math.min(90_000, remainingMs - timeoutMs - 15_000))
       : 90_000;
-    const payload = await client.generateTestsForAgent({
-      agent: 'expansion',
-      ...sharedPayload,
+    const payload = await client.generateTestsForFeature({
+      agentType: 'ui',     // coverage top-up maps to the UI feature agent
+      featureId: null,     // not scoped to a specific feature — targets whole suite gaps
       context: feedbackContext,
-      transportTimeoutMs: timeoutMs,
-      transportRetryDelaysMs: [0, 1000, 3000, 8000, 15000, 30000],
-      transportRetryMaxElapsedMs: retryBudgetMs,
+      prd: sharedPayload?.prd || '',
+      parsedPRD: sharedPayload?.parsedPRD || null,
+      explorationArtifact: sharedPayload?.explorationArtifact || null,
+      roles: sharedPayload?.roles || [],
+      testType: sharedPayload?.testType,
+      projectInfo: sharedPayload?.projectInfo || {},
       options: {
         ...(sharedPayload?.options || {}),
         minGeneratedTests: requestedAdditional,
         maxExpansionAttempts: 1,
       },
+      transportTimeoutMs: timeoutMs,
+      transportRetryDelaysMs: [0, 1000, 3000, 8000, 15000, 30000],
+      transportRetryMaxElapsedMs: retryBudgetMs,
     });
 
     const incoming = Array.isArray(payload?.tests) ? payload.tests : [];
@@ -6842,6 +7277,7 @@ async function maybeRunCoverageTopUp({
 
     const after = collectGenerationQuality(config.projectPath, {
       baseURL: config.baseURL || sharedPayload?.projectInfo?.baseURL,
+      apiBaseURL: config.apiBaseURL || sharedPayload?.projectInfo?.apiBaseURL,
     });
     event.after = after;
     event.status = after.runnableTests > before.runnableTests
@@ -6999,7 +7435,7 @@ async function maybeRunCoverageTopUp({
 }
 
 /**
- * P1 per-agent parallel fan-out — one generateTestsForAgent call per agent,
+ * P1 per-agent parallel fan-out (legacy) — one generateTestsForFeature call per agent,
  * all in flight simultaneously. A rejection in one agent cannot cancel the
  * others; failures accumulate in `agentFailures[]` and we only hard-fail the
  * stage if every agent rejected AND nothing landed on disk.
@@ -7091,28 +7527,32 @@ async function runPhase1FanOut({
     Math.min(12, Math.ceil(globalMinGeneratedTests / Math.max(1, agents.length))),
   );
 
+  // Map legacy agent names to new feature-based agent types
+  const legacyAgentTypeMap = { smoke: 'ui', frontend: 'ui', workflow: 'ui', error: 'ui', expansion: 'ui', api: 'api' };
+
   async function runAgent(agent) {
     try {
-      const agentSlice = planSliceFor(agent);
+      const agentType = legacyAgentTypeMap[agent] || 'ui';
       const agentPayload = {
-        agent,
-        ...sharedPayload,
+        agentType,
+        featureId: null,   // legacy fan-out is not scoped to a single feature
+        context: sharedPayload.context,
+        prd: sharedPayload.prd,
+        parsedPRD: sharedPayload.parsedPRD,
+        explorationArtifact: sharedPayload.explorationArtifact,
+        roles: sharedPayload.roles,
+        testType: sharedPayload.testType,
+        projectInfo: sharedPayload.projectInfo,
         transportTimeoutMs: agentTransportTimeoutMs,
         options: {
           ...(sharedPayload.options || {}),
-          // The aggregate MCP quality gate enforces the full run minimum after
-          // every agent has landed. Per-agent calls should target their slice,
-          // not each attempt to generate the entire suite by itself.
           minGeneratedTests: perAgentMinGeneratedTests,
           maxExpansionAttempts: Number.isFinite(Number(sharedPayload.options?.maxExpansionAttempts))
             ? Number(sharedPayload.options.maxExpansionAttempts)
             : 0,
         },
       };
-      if (plan && agentSlice) {
-        agentPayload.plan = { slice: agentSlice, planVersion: 1 };
-      }
-      const payload = await client.generateTestsForAgent(agentPayload);
+      const payload = await client.generateTestsForFeature(agentPayload);
       const beforeWriteCount = files.length;
 
         // ── Token usage logging ──────────────────────────────────────────
@@ -7417,11 +7857,707 @@ async function runPhase1FanOut({
   };
 }
 
+// ── Feature-manifest helpers ─────────────────────────────────────────────────
+
 /**
- * P2-h async generation path. Enqueues one job on the webapp orchestrator
+ * Convert a feature name to a URL-safe slug (mirrors agent-dispatcher.ts).
+ */
+function featureNameToSlug(name) {
+  return (name || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'feature';
+}
+
+/**
+ * Build a `featureId → unique slug` map for a parsed PRD. Slugs are derived from
+ * the feature name; collisions (two features that slugify identically) get a
+ * numeric suffix so Playwright project names and generated filenames stay
+ * unique. Used by both the feature loop and playwright.config generation so the
+ * slug used for `testMatch` always equals the slug used in emitted filenames.
+ */
+function buildFeatureSlugMap(features = []) {
+  const map = new Map();
+  const seen = new Map(); // baseSlug → count
+  for (const f of features) {
+    const base = featureNameToSlug(f.name);
+    const n = (seen.get(base) || 0) + 1;
+    seen.set(base, n);
+    map.set(f.id, n === 1 ? base : `${base}-${n}`);
+  }
+  return map;
+}
+
+// ── test-plan.md formatting (shared by sync producer-consumer + async path) ──
+
+function buildTestPlanHeader(baseURL) {
+  return `# Healix Test Plan\nGenerated: ${new Date().toISOString()}\nTarget: ${baseURL || 'http://localhost:3000'}\n`;
+}
+
+function buildFeaturePlanSection(feature, specs) {
+  const uiSpecs = (specs || []).filter((s) => s.agentType === 'ui');
+  const apiSpecs = (specs || []).filter((s) => s.agentType === 'api');
+  const lines = [`\n## Feature: ${feature.name} (${feature.id})\n`];
+
+  if (uiSpecs.length > 0) {
+    lines.push('### UI Tests\n');
+    lines.push('| ID | Title | Kind | AC | Route |');
+    lines.push('|----|-------|------|----|-------|');
+    for (const s of uiSpecs) {
+      lines.push(`| ${s.id} | ${s.title} | ${s.kind} | ${s.acId} | ${s.targetRoute || '-'} |`);
+    }
+    lines.push('');
+  }
+
+  if (apiSpecs.length > 0) {
+    lines.push('### API Tests\n');
+    lines.push('| ID | Title | Kind | AC | Endpoint |');
+    lines.push('|----|-------|------|----|----------|');
+    for (const s of apiSpecs) {
+      lines.push(`| ${s.id} | ${s.title} | ${s.kind} | ${s.acId} | ${s.targetEndpoint || '-'} |`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Run the scenario planner across the given features and write
+ * `.healix/test-plan.md`. Returns `FeatureTestPlan[]` for the async job payload.
+ *
+ * Planning failure for a single feature degrades to empty specs (the generator
+ * then falls back to its non-spec prompt) — it never throws, so a planner outage
+ * cannot block generation. Used by the async path; the sync producer-consumer
+ * keeps its own incremental loop but shares the markdown formatters above.
+ */
+async function planFeaturesForRun({ client, sharedPayload, nonAuthFeatures, projectPath, concurrent = true }) {
+  const testPlanFile = path.join(projectPath, '.healix', 'test-plan.md');
+  try {
+    fs.mkdirSync(path.dirname(testPlanFile), { recursive: true });
+    fs.writeFileSync(testPlanFile, buildTestPlanHeader(sharedPayload.projectInfo?.baseURL), 'utf-8');
+  } catch (err) {
+    Logger.warn('PipelineWorker', '[test-plan.md] could not initialise (async)', { reason: err?.message });
+  }
+
+  const planOne = async (feature) => {
+    let specs = [];
+    try {
+      const planResult = await client.planFeatureTestCases({
+        feature,
+        explorationArtifact: sharedPayload.explorationArtifact,
+        context: sharedPayload.context,
+        testType: sharedPayload.testType,
+        prd: sharedPayload.prd,
+        projectInfo: sharedPayload.projectInfo,
+      });
+      specs = Array.isArray(planResult?.specs) ? planResult.specs : [];
+      Logger.info('PipelineWorker', `[Feature Gen][async] Planned ${specs.length} specs for ${feature.id}`);
+    } catch (planErr) {
+      Logger.warn('PipelineWorker', `[Feature Gen][async] Planning failed for ${feature.id}, proceeding without specs`, { reason: planErr?.message });
+    }
+    return { feature, specs };
+  };
+
+  let planned;
+  if (concurrent) {
+    planned = await Promise.all(nonAuthFeatures.map(planOne));
+  } else {
+    planned = [];
+    for (const feature of nonAuthFeatures) planned.push(await planOne(feature));
+  }
+
+  // Append sections in feature order (Promise.all preserves input order).
+  for (const { feature, specs } of planned) {
+    try {
+      fs.appendFileSync(testPlanFile, buildFeaturePlanSection(feature, specs), 'utf-8');
+    } catch (err) {
+      Logger.warn('PipelineWorker', '[test-plan.md] could not append feature plan (async)', { feature: feature.id, reason: err?.message });
+    }
+  }
+
+  return planned.map(({ feature, specs }) => ({
+    featureId: feature.id,
+    featureName: feature.name,
+    plannedAt: new Date().toISOString(),
+    specs,
+  }));
+}
+
+/**
+ * Extract exported `async function` signatures from an actions file.
+ * Produces an array of { name, params[] } objects (mirrors agent-dispatcher.ts).
+ */
+function extractActionSignatures(content) {
+  const fnRegex = /export\s+async\s+function\s+(\w+)\s*\(([^)]*)\)/g;
+  const actions = [];
+  let m;
+  while ((m = fnRegex.exec(content)) !== null) {
+    const name = m[1];
+    const rawParams = m[2].trim();
+    const params = rawParams ? rawParams.split(',').map((p) => p.trim()).filter(Boolean) : [];
+    actions.push({ name, params });
+  }
+  return actions;
+}
+
+/**
+ * Detect the auth feature in parsedPRD.
+ * First tries name-pattern match; falls back to first feature with authRequired AC.
+ * Returns the feature object or null.
+ */
+function detectAuthFeatureFromPRD(parsedPRD) {
+  if (!parsedPRD?.features?.length) return null;
+  // Word-boundary substring match (kept in sync with detectAuthFeature in
+  // webapp agent-dispatcher.ts) so multi-word names like "User Authentication"
+  // are detected. Boundaries prevent false positives like "Author".
+  const AUTH_NAMES = /\b(auth|authentication|login|log[\s-]?in|sign[\s-]?in|sign[\s-]?up|sign[\s-]?on|register|registration|account|sso|identity)\b/i;
+  for (const feature of parsedPRD.features) {
+    if (AUTH_NAMES.test((feature.name || '').trim())) return feature;
+  }
+  for (const feature of parsedPRD.features) {
+    for (const story of feature.userStories || []) {
+      for (const ac of story.acceptanceCriteria || []) {
+        if (ac.authRequired) return feature;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Build a feature-based playwright.config.ts content string.
+ *
+ * Projects:
+ *   auth-setup   → runs *\/auth-setup.ts (Playwright setup fixture — writes .healix/{role}.json)
+ *   {slug}       → runs *\/{slug}-*.spec.ts (depends on auth-setup when auth is present)
+ *   e2e          → runs *\/e2e-workflows.spec.ts (depends on all feature projects)
+ *
+ * @param {object} opts
+ * @param {{ id: string, name: string }[]} opts.features
+ * @param {string|null}  opts.authFeatureId
+ * @param {{ name?: string, role?: string }[]} opts.roles
+ * @param {'frontend'|'backend'|'both'} opts.testType
+ * @param {string} opts.baseURL
+ */
+function buildFeaturePlaywrightConfig({ features, authFeatureId, roles, testType, slugMap, baseURL = 'http://localhost:3000' }) {
+  const defaultRole = (roles[0])
+    ? ((roles[0].name || roles[0].role || 'user').toLowerCase().replace(/[^a-z0-9_-]/g, ''))
+    : 'user';
+
+  const nonAuthFeatures = features.filter((f) => f.id !== authFeatureId);
+  const hasAuth = authFeatureId !== null && authFeatureId !== undefined;
+
+  // Resolve a feature's slug from the shared map (deduped) when provided, so
+  // project names + testMatch match the filenames the generator emitted. Falls
+  // back to name derivation for callers that don't pass a map.
+  const slugFor = (f) => (slugMap && slugMap.get(f.id)) || featureNameToSlug(f.name);
+
+  const specPatternFor = (slug) => {
+    if (testType === 'frontend') return `**/${slug}-ui.spec.ts`;
+    if (testType === 'backend') return `**/${slug}-api.spec.ts`;
+    return `**/${slug}-*.spec.ts`;
+  };
+
+  const featureProjectLines = nonAuthFeatures.map((f) => {
+    const slug = slugFor(f);
+    const storageState = hasAuth ? `\n      use: { storageState: '.healix/${defaultRole}.json' },` : '';
+    const deps = hasAuth ? `\n      dependencies: ['auth-setup'],` : '';
+    return `    {
+      name: '${slug}',
+      testMatch: '${specPatternFor(slug)}',${deps}${storageState}
+    }`;
+  });
+
+  const allFeatureSlugs = nonAuthFeatures.map((f) => `'${slugFor(f)}'`).join(', ');
+
+  const authProject = hasAuth
+    ? `    {
+      name: 'auth-setup',
+      testMatch: '**/auth-setup.ts',
+    },\n`
+    : '';
+
+  const e2eProject = `    {
+      name: 'e2e',
+      testMatch: '**/e2e-workflows.spec.ts',
+      ${allFeatureSlugs ? `dependencies: [${allFeatureSlugs}],` : ''}
+    }`;
+
+  return `// playwright.config.ts — generated by Healix. Do not edit manually.
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/generated',
+  timeout: 60000,
+  fullyParallel: false,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: [
+    ['list'],
+    ['json', { outputFile: 'healix-reports/results/results.json' }],
+    ['html', { open: 'never', outputFolder: 'healix-reports/html-report' }],
+  ],
+  use: {
+    baseURL: '${baseURL}',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+  projects: [
+${authProject}${featureProjectLines.join(',\n')},
+${e2eProject},
+  ],
+});
+`;
+}
+
+/**
+ * Feature-based sync generation path.
+ *
+ * Implements the 5-step pipeline:
+ *   Step 1: Parse PRD (already done — passed in as parsedPRD)
+ *   Step 2: Auth feature (blocking, always first)
+ *   Step 3: Feature loop (sequential across features; UI + API parallel per feature per testType)
+ *   Step 4: E2E generation (after all features, with featureManifest)
+ *   Step 5: Write playwright.config.ts
+ *
+ * Returns the same shape as runPhase1FanOut:
+ *   { generated, files, provider, generationMeta }
+ */
+async function runFeatureBasedGeneration({
+  client,
+  sharedPayload,
+  parsedPRD,
+  testsDir,
+  runId,
+  statusDir,
+  config,
+  runBudget = null,
+  telemetryReporter = null,
+}) {
+  const used = seedUsedFilenamesFromDisk(testsDir);
+  const files = [];
+  const agentFailures = [];
+  const agentsCompleted = [];
+  const allTokenRuns = [];
+  let doneCount = 0;
+
+  const testType = String(sharedPayload.testType || 'both').toLowerCase();
+
+  // Helper: write tests from a generation result to disk
+  const writeTests = (tests, agentLabel) => {
+    const writtenFiles = [];
+    for (const test of (tests || [])) {
+      try {
+        const written = safeWriteGeneratedTest(testsDir, test, files.length, agentLabel, used);
+        files.push({ ...written, type: test.type || 'generated', agent: agentLabel });
+        writtenFiles.push(written);
+      } catch (writeErr) {
+        Logger.warn('PipelineWorker', `safeWriteGeneratedTest failed for ${agentLabel}`, {
+          filename: test?.filename,
+          reason: writeErr?.message,
+        });
+      }
+    }
+    return writtenFiles;
+  };
+
+  // Helper: log token usage from agentRuns[]
+  const logTokenRuns = (agentRuns, fallbackLabel) => {
+    const REAL_TOKENS_PER_DISPLAY_UNIT = 4800;
+    if (Array.isArray(agentRuns) && agentRuns.length > 0) {
+      for (const run of agentRuns) {
+        allTokenRuns.push(run);
+        const displayUnits = Math.floor((run.tokensTotal || 0) / REAL_TOKENS_PER_DISPLAY_UNIT);
+        Logger.info('PipelineWorker', `[TOKEN USAGE] agent=${run.agent || fallbackLabel} prompt=${run.tokensPrompt ?? 'n/a'} completion=${run.tokensCompletion ?? 'n/a'} total=${run.tokensTotal ?? 'n/a'} displayUnits=${displayUnits}`);
+      }
+    } else {
+      Logger.info('PipelineWorker', `[TOKEN USAGE] agent=${fallbackLabel} — no agentRuns in response`);
+    }
+  };
+
+  // Helper: call one feature agent and handle success/failure
+  const callFeatureAgent = async ({ featureId, agentType, featureSlug, featureManifest, specs }) => {
+    const agentLabel = `${featureSlug}-${agentType}`;
+    try {
+      const agentTransportTimeoutMs = computeGenerationAgentTimeoutMs({
+        config,
+        runBudget,
+        agents: ['feature'],   // approximate — single-agent equivalent
+        concurrency: 1,
+        context: sharedPayload.context,
+        parsedPRD,
+        projectInfo: sharedPayload.projectInfo,
+      });
+      const payload = await client.generateTestsForFeature({
+        featureId: featureId || null,
+        // Auth/e2e use fixed file prefixes; only feature agents need the slug to
+        // keep generated filenames in sync with the deduped config testMatch.
+        featureSlug: (agentType === 'ui' || agentType === 'api') ? featureSlug : undefined,
+        agentType,
+        featureManifest: Array.isArray(featureManifest) && featureManifest.length > 0 ? featureManifest : undefined,
+        specs: Array.isArray(specs) && specs.length > 0 ? specs : undefined,
+        context: sharedPayload.context,
+        prd: sharedPayload.prd,
+        parsedPRD: sharedPayload.parsedPRD,
+        explorationArtifact: sharedPayload.explorationArtifact,
+        roles: sharedPayload.roles,
+        testType: sharedPayload.testType,
+        projectInfo: sharedPayload.projectInfo,
+        options: sharedPayload.options,
+        transportTimeoutMs: agentTransportTimeoutMs,
+      });
+
+      logTokenRuns(payload?.agentRuns, agentLabel);
+      const writtenFiles = writeTests(payload?.tests || [], agentLabel);
+      agentsCompleted.push(agentLabel);
+      doneCount += 1;
+
+      if (statusDir) {
+        try {
+          updateStatus(statusDir, 'generating_tests', {
+            runId,
+            agent: agentLabel,
+            agentsCompleted: doneCount,
+            generatedCount: files.length,
+          }, telemetryReporter);
+        } catch { /* status writes are best-effort */ }
+      }
+      return { ok: true, files: writtenFiles, payload };
+    } catch (err) {
+      agentFailures.push({
+        agent: agentLabel,
+        code: err?.code || 'AGENT_FAILED',
+        message: err?.message || String(err),
+      });
+      Logger.warn('PipelineWorker', `Feature agent failed: ${agentLabel}`, {
+        code: err?.code,
+        reason: err?.message,
+      });
+      if (statusDir) {
+        try {
+          recordRunDecision(statusDir, telemetryReporter, {
+            runId,
+            decisionType: 'generation_agent_result',
+            phase: 'generating_tests',
+            status: 'error',
+            errorCode: err?.code || 'AGENT_FAILED',
+            reason: err?.message,
+            message: `${agentLabel} generation failed`,
+            metadata: { agent: agentLabel, generatedCount: files.length },
+          });
+        } catch { /* noop */ }
+      }
+      return { ok: false, error: err };
+    }
+  };
+
+  // Detect auth feature
+  const authFeature = detectAuthFeatureFromPRD(parsedPRD);
+  const authFeatureId = authFeature ? authFeature.id : null;
+
+  // ── Clean feature list ────────────────────────────────────────────────────
+  // parsedPRD (especially source=mixed_chunked) can contain junk entries:
+  //   • Features with no `id` field — README section headers misread as features
+  //     (e.g. "Technologies Used", "PRD").
+  //   • Duplicate ids — the chunked parser emits a consolidated feature with the
+  //     same id as a real one (e.g. two separate "F1" entries).
+  // Build the canonical feature list once here; both slug-map and the loop
+  // share it so they can never diverge.
+  const _seenIds = new Set();
+  const cleanFeatures = (parsedPRD?.features || []).filter((f) => {
+    if (!f.id) return false;             // no id → junk header artifact
+    if (_seenIds.has(f.id)) return false; // duplicate id → keep first occurrence
+    _seenIds.add(f.id);
+    return true;
+  });
+
+  // Unique slug per feature — shared by the feature loop (filenames) and
+  // playwright.config generation (project names + testMatch) so they never drift.
+  const featureSlugMap = buildFeatureSlugMap(cleanFeatures);
+
+  if (statusDir) {
+    updateStatus(statusDir, 'generating_tests', {
+      runId,
+      message: 'Feature-based generation starting...',
+      authFeatureId,
+      totalFeatures: parsedPRD?.features?.length || 0,
+    }, telemetryReporter);
+  }
+
+  // ── Step 2: Auth feature (blocking) ────────────────────────────────────────
+  if (authFeature) {
+    const authSlug = featureNameToSlug(authFeature.name);
+    Logger.info('PipelineWorker', `[Feature Gen] Step 2 — auth agent: ${authSlug}`);
+    await callFeatureAgent({ featureId: authFeatureId, agentType: 'auth', featureSlug: authSlug });
+  }
+
+  // ── Step 3: Producer-consumer across all non-auth features ─────────────────
+  //
+  // Process 1 (Planner) — sequential: plan feature → append test-plan.md → enqueue
+  // Process 2 (Generator) — concurrent with planner: dequeue → generate UI+API
+  //
+  // While F1 is being generated, F2 is already being planned.
+
+  const featureManifest = [];
+  // Use the pre-cleaned feature list (junk-filtered + deduped by id).
+  const nonAuthFeatures = cleanFeatures.filter((f) => f.id !== authFeatureId);
+
+  // ── Inline async queue ──────────────────────────────────────────────────────
+  class AsyncQueue {
+    constructor() {
+      this._items = [];
+      this._waiters = [];
+      this._done = false;
+    }
+    enqueue(item) {
+      if (this._waiters.length > 0) {
+        this._waiters.shift()(item);
+      } else {
+        this._items.push(item);
+      }
+    }
+    dequeue() {
+      if (this._items.length > 0) return Promise.resolve(this._items.shift());
+      if (this._done) return Promise.resolve(null);
+      return new Promise((resolve) => { this._waiters.push(resolve); });
+    }
+    markDone() {
+      this._done = true;
+      while (this._waiters.length > 0) this._waiters.shift()(null);
+    }
+  }
+
+  // ── test-plan.md helpers ────────────────────────────────────────────────────
+  const testPlanFile = path.join(config.projectPath, '.healix', 'test-plan.md');
+
+  function initTestPlanFile() {
+    try {
+      fs.mkdirSync(path.dirname(testPlanFile), { recursive: true });
+      fs.writeFileSync(testPlanFile, buildTestPlanHeader(sharedPayload.projectInfo?.baseURL), 'utf-8');
+    } catch (err) {
+      Logger.warn('PipelineWorker', '[test-plan.md] could not initialise', { reason: err?.message });
+    }
+  }
+
+  function appendFeaturePlan(feature, specs) {
+    try {
+      fs.appendFileSync(testPlanFile, buildFeaturePlanSection(feature, specs), 'utf-8');
+    } catch (err) {
+      Logger.warn('PipelineWorker', '[test-plan.md] could not append feature plan', { feature: feature.id, reason: err?.message });
+    }
+  }
+
+  initTestPlanFile();
+  const queue = new AsyncQueue();
+
+  // ── Process 1: Planner (sequential) ────────────────────────────────────────
+  const plannerProcess = (async () => {
+    for (const feature of nonAuthFeatures) {
+      let specs = [];
+      try {
+        Logger.info('PipelineWorker', `[Feature Gen] Planning: ${feature.name} (${feature.id})`);
+        const planResult = await client.planFeatureTestCases({
+          feature,
+          explorationArtifact: sharedPayload.explorationArtifact,
+          context: sharedPayload.context,
+          testType: sharedPayload.testType,
+          prd: sharedPayload.prd,
+          projectInfo: sharedPayload.projectInfo,
+        });
+        specs = Array.isArray(planResult?.specs) ? planResult.specs : [];
+        Logger.info('PipelineWorker', `[Feature Gen] Planned ${specs.length} specs for ${feature.id}`);
+      } catch (planErr) {
+        Logger.warn('PipelineWorker', `[Feature Gen] Planning failed for ${feature.id}, proceeding without specs`, { reason: planErr?.message });
+      }
+      appendFeaturePlan(feature, specs);
+      queue.enqueue({ feature, specs });
+    }
+    queue.markDone();
+  })();
+
+  // ── Process 2: Generator (concurrent with planner) ─────────────────────────
+  const generatorProcess = (async () => {
+    while (true) {
+      const item = await queue.dequeue();
+      if (!item) break;
+
+      const { feature, specs } = item;
+      const featureSlug = featureSlugMap.get(feature.id) || featureNameToSlug(feature.name);
+      const agentTypes = testType === 'frontend' ? ['ui']
+        : testType === 'backend' ? ['api']
+        : ['ui', 'api'];
+
+      Logger.info('PipelineWorker', `[Feature Gen] Generating: ${featureSlug} agents: [${agentTypes.join(', ')}]`);
+      if (statusDir) {
+        updateStatus(statusDir, 'generating_tests', {
+          runId,
+          message: `Generating tests for feature: ${featureSlug}`,
+          feature: featureSlug,
+        }, telemetryReporter);
+      }
+
+      const uiSpecs = specs.filter((s) => s.agentType === 'ui');
+      const apiSpecs = specs.filter((s) => s.agentType === 'api');
+
+      const agentCalls = agentTypes.map((agentType) => {
+        const agentSpecs = agentType === 'ui' ? uiSpecs : apiSpecs;
+        return callFeatureAgent({
+          featureId: feature.id,
+          agentType,
+          featureSlug,
+          specs: agentSpecs.length > 0 ? agentSpecs : undefined,
+        });
+      });
+
+      const results = await Promise.all(agentCalls);
+
+      // Build feature manifest entry from the UI agent's generated actions file
+      const uiIdx = agentTypes.indexOf('ui');
+      if (uiIdx >= 0 && results[uiIdx]?.ok) {
+        const uiWrittenFiles = results[uiIdx].files || [];
+        const actionsFile = uiWrittenFiles.find((f) => f.filename?.endsWith('-actions.ts'));
+        if (actionsFile) {
+          try {
+            const actionsContent = fs.readFileSync(path.join(testsDir, actionsFile.filename), 'utf-8');
+            const actions = extractActionSignatures(actionsContent);
+            featureManifest.push({
+              featureId: feature.id,
+              featureSlug,
+              featureName: feature.name,
+              actionsFile: actionsFile.filename,
+              actions,
+            });
+          } catch (readErr) {
+            Logger.warn('PipelineWorker', `Could not build feature manifest for ${featureSlug}`, {
+              filename: actionsFile?.filename,
+              reason: readErr?.message,
+            });
+          }
+        }
+      }
+    }
+  })();
+
+  // Wait for both processes to finish before moving to E2E
+  await Promise.all([plannerProcess, generatorProcess]);
+
+  // ── Step 4: E2E generation (after all features) ────────────────────────────
+  Logger.info('PipelineWorker', `[Feature Gen] Step 4 — e2e agent (featureManifest entries: ${featureManifest.length})`);
+  if (statusDir) {
+    updateStatus(statusDir, 'generating_tests', {
+      runId,
+      message: 'Running E2E agent...',
+      featureManifestCount: featureManifest.length,
+    }, telemetryReporter);
+  }
+  await callFeatureAgent({ featureId: null, agentType: 'e2e', featureSlug: 'e2e', featureManifest });
+
+  // ── Step 5: Write playwright.config.ts ────────────────────────────────────
+  if (cleanFeatures.length > 0) {
+    const configCandidates = [
+      'playwright.config.ts', 'playwright.config.js',
+      'playwright.config.mjs', 'playwright.config.cjs',
+    ];
+    const existingConfigName = configCandidates.find((c) => fs.existsSync(path.join(config.projectPath, c)));
+
+    // Always regenerate if the file was previously written by Healix (marker comment
+    // on the first line). Skip only if the user owns a hand-written config.
+    let shouldWrite = !existingConfigName;
+    if (existingConfigName) {
+      try {
+        const existingContent = fs.readFileSync(path.join(config.projectPath, existingConfigName), 'utf-8');
+        const isHealixGenerated = existingContent.trimStart().startsWith('// playwright.config');
+        if (isHealixGenerated) {
+          shouldWrite = true;
+          Logger.info('PipelineWorker', `[Feature Gen] Step 5 — overwriting Healix-generated ${existingConfigName} with clean config`);
+        } else {
+          Logger.info('PipelineWorker', `[Feature Gen] Step 5 — user-owned ${existingConfigName} detected, skipping dynamic generation`);
+        }
+      } catch { /* treat as user-owned on read error */ }
+    }
+
+    if (shouldWrite) {
+      try {
+        const configContent = buildFeaturePlaywrightConfig({
+          features: cleanFeatures,
+          authFeatureId,
+          roles: sharedPayload.roles || [],
+          testType,
+          slugMap: featureSlugMap,
+          baseURL: sharedPayload.projectInfo?.baseURL || config.baseURL || 'http://localhost:3000',
+        });
+        const configPath = path.join(config.projectPath, 'playwright.config.ts');
+        fs.writeFileSync(configPath, configContent, 'utf-8');
+        Logger.info('PipelineWorker', '[Feature Gen] Step 5 — wrote playwright.config.ts', { configPath });
+      } catch (cfgErr) {
+        Logger.warn('PipelineWorker', '[Feature Gen] Step 5 — failed to write playwright.config.ts (non-fatal)', {
+          reason: cfgErr?.message,
+        });
+      }
+    }
+  }
+
+  // ── Aggregate token summary ────────────────────────────────────────────────
+  {
+    const REAL_TOKENS_PER_DISPLAY_UNIT = 4800;
+    let totalPrompt = 0, totalCompletion = 0, totalReal = 0;
+    for (const run of allTokenRuns) {
+      totalPrompt += run.tokensPrompt || 0;
+      totalCompletion += run.tokensCompletion || 0;
+      totalReal += run.tokensTotal || 0;
+    }
+    const totalDisplayUnits = Math.floor(totalReal / REAL_TOKENS_PER_DISPLAY_UNIT);
+    Logger.info('PipelineWorker', `[TOKEN SUMMARY] Feature-based generation complete — totalRealTokens=${totalReal} (prompt=${totalPrompt} completion=${totalCompletion}) displayUnitsConsumed=${totalDisplayUnits}`);
+  }
+
+  // Hard fail: all agents failed AND nothing on disk
+  if (files.length === 0 && agentFailures.length > 0) {
+    const firstFailure = agentFailures[0];
+    const err = new Error(
+      `All ${agentFailures.length} feature agent(s) failed` +
+      (firstFailure ? `: ${firstFailure.agent}=${firstFailure.code}` : '')
+    );
+    err.code = firstFailure?.code || 'GENERATION_FAILED';
+    err.agentFailures = agentFailures;
+    err.agentsRequested = agentsCompleted.concat(agentFailures.map((f) => f.agent));
+    err.agentsCompleted = agentsCompleted;
+    throw err;
+  }
+
+  if (files.length === 0) {
+    const err = new Error('Feature-based generation returned zero tests');
+    err.code = 'AGENTS_RETURNED_ZERO_TESTS';
+    err.agentFailures = agentFailures;
+    throw err;
+  }
+
+  installMissingDependencies(config.projectPath, testsDir);
+
+  return {
+    generated: files.length,
+    files,
+    provider: 'saas',
+    generationMeta: {
+      chunkingStrategy: 'feature_based',
+      agentsRequested: agentsCompleted.concat(agentFailures.map((f) => f.agent)),
+      agentsCompleted,
+      agentFailures,
+      partialsWrittenCount: files.length,
+      featureCount: nonAuthFeatures.length + (authFeature ? 1 : 0),
+      authFeatureId,
+      featureManifestCount: featureManifest.length,
+    },
+  };
+}
+
+/**
+ * Async generation path (Inngest). Enqueues one job on the webapp orchestrator
  * and polls for partials, writing each new test spec to disk as it arrives
- * (dedupe by filename). Falls back to the Phase-1 fan-out if the webapp
- * replies with {mode:'sync'} (i.e. the server doesn't speak async yet).
+ * (dedupe by filename). Falls back to the feature-based sync path if the webapp
+ * replies with {mode:'sync'} (i.e. the server doesn't support async yet).
+ *
+ * The Inngest orchestrator handles feature fan-out internally (auth → feature
+ * loop → e2e) using `parsedPRD.features[]` from the job payload.
  *
  * Error policy:
  *   - client.generateTestsAsync throws → propagate; outer tryGenerator handles.
@@ -7433,26 +8569,41 @@ async function runPhase1FanOut({
  */
 async function runAsyncGenerationPath({
   client,
-  agents,
   sharedPayload,
   testsDir,
   runId,
   statusDir,
   runBudget,
   telemetryReporter = null,
-  plan,
-  planMeta,
   config,
-  planSliceFor,
-  backendGenerationSkippedReason = null,
 }) {
-  // Build a whole-plan slice for the orchestrator (it fans out internally).
-  const planArg = plan
-    ? { slice: plan, planVersion: 1 }
-    : undefined;
+  // ── Phase 1: scenario planning (parity with the sync producer-consumer) ─────
+  // The Inngest orchestrator fans out feature agents from the frozen job
+  // payload, so the planner must run here (before enqueue) and ride along as
+  // `featurePlans`. Without this the async path silently skips two-phase
+  // generation, never writes test-plan.md, and never populates spec validation.
+  let featurePlans = [];
+  try {
+    const parsedPRD = sharedPayload.parsedPRD;
+    if (parsedPRD?.features?.length) {
+      const authFeature = detectAuthFeatureFromPRD(parsedPRD);
+      const authFeatureId = authFeature ? authFeature.id : null;
+      const nonAuthFeatures = parsedPRD.features.filter((f) => f.id !== authFeatureId);
+      featurePlans = await planFeaturesForRun({
+        client,
+        sharedPayload,
+        nonAuthFeatures,
+        projectPath: config.projectPath,
+        concurrent: true,   // no producer-consumer overlap async — plan in parallel
+      });
+      Logger.info('PipelineWorker', `[Feature Gen][async] Planned ${featurePlans.length} feature(s); enqueueing job`);
+    }
+  } catch (planErr) {
+    Logger.warn('PipelineWorker', '[Feature Gen][async] Planning phase failed; enqueueing without specs', { reason: planErr?.message });
+    featurePlans = [];
+  }
 
   const enqueueResp = await client.generateTestsAsync({
-    agents,
     context: sharedPayload.context,
     prd: sharedPayload.prd,
     parsedPRD: sharedPayload.parsedPRD,
@@ -7460,22 +8611,13 @@ async function runAsyncGenerationPath({
     roles: sharedPayload.roles,
     projectInfo: sharedPayload.projectInfo,
     options: sharedPayload.options,
-    plan: planArg,
+    featurePlans,
     idempotencyKey: runId ? `${runId}-saas-gen-v1` : undefined,
   });
 
-  // Back-compat: older webapp returned a full sync payload. Two options:
-  //   (1) write the payload's tests here inline, (2) fall through to Phase-1.
-  // (2) is simpler + keeps the sync-path invariants, so call runPhase1FanOut.
-  // Note: the sync payload itself contains pre-computed tests but those came
-  // from the webapp's legacy non-async pipeline — there's no harm writing
-  // them here directly since that's what Phase-1 would have produced. But
-  // for simplicity (and to keep a single source of truth for the sync
-  // contract), we just re-invoke the fan-out loop, which will call
-  // generateTestsForAgent the same way the non-async branch does.
-  //
-  // Exception: if the sync payload actually carries tests, prefer writing
-  // them directly — avoids a second round-trip.
+  // Back-compat: older webapp returned a full sync payload. If it carries
+  // tests, write them directly; otherwise fall back to the feature-based
+  // sync path.
   if (enqueueResp?.mode === 'sync') {
     const syncPayload = enqueueResp.payload || {};
     const syncTests = Array.isArray(syncPayload.tests) ? syncPayload.tests : null;
@@ -7529,13 +8671,10 @@ async function runAsyncGenerationPath({
         provider: 'saas',
         generationMeta: {
           chunkingStrategy: 'async_sync_fallback',
-          agentsRequested: agents,
+          agentsRequested: [],
           agentsCompleted: [],
           agentFailures: [],
           partialsWrittenCount: files.length,
-          plannedTests: plan?.totalPlannedTests ?? 0,
-          planStatus: planMeta?.status || null,
-          backendGenerationSkippedReason,
           ...(syncPayload.generationMeta || {}),
           coverageTopUps,
           coverageRetry: topUpEvent?.coverageRetry || null,
@@ -7543,28 +8682,22 @@ async function runAsyncGenerationPath({
       };
     }
 
-    // No tests in the sync payload → degrade all the way to Phase-1 fan-out.
-    return await runPhase1FanOut({
+    // No tests in the sync payload → fall back to the feature-based sync path.
+    return await runFeatureBasedGeneration({
       client,
-      agents,
       sharedPayload,
+      parsedPRD: sharedPayload.parsedPRD || null,
       testsDir,
       runId,
       statusDir,
       config,
       runBudget,
       telemetryReporter,
-      plan,
-      planMeta,
-      planSliceFor,
-      backendGenerationSkippedReason,
     });
   }
 
-  const { jobId, agentsRequested } = enqueueResp;
-  const agentsRequestedList = Array.isArray(agentsRequested) && agentsRequested.length > 0
-    ? agentsRequested
-    : agents;
+  const { jobId } = enqueueResp;
+  const agentsRequestedList = [];
 
   if (statusDir) {
     try {
@@ -7777,9 +8910,6 @@ async function runAsyncGenerationPath({
       agentsCompleted: agentsCompletedList,
       agentFailures,
       partialsWrittenCount: files.length,
-      plannedTests: plan?.totalPlannedTests ?? 0,
-      planStatus: planMeta?.status || null,
-      backendGenerationSkippedReason,
       ...(finalResp?.generationMeta || {}),
       coverageTopUps,
       coverageRetry,
@@ -8118,6 +9248,7 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
       const validationBeforeQualityRecovery = validation;
       const beforeRecoveryQuality = collectGenerationQuality(config.projectPath, {
         baseURL: config.baseURL || projectInfo?.baseURL,
+        apiBaseURL: config.apiBaseURL || projectInfo?.apiBaseURL,
       });
       const beforeRecoverySnapshot = snapshotGeneratedSpecFiles(config.projectPath);
       const rollbackQualityRecovery = ({ recovery, assessment, demoteIfSoft = true } = {}) => {
@@ -8239,6 +9370,7 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
         });
         const afterPruningQuality = collectGenerationQuality(config.projectPath, {
           baseURL: config.baseURL || projectInfo?.baseURL,
+          apiBaseURL: config.apiBaseURL || projectInfo?.apiBaseURL,
         });
         const pruningAssessment = assessQualityRecoveryNetBenefit({
           config,
@@ -8335,6 +9467,7 @@ async function generateWithFallbackChain({ config, context, prdContent, runBudge
         qualityAudit.qualityRecovery = quarantine;
         const afterQuarantineQuality = collectGenerationQuality(config.projectPath, {
           baseURL: config.baseURL || projectInfo?.baseURL,
+          apiBaseURL: config.apiBaseURL || projectInfo?.apiBaseURL,
         });
         const retainedSuite = buildRetainedSuiteRecoveryMeta({
           config,
@@ -10292,6 +11425,8 @@ async function runPipeline(config, runId) {
   let requirementsCoverage = null;
   let phaseResults = null;
   let routeAccessSummary = null;
+  let explorationSource = null;
+  let staticRoutesAdded = 0;
   const aiOnlyEnforced = strictAIEnabled(config);
   let workspaceState = null; // populated by pre-flight if shared workspace found
 
@@ -10514,253 +11649,254 @@ async function runPipeline(config, runId) {
     }
 
     // -------------------------------------------------------
-    // 2. Gather codebase context
+    // 2 + 3. Gather codebase context AND read/parse PRD in parallel.
+    // Both are fast (3-15 s combined) and their outputs are the inputs that
+    // the exploration phase needs. Running them concurrently saves 5-15 s
+    // before exploration even starts.
     // -------------------------------------------------------
     let codebaseContext = config.codebaseContext;
-    if (config.generateTests && !codebaseContext) {
-      updateStatus(statusDir, 'context', {
-        runId,
-        message: 'Gathering codebase context...',
-        aiOnlyEnforced,
-      }, telemetryReporter);
+    let parsedPRD = null;
+    let combinedPrdContent = null;
 
-      codebaseContext = await withStageBudget(runBudget, 'context', async () => {
-        const contextGatherer = new ContextGatherer({
-          projectPath: config.projectPath,
-          language: config.language,
-        });
-        return contextGatherer.gatherRichContext();
-      });
-
-      Logger.info('PipelineWorker', 'Codebase context gathered', {
-        pages: codebaseContext.pages?.length || 0,
-        endpoints: codebaseContext.apiEndpoints?.length || 0,
-        workflows: codebaseContext.workflows?.length || 0,
-      });
-
-      if (config.ideContextMode === 'on' || config.ideContextMode === 'required') {
-        updateStatus(statusDir, 'context_enrichment', {
+    const [contextResult, prdResult] = await Promise.all([
+      // ── Step 2: codebase context ──────────────────────────────────────────
+      (async () => {
+        if (!config.generateTests || codebaseContext) return codebaseContext;
+        updateStatus(statusDir, 'context', {
           runId,
-          message: 'Requesting optional IDE context enrichment...',
+          message: 'Gathering codebase context...',
           aiOnlyEnforced,
         }, telemetryReporter);
 
-        try {
-          const requester = new AgentContextRequester({
+        let ctx = await withStageBudget(runBudget, 'context', async () => {
+          const contextGatherer = new ContextGatherer({
             projectPath: config.projectPath,
-            responseTimeout: toFiniteNumber(config.ideContextTimeoutMs, 2500),
+            language: config.language,
           });
-
-          const agentContext = await withStageBudget(runBudget, 'context', async () =>
-            requester.requestContext(codebaseContext, toFiniteNumber(config.ideContextTimeoutMs, 2500))
-          );
-
-          if (agentContext && typeof agentContext === 'object' && Object.keys(agentContext).length > 0) {
-            codebaseContext = requester.mergeContexts(codebaseContext, agentContext);
-            const summary = requester.summarizeContext(codebaseContext);
-            Logger.info('PipelineWorker', 'IDE context enrichment applied', summary);
-          } else {
-            Logger.info('PipelineWorker', 'IDE context enrichment not provided; continuing with auto-gathered context');
-          }
-        } catch (error) {
-          Logger.warn('PipelineWorker', 'IDE context enrichment failed (best-effort)', { reason: error.message });
-        }
-      }
-    }
-
-    // -------------------------------------------------------
-    // 3. Read PRD file(s) if specified
-    // -------------------------------------------------------
-    let prdContent = null;
-    const prdContents = [];
-    const prdErrors = [];
-
-    if (config.prdFile) {
-      try {
-        prdContent = fs.readFileSync(config.prdFile, 'utf-8');
-        prdContents.push(prdContent);
-        Logger.info('PipelineWorker', 'Read PRD file', { path: config.prdFile, length: prdContent.length });
-      } catch (error) {
-        Logger.error('PipelineWorker', 'Could not read PRD file', { path: config.prdFile, reason: error.message });
-        prdErrors.push({ path: config.prdFile, reason: error.message });
-      }
-    }
-
-    if (Array.isArray(config.prdFiles) && config.prdFiles.length > 0) {
-      for (const prdFilePath of config.prdFiles) {
-        if (prdFilePath === config.prdFile) continue;
-        try {
-          const content = fs.readFileSync(prdFilePath, 'utf-8');
-          prdContents.push(content);
-          Logger.info('PipelineWorker', 'Read additional PRD file', { path: prdFilePath, length: content.length });
-        } catch (error) {
-          Logger.error('PipelineWorker', 'Could not read PRD file', { path: prdFilePath, reason: error.message });
-          prdErrors.push({ path: prdFilePath, reason: error.message });
-        }
-      }
-    }
-
-    if (prdErrors.length > 0) {
-      // Surface PRD-read failures as a run-level warning event instead of silently dropping them.
-      updateStatus(statusDir, 'warning', {
-        runId,
-        message: `Some PRD file(s) could not be read and were skipped (${prdErrors.length}).`,
-        prdErrors,
-      }, telemetryReporter);
-      process.stderr.write(`[HEALIX] PRD read failures for run ${runId}: ${JSON.stringify(prdErrors)}\n`);
-    }
-
-    // Auto-ingest: if the user didn't hand us any PRD at all, sniff the project
-    // root for obvious candidates (README, PRD.md, docs/*.md). This is the
-    // silent fallback that lets Healix still benefit from whatever the repo
-    // ships — previously an empty prdFiles list just skipped this stage.
-    const userSuppliedPrd = Boolean(
-      config.prdFile || (Array.isArray(config.prdFiles) && config.prdFiles.length > 0)
-    );
-    if (!userSuppliedPrd && prdContents.length === 0 && config.projectPath) {
-      try {
-        const discovered = autoDiscoverPrdDocs(config.projectPath);
-        if (discovered.paths.length > 0 && discovered.content) {
-          prdContents.push(discovered.content);
-          Logger.info('PipelineWorker', 'Auto-ingested PRD candidates', {
-            paths: discovered.paths,
-            totalBytes: discovered.totalBytes,
-          });
-          updateStatus(statusDir, 'auto_ingested_prd', {
-            runId,
-            paths: discovered.paths,
-            totalBytes: discovered.totalBytes,
-          }, telemetryReporter);
-        }
-      } catch (error) {
-        // Silent-on-failure: autoscan must never break a run.
-        Logger.warn('PipelineWorker', 'PRD auto-ingest failed (best-effort)', { reason: error.message });
-      }
-    }
-
-    // Webapp Zod schema caps `prd` at MAX_PROMPT_CHARS (default 40 000). Truncate
-    // here so both /api/parse-prd and /api/generate-tests accept the payload.
-    // 38 000 gives a 2 000-char safety margin for multi-file join separators.
-    const PRD_CHAR_CAP = 38_000;
-    const rawCombinedPrdContent = prdContents.length > 0 ? prdContents.join('\n\n---\n\n') : null;
-    const combinedPrdContent = rawCombinedPrdContent && rawCombinedPrdContent.length > PRD_CHAR_CAP
-      ? rawCombinedPrdContent.slice(0, PRD_CHAR_CAP)
-      : rawCombinedPrdContent;
-    if (rawCombinedPrdContent && rawCombinedPrdContent.length > PRD_CHAR_CAP) {
-      Logger.warn('PipelineWorker', `PRD truncated from ${rawCombinedPrdContent.length} to ${PRD_CHAR_CAP} chars to stay under webapp limit`);
-    }
-
-    // -------------------------------------------------------
-    // 3a. Parse PRD into structured acceptance criteria (Phase B).
-    //
-    // Three paths converge here:
-    //   (1) User uploaded a PRD file      → config.prdFile / config.prdFiles → combinedPrdContent
-    //   (2) Cursor agent synthesised a PRD → submitted as prd text → persisted to disk upstream → same
-    //   (3) No PRD at all                  → combinedPrdContent === null → skip entirely, generator
-    //                                        falls back to context + exploration artifacts alone.
-    //
-    // If the /api/parse-prd call fails we don't kill the run — the raw PRD string is still
-    // passed down and the generator degrades to free-form PRD mode.
-    // -------------------------------------------------------
-    let parsedPRD = null;
-    if (combinedPrdContent && config.generateTests) {
-      updateStatus(statusDir, 'parsing_prd', {
-        runId,
-        message: 'Parsing PRD into structured acceptance criteria...',
-      }, telemetryReporter);
-      try {
-        const client = new WebappClient({ apiKey: process.env.HEALIX_API_KEY });
-        // Chunked parse: split PRD by top-level `##` headings, parse each
-        // chunk separately (≤ ~1500 input tokens) so the model's 8000-token
-        // completion cap never truncates the JSON. Falls back to a
-        // deterministic regex per chunk so AC traceability is preserved
-        // even if every LLM call fails (run vz2nys repro).
-        const chunks = PrdChunked.splitByFeatureHeadings(combinedPrdContent);
-        const chunkResult = await withStageBudget(runBudget, 'prdParse', () =>
-          PrdChunked.parsePRDChunked(combinedPrdContent, {
-            parseChunkLLM: async (chunkBody, { heading }) => {
-              try {
-                const sub = await ModelLadder.runWithLadder('parse_prd', async (model) => {
-                  return await client.parsePRD({ prdContent: chunkBody, model });
-                }, {
-                  onFallback: (decision) => {
-                    Logger.warn('PipelineWorker', '[parse-prd] model ladder fallback', decision);
-                    if (statusDir) {
-                      recordRunDecision(statusDir, telemetryReporter, {
-                        runId,
-                        decisionType: 'model_ladder_decision',
-                        phase: 'parsing_prd',
-                        status: 'warning',
-                        message: `parse-prd: ${decision.model} unavailable; falling back to ${decision.nextModel || 'next'}.`,
-                        metadata: { ...decision, heading },
-                      });
-                    }
-                  },
-                });
-                return sub?.value?.parsedPRD || null;
-              } catch (err) {
-                Logger.warn('PipelineWorker', '[parse-prd] chunk LLM failed — using regex', { reason: err?.message, heading });
-                return null;
-              }
-            },
-            onChunkParsed: ({ heading, source, acCount }) => {
-              Logger.info('PipelineWorker', `[parse-prd] chunk parsed via ${source}: ${heading} (${acCount} AC)`);
-            },
-          })
-        );
-        const parseResponse = { parsedPRD: chunkResult.parsedPRD, cached: false, tokenUsage: null, stats: chunkResult.stats };
-        parsedPRD = parseResponse?.parsedPRD || null;
-        Logger.info('PipelineWorker', `[parse-prd] chunked stats: total=${chunkResult.stats.totalAcs} chunks=${chunkResult.stats.chunkCount} (llm=${chunkResult.stats.llmChunkCount}, regex=${chunkResult.stats.regexChunkCount})`);
-        const prdTokens = parseResponse?.tokenUsage;
-        if (prdTokens && prdTokens.totalTokens > 0) {
-          Logger.info('PipelineWorker', '[TOKEN USAGE] parse-prd prompt=' + prdTokens.promptTokens + ' completion=' + prdTokens.completionTokens + ' total=' + prdTokens.totalTokens);
-        } else if (parseResponse?.cached) {
-          Logger.info('PipelineWorker', '[TOKEN USAGE] parse-prd — cached (no tokens charged)');
-        }
-        if (parsedPRD) {
-          try {
-            fs.writeFileSync(
-              path.join(statusDir, 'parsed-prd.json'),
-              JSON.stringify(parsedPRD, null, 2),
-              'utf-8'
-            );
-          } catch (writeErr) {
-            Logger.warn('PipelineWorker', 'Failed to cache parsed-prd.json', { reason: writeErr.message });
-          }
-          const featureCount = Array.isArray(parsedPRD.features) ? parsedPRD.features.length : 0;
-          const acCount = Array.isArray(parsedPRD.features)
-            ? parsedPRD.features.reduce((sum, f) =>
-                sum + (Array.isArray(f.userStories)
-                  ? f.userStories.reduce((s, st) =>
-                      s + (Array.isArray(st.acceptanceCriteria) ? st.acceptanceCriteria.length : 0), 0)
-                  : 0), 0)
-            : 0;
-          Logger.info('PipelineWorker', 'PRD parsed', { featureCount, acCount, cached: !!parseResponse?.cached });
-          updateStatus(statusDir, 'prd_parsed', {
-            runId,
-            message: `Parsed PRD: ${featureCount} feature(s), ${acCount} acceptance criteria`,
-            featureCount,
-            acCount,
-            cached: !!parseResponse?.cached,
-          }, telemetryReporter);
-        }
-      } catch (parseErr) {
-        Logger.warn('PipelineWorker', 'PRD parse failed — falling back to raw PRD text', {
-          reason: parseErr.message,
-          code: parseErr.code,
+          return contextGatherer.gatherRichContext();
         });
-        updateStatus(statusDir, 'warning', {
-          runId,
-          message: `PRD parsing failed — continuing with raw PRD text. (${parseErr.message})`,
-        }, telemetryReporter);
-        // parsedPRD stays null; generator will fall back to raw prd.
-      }
-    }
+
+        Logger.info('PipelineWorker', 'Codebase context gathered', {
+          pages: ctx.pages?.length || 0,
+          endpoints: ctx.apiEndpoints?.length || 0,
+          workflows: ctx.workflows?.length || 0,
+        });
+
+        if (config.ideContextMode === 'on' || config.ideContextMode === 'required') {
+          updateStatus(statusDir, 'context_enrichment', {
+            runId,
+            message: 'Requesting optional IDE context enrichment...',
+            aiOnlyEnforced,
+          }, telemetryReporter);
+          try {
+            const requester = new AgentContextRequester({
+              projectPath: config.projectPath,
+              responseTimeout: toFiniteNumber(config.ideContextTimeoutMs, 2500),
+            });
+            const agentContext = await withStageBudget(runBudget, 'context', async () =>
+              requester.requestContext(ctx, toFiniteNumber(config.ideContextTimeoutMs, 2500))
+            );
+            if (agentContext && typeof agentContext === 'object' && Object.keys(agentContext).length > 0) {
+              ctx = requester.mergeContexts(ctx, agentContext);
+              Logger.info('PipelineWorker', 'IDE context enrichment applied', requester.summarizeContext(ctx));
+            } else {
+              Logger.info('PipelineWorker', 'IDE context enrichment not provided; continuing with auto-gathered context');
+            }
+          } catch (error) {
+            Logger.warn('PipelineWorker', 'IDE context enrichment failed (best-effort)', { reason: error.message });
+          }
+        }
+        return ctx;
+      })(),
+
+      // ── Step 3: PRD read + parse ──────────────────────────────────────────
+      (async () => {
+        const prdContents = [];
+        const prdErrors = [];
+
+        if (config.prdFile) {
+          try {
+            const prdContent = fs.readFileSync(config.prdFile, 'utf-8');
+            prdContents.push(prdContent);
+            Logger.info('PipelineWorker', 'Read PRD file', { path: config.prdFile, length: prdContent.length });
+          } catch (error) {
+            Logger.error('PipelineWorker', 'Could not read PRD file', { path: config.prdFile, reason: error.message });
+            prdErrors.push({ path: config.prdFile, reason: error.message });
+          }
+        }
+
+        if (Array.isArray(config.prdFiles) && config.prdFiles.length > 0) {
+          for (const prdFilePath of config.prdFiles) {
+            if (prdFilePath === config.prdFile) continue;
+            try {
+              const content = fs.readFileSync(prdFilePath, 'utf-8');
+              prdContents.push(content);
+              Logger.info('PipelineWorker', 'Read additional PRD file', { path: prdFilePath, length: content.length });
+            } catch (error) {
+              Logger.error('PipelineWorker', 'Could not read PRD file', { path: prdFilePath, reason: error.message });
+              prdErrors.push({ path: prdFilePath, reason: error.message });
+            }
+          }
+        }
+
+        if (prdErrors.length > 0) {
+          updateStatus(statusDir, 'warning', {
+            runId,
+            message: `Some PRD file(s) could not be read and were skipped (${prdErrors.length}).`,
+            prdErrors,
+          }, telemetryReporter);
+          process.stderr.write(`[HEALIX] PRD read failures for run ${runId}: ${JSON.stringify(prdErrors)}\n`);
+        }
+
+        const userSuppliedPrd = Boolean(
+          config.prdFile || (Array.isArray(config.prdFiles) && config.prdFiles.length > 0)
+        );
+        if (!userSuppliedPrd && prdContents.length === 0 && config.projectPath) {
+          try {
+            const discovered = autoDiscoverPrdDocs(config.projectPath);
+            if (discovered.paths.length > 0 && discovered.content) {
+              prdContents.push(discovered.content);
+              Logger.info('PipelineWorker', 'Auto-ingested PRD candidates', {
+                paths: discovered.paths,
+                totalBytes: discovered.totalBytes,
+              });
+              updateStatus(statusDir, 'auto_ingested_prd', {
+                runId,
+                paths: discovered.paths,
+                totalBytes: discovered.totalBytes,
+              }, telemetryReporter);
+            }
+          } catch (error) {
+            Logger.warn('PipelineWorker', 'PRD auto-ingest failed (best-effort)', { reason: error.message });
+          }
+        }
+
+        const PRD_CHAR_CAP = 38_000;
+        const rawCombined = prdContents.length > 0 ? prdContents.join('\n\n---\n\n') : null;
+        const combined = rawCombined && rawCombined.length > PRD_CHAR_CAP
+          ? rawCombined.slice(0, PRD_CHAR_CAP)
+          : rawCombined;
+        if (rawCombined && rawCombined.length > PRD_CHAR_CAP) {
+          Logger.warn('PipelineWorker', `PRD truncated from ${rawCombined.length} to ${PRD_CHAR_CAP} chars to stay under webapp limit`);
+        }
+
+        // ── 3a. Parse PRD into structured acceptance criteria ───────────────
+        let parsed = null;
+        if (combined && config.generateTests) {
+          updateStatus(statusDir, 'parsing_prd', {
+            runId,
+            message: 'Parsing PRD into structured acceptance criteria...',
+          }, telemetryReporter);
+          try {
+            const client = new WebappClient({ apiKey: process.env.HEALIX_API_KEY });
+            const chunkResult = await withStageBudget(runBudget, 'prdParse', () =>
+              PrdChunked.parsePRDChunked(combined, {
+                parseChunkLLM: async (chunkBody, { heading }) => {
+                  try {
+                    const sub = await ModelLadder.runWithLadder('parse_prd', async (model) => {
+                      return await client.parsePRD({ prdContent: chunkBody, model });
+                    }, {
+                      onFallback: (decision) => {
+                        Logger.warn('PipelineWorker', '[parse-prd] model ladder fallback', decision);
+                        if (statusDir) {
+                          recordRunDecision(statusDir, telemetryReporter, {
+                            runId,
+                            decisionType: 'model_ladder_decision',
+                            phase: 'parsing_prd',
+                            status: 'warning',
+                            message: `parse-prd: ${decision.model} unavailable; falling back to ${decision.nextModel || 'next'}.`,
+                            metadata: { ...decision, heading },
+                          });
+                        }
+                      },
+                    });
+                    return sub?.value?.parsedPRD || null;
+                  } catch (err) {
+                    Logger.warn('PipelineWorker', '[parse-prd] chunk LLM failed — using regex', { reason: err?.message, heading });
+                    return null;
+                  }
+                },
+                onChunkParsed: ({ heading, source, acCount }) => {
+                  Logger.info('PipelineWorker', `[parse-prd] chunk parsed via ${source}: ${heading} (${acCount} AC)`);
+                },
+              })
+            );
+            const parseResponse = { parsedPRD: chunkResult.parsedPRD, cached: false, tokenUsage: null, stats: chunkResult.stats };
+            parsed = parseResponse?.parsedPRD || null;
+            Logger.info('PipelineWorker', `[parse-prd] chunked stats: total=${chunkResult.stats.totalAcs} chunks=${chunkResult.stats.chunkCount} (llm=${chunkResult.stats.llmChunkCount}, regex=${chunkResult.stats.regexChunkCount})`);
+            const prdTokens = parseResponse?.tokenUsage;
+            if (prdTokens && prdTokens.totalTokens > 0) {
+              Logger.info('PipelineWorker', '[TOKEN USAGE] parse-prd prompt=' + prdTokens.promptTokens + ' completion=' + prdTokens.completionTokens + ' total=' + prdTokens.totalTokens);
+            } else if (parseResponse?.cached) {
+              Logger.info('PipelineWorker', '[TOKEN USAGE] parse-prd — cached (no tokens charged)');
+            }
+            if (parsed) {
+              try {
+                fs.writeFileSync(
+                  path.join(statusDir, 'parsed-prd.json'),
+                  JSON.stringify(parsed, null, 2),
+                  'utf-8'
+                );
+              } catch (writeErr) {
+                Logger.warn('PipelineWorker', 'Failed to cache parsed-prd.json', { reason: writeErr.message });
+              }
+              const featureCount = Array.isArray(parsed.features) ? parsed.features.length : 0;
+              const acCount = Array.isArray(parsed.features)
+                ? parsed.features.reduce((sum, f) =>
+                    sum + (Array.isArray(f.userStories)
+                      ? f.userStories.reduce((s, st) =>
+                          s + (Array.isArray(st.acceptanceCriteria) ? st.acceptanceCriteria.length : 0), 0)
+                      : 0), 0)
+                : 0;
+              Logger.info('PipelineWorker', 'PRD parsed', { featureCount, acCount, cached: !!parseResponse?.cached });
+              updateStatus(statusDir, 'prd_parsed', {
+                runId,
+                message: `Parsed PRD: ${featureCount} feature(s), ${acCount} acceptance criteria`,
+                featureCount,
+                acCount,
+                cached: !!parseResponse?.cached,
+              }, telemetryReporter);
+            }
+          } catch (parseErr) {
+            Logger.warn('PipelineWorker', 'PRD parse failed — falling back to raw PRD text', {
+              reason: parseErr.message,
+              code: parseErr.code,
+            });
+            updateStatus(statusDir, 'warning', {
+              runId,
+              message: `PRD parsing failed — continuing with raw PRD text. (${parseErr.message})`,
+            }, telemetryReporter);
+          }
+        }
+        return { combined, parsed, prdContents };
+      })(),
+    ]);
+
+    if (contextResult !== undefined) codebaseContext = contextResult;
+    combinedPrdContent = prdResult?.combined ?? null;
+    parsedPRD = prdResult?.parsed ?? null;
+    const prdContents = prdResult?.prdContents ?? [];
+
+    // When the repo splits frontend + backend, `config.baseURL` points at the
+    // primary (frontend) service. API specs need the backend origin so direct
+    // `request()` calls hit the right port instead of resolving against the
+    // frontend. Derive it from the detected backend/fullstack service; leave it
+    // equal to baseURL for single-service / fullstack / api-only repos so the
+    // generator keeps emitting clean relative paths.
+    // Backfills any missing per-service baseURL from host+port and resolves the
+    // backend origin for API specs. The config form drops per-service baseURL
+    // for non-primary services, so without the backfill apiBaseURL would fall
+    // through to the frontend baseURL and API specs would hit the wrong port.
+    const apiBaseURL = resolveApiBaseURL(config);
+    // Surface the resolved value on config so it is recorded in
+    // pipeline-config.json and can be verified post-run.
+    config.apiBaseURL = apiBaseURL;
 
     const projectInfo = {
       name: config.projectName,
       framework: codebaseContext?.projectStructure?.framework || 'Unknown',
       baseURL: config.baseURL,
+      apiBaseURL,
       startCommand: config.startCommand,
       testCredentials: config.testCredentials,
       services: Array.isArray(config.services) ? config.services : undefined,
@@ -10850,7 +11986,9 @@ async function runPipeline(config, runId) {
         // sub-path. Falls back to projectPath for single-service repos, which
         // preserves prior behavior.
         const primaryCwd = primaryServiceFromConfig?.path && primaryServiceFromConfig.path !== '.'
-          ? path.join(config.projectPath, primaryServiceFromConfig.path)
+          ? (path.isAbsolute(primaryServiceFromConfig.path)
+            ? primaryServiceFromConfig.path
+            : path.join(config.projectPath, primaryServiceFromConfig.path))
           : config.projectPath;
         let primaryGetStderr = null;
         try {
@@ -10910,6 +12048,20 @@ async function runPipeline(config, runId) {
         message: 'Exploring app with browser-use...',
       }, telemetryReporter);
       try {
+        // Extract knownRoutes and prdFeatures to feed the inverted exploration model.
+        const knownRoutes = Array.isArray(codebaseContext?.pages)
+          ? codebaseContext.pages
+              .map((p) => ({
+                path: String(p?.path || p?.route || p?.url || '').trim(),
+                requiresAuth: p?.requiresAuth === true,
+                requiredRole: p?.requiredRole || null,
+              }))
+              .filter((r) => r.path && r.path.startsWith('/') && !r.path.includes('*'))
+          : [];
+        const prdFeatures = Array.isArray(parsedPRD?.features)
+          ? parsedPRD.features.map((f) => ({ name: f?.name || f?.title || '' })).filter((f) => f.name)
+          : [];
+
         const result = await runExplorationPhase({
           statusDir,
           baseURL: config.baseURL,
@@ -10917,26 +12069,43 @@ async function runPipeline(config, runId) {
           projectPath: config.projectPath,
           skipExploration: explorationSkipped,
           totalTimeoutMs: 120_000,
+          knownRoutes,
+          prdFeatures,
         });
         explorationArtifact = result.artifact;
-        let explorationSource = result.source;
+        explorationSource = result.source;
         let explorationReason = result.reason || null;
-        if (!artifactHasUsefulContext(explorationArtifact) && Array.isArray(codebaseContext?.pages) && codebaseContext.pages.length > 0) {
+
+        // Always supplement the live artifact with static context — static
+        // testIds / selectorHints are high-quality selectors that must not be
+        // discarded when browser exploration succeeds but is incomplete.
+        const routeCountBeforeStaticMerge = (explorationArtifact?.routes || []).length;
+        if (Array.isArray(codebaseContext?.pages) && codebaseContext.pages.length > 0) {
+          if (!artifactHasUsefulContext(explorationArtifact)) {
+            // Full fallback: browser exploration returned nothing useful.
+            explorationSource = `${result.source || 'unknown'}+static-context`;
+            explorationReason = explorationReason || 'browser exploration returned no useful app context';
+            Logger.warn('PipelineWorker', 'Exploration returned no useful app context; synthesized route/form context from static code analysis', {
+              originalSource: result.source,
+            });
+          }
           explorationArtifact = synthesizeExplorationArtifactFromContext(codebaseContext, explorationArtifact);
-          explorationSource = `${result.source || 'unknown'}+static-context`;
-          explorationReason = explorationReason || 'browser exploration returned no useful app context';
-          Logger.warn('PipelineWorker', 'Exploration returned no useful app context; synthesized route/form context from static code analysis', {
-            originalSource: result.source,
-            routeCount: (explorationArtifact?.routes || []).length,
-            formCount: (explorationArtifact?.forms || []).length,
-            keyFlowCount: (explorationArtifact?.keyFlows || []).length,
-          });
         }
+        staticRoutesAdded = (explorationArtifact?.routes || []).length - routeCountBeforeStaticMerge;
+        if (staticRoutesAdded > 0) {
+          Logger.info('PipelineWorker', `Static context merge added ${staticRoutesAdded} route(s) to exploration artifact`);
+        }
+
         routeAccessSummary = buildRouteAccessSummary(explorationArtifact);
         // preAuthRoles carries the storageState files written during the
         // exploration pre-auth pass — used in step 3c to skip redundant logins.
+        // preAuthFailedRoles carries roles that failed injection (noLoginForm etc.)
+        // — surfaced in the auth_injected status event for user-facing diagnostics.
         if (Array.isArray(result.preAuthRoles)) {
           config = { ...config, _preAuthRoles: result.preAuthRoles };
+        }
+        if (Array.isArray(result.preAuthFailedRoles)) {
+          config = { ...config, _preAuthFailedRoles: result.preAuthFailedRoles };
         }
         updateStatus(statusDir, 'explored', {
           runId,
@@ -10946,6 +12115,9 @@ async function runPipeline(config, runId) {
           routeCount: (explorationArtifact?.routes || []).length,
           keyFlowCount: (explorationArtifact?.keyFlows || []).length,
           formCount: (explorationArtifact?.forms || []).length,
+          staticRoutesAdded,
+          explorationPhaseRouteCount: (explorationArtifact?.routes || []).length,
+          explorationPhaseSource: explorationSource,
           routeAccessSummary,
           authFlowRejected: explorationArtifact?.authFlowRejected || null,
         }, telemetryReporter);
@@ -10954,6 +12126,8 @@ async function runPipeline(config, runId) {
         if (Array.isArray(codebaseContext?.pages) && codebaseContext.pages.length > 0) {
           explorationArtifact = synthesizeExplorationArtifactFromContext(codebaseContext, explorationArtifact);
           routeAccessSummary = buildRouteAccessSummary(explorationArtifact);
+          explorationSource = 'failed+static-context';
+          staticRoutesAdded = (explorationArtifact?.routes || []).length;
           updateStatus(statusDir, 'explored', {
             runId,
             message: `Exploration failed; using static code context (${explErr.message})`,
@@ -10985,12 +12159,56 @@ async function runPipeline(config, runId) {
     let roles = [];
     if (Array.isArray(config.testCredentials) && config.testCredentials.length > 0) {
       const preAuthRoles = Array.isArray(config._preAuthRoles) ? config._preAuthRoles : [];
+      const preAuthFailedRoles = Array.isArray(config._preAuthFailedRoles) ? config._preAuthFailedRoles : [];
+      const noLoginFormRoles = preAuthFailedRoles
+        .filter((r) => r.noLoginForm)
+        .map((r) => r.role);
       const allPreAuthVerified = allCredentialsCoveredByPreAuth(config.testCredentials, preAuthRoles);
       const hasTrustedAuthFlow = shouldTrustDiscoveredAuthFlow(explorationArtifact?.authFlow);
 
+      // Determine whether pre-auth storageStates can be safely reused.
+      // Condition: all credentials are covered by pre-auth AND no better
+      // authFlow was discovered (would improve selector accuracy).
+      // Additionally run a lightweight probe to guard against corrupt states
+      // written by broad fallback selectors matching non-login form inputs.
+      let reusePreAuth = false;
+      let probeFailedRoleKeys = new Set();
       if (allPreAuthVerified && !hasTrustedAuthFlow) {
-        // Pre-auth storageStates are sufficient and there is no better authFlow
-        // from exploration — skip the redundant login round-trip.
+        const protectedPath = firstProtectedRoute(explorationArtifact);
+        const probeResults = protectedPath
+          ? (await Promise.allSettled(
+              preAuthRoles.map(async (role) => {
+                const probe = await probeStorageState({
+                  baseURL: config.baseURL,
+                  storageStatePath: role.storageStatePath,
+                  protectedPath,
+                });
+                return { role, probe };
+              }),
+            )).map((outcome, i) =>
+              outcome.status === 'fulfilled'
+                ? outcome.value
+                : { role: preAuthRoles[i], probe: { authenticated: false, reason: outcome.reason?.message || 'probe threw unexpectedly' } },
+            )
+          : preAuthRoles.map((role) => ({ role, probe: { authenticated: true } }));
+
+        const failedProbeKeys = new Set(
+          probeResults.filter(({ probe }) => !probe.authenticated).map(({ role }) => roleKeyForAuth(role)),
+        );
+        if (failedProbeKeys.size > 0) {
+          for (const { role, probe } of probeResults.filter(({ probe: p }) => !p.authenticated)) {
+            Logger.warn('PipelineWorker', `Pre-auth storageState for ${roleKeyForAuth(role)} failed probe (${probe.reason}) — will not reuse`);
+          }
+          // Carry the failed keys so the deferred path can exclude them too.
+          probeFailedRoleKeys = failedProbeKeys;
+        } else {
+          reusePreAuth = true;
+        }
+      }
+
+      if (reusePreAuth) {
+        // All probes passed — safe to reuse pre-auth storageStates and skip the
+        // redundant headless login round-trip.
         roles = preAuthRoles.map((role) => ({ ...role, reusedFromPreAuth: true }));
         Logger.info('PipelineWorker', 'Reusing pre-auth storageStates — skipping duplicate credential injection', {
           roles: roles.map((r) => roleKeyForAuth(r)),
@@ -11001,6 +12219,10 @@ async function runPipeline(config, runId) {
           message: `${roles.filter((r) => r.loginVerified).length}/${roles.length} role login(s) verified (reused from pre-auth)`,
           roles: summarizeAuthRoles(roles),
           authFlowRejected: explorationArtifact?.authFlowRejected || null,
+          ...(noLoginFormRoles.length > 0 ? {
+            noLoginFormRoles,
+            noLoginFormHint: 'Sign-in route not found — check HEALIX_LOGIN_URL config or verify the app\'s login path',
+          } : {}),
         }, telemetryReporter);
         recordRunDecision(statusDir, telemetryReporter, {
           runId,
@@ -11017,73 +12239,86 @@ async function runPipeline(config, runId) {
           },
         });
       } else {
-        // Either pre-auth failed for some roles OR exploration found a richer
-        // authFlow — run a fresh injection so storageStates use the best available selectors.
-        updateStatus(statusDir, 'auth_injecting', {
-          runId,
-          message: hasTrustedAuthFlow
-            ? `Re-injecting credentials with discovered authFlow for ${config.testCredentials.length} role(s)...`
-            : `Verifying credentials for ${config.testCredentials.length} role(s)...`,
-          authFlowRejected: explorationArtifact?.authFlowRejected || null,
-        }, telemetryReporter);
-        try {
-          const freshRoles = await injectCredentials({
-            projectPath: config.projectPath,
-            baseURL: config.baseURL,
-            credentials: config.testCredentials,
-            authFlow: hasTrustedAuthFlow ? explorationArtifact?.authFlow : null,
+        // Auth is handled by the generated auth-setup.ts Playwright setup
+        // project. Use pre-auth states if available, excluding any roles whose
+        // storageState failed the session probe (corrupt state). Otherwise
+        // register expected storageState paths so downstream Playwright config
+        // and Tier B decisions are populated.
+        const safePreAuthRoles = preAuthRoles.filter((r) => !probeFailedRoleKeys.has(roleKeyForAuth(r)));
+        if (safePreAuthRoles.length > 0) {
+          roles = safePreAuthRoles;
+          Logger.info('PipelineWorker', 'Using pre-auth storageStates for role configuration (auth-setup.ts handles verification at test time)', {
+            roles: roles.map((r) => roleKeyForAuth(r)),
           });
-          const mergedAuth = mergeCredentialInjectionRoles({ freshRoles, preAuthRoles });
-          roles = mergedAuth.roles;
-          const verifiedCount = roles.filter((r) => r.loginVerified).length;
-          updateStatus(statusDir, 'auth_injected', {
-            runId,
-            message: mergedAuth.reusedPreAuthRoles.length > 0
-              ? `${verifiedCount}/${roles.length} role login(s) verified (${mergedAuth.reusedPreAuthRoles.length} reused from pre-auth after reinjection failure)`
-              : `${verifiedCount}/${roles.length} role login(s) verified`,
-            roles: summarizeAuthRoles(roles),
-            reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-            failedFreshRoles: mergedAuth.failedFreshRoles,
-            authFlowRejected: explorationArtifact?.authFlowRejected || null,
-          }, telemetryReporter);
-          recordRunDecision(statusDir, telemetryReporter, {
-            runId,
-            decisionType: 'auth_decision',
-            phase: 'auth_injected',
-            status: verifiedCount > 0 ? (mergedAuth.failedFreshRoles.length > 0 ? 'warning' : 'success') : 'error',
-            message: `${verifiedCount}/${roles.length} role login(s) verified after credential injection.`,
-            metadata: {
-              authDecision: hasTrustedAuthFlow ? 'fresh_injection_with_discovered_flow' : 'fresh_injection_without_flow',
-              totalCredentials: config.testCredentials.length,
-              verifiedCount,
-              roles: summarizeAuthRoles(roles),
-              reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-              failedFreshRoles: mergedAuth.failedFreshRoles,
-              authFlowSource: hasTrustedAuthFlow ? 'trusted_exploration' : 'heuristic_fallback',
-              authFlowRejected: explorationArtifact?.authFlowRejected || null,
-            },
+        } else {
+          // Pre-auth produced no usable storageStates. Attempt direct credential
+          // injection now using any authFlow discovered during exploration — this
+          // is required when the project has its own playwright.config.ts (no
+          // auth-setup.ts hook available) and gives the injector one more try
+          // with better selectors than the null-fallback used during pre-auth.
+          const discoveredAuthFlow = explorationArtifact?.authFlow || null;
+          Logger.info('PipelineWorker', 'Attempting direct credential injection post-exploration', {
+            hasDiscoveredAuthFlow: !!discoveredAuthFlow,
+            credentialRoles: config.testCredentials.map((c) => normalizeRoleLabel(c.role || c.name || 'user')),
           });
-        } catch (credErr) {
-          Logger.warn('PipelineWorker', 'Credential injection failed (best-effort)', { reason: credErr.message });
-          // Fall back to whatever pre-auth gave us rather than leaving roles empty.
-          roles = preAuthRoles.length > 0 ? preAuthRoles : [];
-          recordRunDecision(statusDir, telemetryReporter, {
-            runId,
-            decisionType: 'auth_decision',
-            phase: 'auth_injected',
-            status: roles.some(hasVerifiedStorageState) ? 'warning' : 'error',
-            errorCode: credErr?.code || 'AUTH_INJECTION_FAILED',
-            reason: credErr.message,
-            message: 'Credential injection failed; Healix will use any verified pre-auth storage states.',
-            metadata: {
-              authDecision: 'fresh_injection_failed',
-              roles: summarizeAuthRoles(roles),
-              preAuthRoleCount: preAuthRoles.length,
-              authFlowSource: hasTrustedAuthFlow ? 'trusted_exploration' : 'heuristic_fallback',
-              authFlowRejected: explorationArtifact?.authFlowRejected || null,
-            },
-          });
+          try {
+            const freshRoles = await injectCredentials({
+              projectPath: config.projectPath,
+              baseURL: config.baseURL,
+              credentials: config.testCredentials,
+              authFlow: discoveredAuthFlow,
+            });
+            const mergedResult = mergeCredentialInjectionRoles({ freshRoles, preAuthRoles });
+            roles = mergedResult.roles;
+            const verifiedCount = roles.filter((r) => r.loginVerified).length;
+            if (verifiedCount > 0) {
+              Logger.info('PipelineWorker', `Direct credential injection succeeded for ${verifiedCount}/${roles.length} role(s)`, {
+                roles: roles.map((r) => ({ role: r.role, verified: r.loginVerified })),
+              });
+            } else {
+              Logger.warn('PipelineWorker', 'Direct credential injection failed for all roles — @auth tests may fail', {
+                failed: mergedResult.failedFreshRoles,
+              });
+            }
+          } catch (injErr) {
+            Logger.warn('PipelineWorker', 'Direct credential injection threw unexpectedly — creating stub role entries', {
+              reason: injErr.message,
+            });
+            roles = config.testCredentials.map((cred) => {
+              const roleLabel = normalizeRoleLabel(cred.role || cred.name || 'user');
+              const storageStatePath = path.join(config.projectPath, '.healix', `auth-state-${roleLabel}.json`);
+              return { role: roleLabel, name: roleLabel, storageStatePath, loginVerified: false };
+            });
+          }
         }
+
+        // Surface roles whose pre-auth login failed so the dashboard shows them
+        // as loginVerified:false (with a reason) instead of silently omitting
+        // them — see mergeFailedPreAuthRoles.
+        roles = mergeFailedPreAuthRoles(roles, preAuthFailedRoles);
+
+        updateStatus(statusDir, 'auth_injected', {
+          runId,
+          message: `${roles.length} role(s) configured — auth handled by generated auth-setup.ts`,
+          roles: summarizeAuthRoles(roles),
+          authFlowRejected: explorationArtifact?.authFlowRejected || null,
+          ...(noLoginFormRoles.length > 0 ? {
+            noLoginFormRoles,
+            noLoginFormHint: 'Sign-in route not found — check HEALIX_LOGIN_URL config or verify the app\'s login path',
+          } : {}),
+        }, telemetryReporter);
+        recordRunDecision(statusDir, telemetryReporter, {
+          runId,
+          decisionType: 'auth_decision',
+          phase: 'auth_injected',
+          status: 'success',
+          message: 'Auth deferred to generated auth-setup.ts Playwright setup project.',
+          metadata: {
+            authDecision: 'deferred_to_auth_setup_ts',
+            totalCredentials: config.testCredentials.length,
+            roles: summarizeAuthRoles(roles),
+          },
+        });
       }
     }
 
@@ -11173,6 +12408,32 @@ async function runPipeline(config, runId) {
               .map((r) => ({ role: normalizeRoleLabel(r.role || r.name || 'user'), reason: r.reason || null }));
           }
 
+          // RC-A/RC-B: retag generated specs with role-scoped auth tags BEFORE
+          // the Playwright config is written, so each tier-B project greps only
+          // its own role's tests (no cross-role redirects) and protected-route
+          // tests whose navigation hides in a helper still get @auth.
+          try {
+            const roleTagResult = applyRoleScopedAuthTags({
+              projectPath: config.projectPath,
+              routeAccessSummary,
+              roles,
+            });
+            if (roleTagResult.applied) {
+              if (generationMeta) {
+                generationMeta.roleScopedAuthTags = {
+                  taggedBlocks: roleTagResult.taggedBlocks,
+                  files: roleTagResult.files,
+                };
+              }
+              Logger.info('PipelineWorker', 'Applied role-scoped auth tags to generated specs', {
+                taggedBlocks: roleTagResult.taggedBlocks,
+                files: roleTagResult.files.length,
+              });
+            }
+          } catch (err) {
+            Logger.warn('PipelineWorker', 'Role-scoped auth tagging failed', { error: err?.message });
+          }
+
           // Ensure playwright.config.ts exists after test generation
           const playwrightConfigResult = ensurePlaywrightConfig(config.projectPath, projectInfo, roles);
           const currentRunAuthConfigPath = playwrightConfigResult?.supplementalAuthConfigPath || null;
@@ -11190,8 +12451,36 @@ async function runPipeline(config, runId) {
             generationMeta.tierBRoles = currentRunTierBRoles;
           }
 
+          // RC2: gate role-dependent tests whose required role never verified a
+          // session this run, so they report as skipped (blocked) instead of
+          // executing against the wrong session and failing red.
+          try {
+            const roleGate = gateBlockedRoleSpecs({
+              projectPath: config.projectPath,
+              routeAccessSummary,
+              roles,
+            });
+            if (roleGate.applied) {
+              if (generationMeta) {
+                generationMeta.blockedRoleGate = {
+                  gatedFiles: roleGate.gatedFiles,
+                  gatedBlocks: roleGate.gatedBlocks,
+                  blockedRoles: roleGate.blockedRoles,
+                };
+              }
+              Logger.info('PipelineWorker', 'Gated role-dependent tests with no verified session', {
+                gatedBlocks: roleGate.gatedBlocks,
+                gatedFiles: roleGate.gatedFiles.length,
+                blockedRoles: roleGate.blockedRoles,
+              });
+            }
+          } catch (err) {
+            Logger.warn('PipelineWorker', 'Blocked-role test gating failed', { error: err?.message });
+          }
+
           const qualityScan = collectGenerationQuality(config.projectPath, {
             baseURL: config.baseURL || projectInfo.baseURL,
+            apiBaseURL: config.apiBaseURL || projectInfo.apiBaseURL,
           });
           if (generationMeta?.retainedSuite) {
             qualityScan.retainedSuite = generationMeta.retainedSuite;
@@ -11317,6 +12606,7 @@ async function runPipeline(config, runId) {
           generationAttempt += 1;
           const failureQuality = extractGenerationFailureQuality(generationError) || collectGenerationQuality(config.projectPath, {
             baseURL: config.baseURL || projectInfo.baseURL,
+            apiBaseURL: config.apiBaseURL || projectInfo.apiBaseURL,
           });
           const repairRecord = {
             attempt: generationAttempt,
@@ -11648,85 +12938,11 @@ async function runPipeline(config, runId) {
       },
     });
 
-    // Re-inject credentials just before execution so storageState tokens are
-    // always fresh. Generation can take >13 min and Supabase access tokens
-    // expire in 1h — stale tokens cause middleware to reject the session and
-    // redirect tests to /login or /signup.
-    if (Array.isArray(config.testCredentials) && config.testCredentials.length > 0) {
-      try {
-        const preAuthRoles = Array.isArray(config._preAuthRoles) ? config._preAuthRoles : [];
-        const hasTrustedAuthFlow = shouldTrustDiscoveredAuthFlow(explorationArtifact?.authFlow);
-        updateStatus(statusDir, 'auth_refreshing', {
-          runId,
-          message: `Refreshing auth tokens before execution for ${config.testCredentials.length} role(s)...`,
-          authFlowRejected: explorationArtifact?.authFlowRejected || null,
-        }, telemetryReporter);
-        const freshRoles = await injectCredentials({
-          projectPath: config.projectPath,
-          baseURL: config.baseURL,
-          credentials: config.testCredentials,
-          authFlow: hasTrustedAuthFlow ? explorationArtifact?.authFlow : null,
-        });
-        const mergedAuth = mergeCredentialInjectionRoles({
-          freshRoles,
-          preAuthRoles: roles.filter(hasVerifiedStorageState).length > 0 ? roles : preAuthRoles,
-        });
-        const verifiedFresh = freshRoles.filter(hasVerifiedStorageState);
-        const verifiedMerged = mergedAuth.roles.filter(hasVerifiedStorageState);
-        if (verifiedMerged.length > 0) {
-          roles = mergedAuth.roles;
-          // Rewrite the fixture file so it embeds the freshest storageState paths
-          // (paths don't change but this ensures the file exists post-generation).
-          ensureHealixFixtureImports({ projectPath: config.projectPath, roles: verifiedMerged });
-        }
-        Logger.info('PipelineWorker', 'Pre-execution auth refresh complete', {
-          verified: verifiedFresh.length,
-          total: freshRoles.length,
-          reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-        });
-        if (mergedAuth.reusedPreAuthRoles.length > 0) {
-          updateStatus(statusDir, 'auth_refresh_reused_preauth', {
-            runId,
-            message: `${mergedAuth.reusedPreAuthRoles.length} role(s) kept verified pre-auth storageState after refresh failed`,
-            roles: summarizeAuthRoles(roles),
-            reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-            failedFreshRoles: mergedAuth.failedFreshRoles,
-          }, telemetryReporter);
-        }
-        recordRunDecision(statusDir, telemetryReporter, {
-          runId,
-          decisionType: 'auth_decision',
-          phase: 'auth_refreshing',
-          status: verifiedMerged.length > 0 ? (mergedAuth.reusedPreAuthRoles.length > 0 ? 'warning' : 'success') : 'error',
-          message: `${verifiedMerged.length}/${mergedAuth.roles.length} role(s) have verified auth state before execution.`,
-          metadata: {
-            authDecision: 'pre_execution_refresh',
-            verifiedFreshCount: verifiedFresh.length,
-            verifiedMergedCount: verifiedMerged.length,
-            reusedPreAuthRoles: mergedAuth.reusedPreAuthRoles,
-            failedFreshRoles: mergedAuth.failedFreshRoles,
-            roles: summarizeAuthRoles(roles),
-            authFlowSource: hasTrustedAuthFlow ? 'trusted_exploration' : 'none',
-          },
-        });
-      } catch (refreshErr) {
-        Logger.warn('PipelineWorker', 'Pre-execution auth refresh failed — using existing storageState', {
-          reason: refreshErr.message,
-        });
-        recordRunDecision(statusDir, telemetryReporter, {
-          runId,
-          decisionType: 'auth_decision',
-          phase: 'auth_refreshing',
-          status: roles.some(hasVerifiedStorageState) ? 'warning' : 'error',
-          errorCode: refreshErr?.code || 'AUTH_REFRESH_FAILED',
-          reason: refreshErr.message,
-          message: 'Pre-execution auth refresh failed; existing storage states will be used if present.',
-          metadata: {
-            authDecision: 'pre_execution_refresh_failed',
-            roles: summarizeAuthRoles(roles),
-          },
-        });
-      }
+    // Auth state is managed by the generated auth-setup.ts Playwright setup
+    // project which runs before feature test projects at execution time.
+    // The fixture file is written if any roles have a verified storageStatePath.
+    if (Array.isArray(roles) && roles.filter(hasVerifiedStorageState).length > 0) {
+      ensureHealixFixtureImports({ projectPath: config.projectPath, roles: roles.filter(hasVerifiedStorageState) });
     }
 
     // -------------------------------------------------------
@@ -11995,6 +13211,8 @@ async function runPipeline(config, runId) {
         generationQuality,
         requirementsCoverage,
         routeAccessSummary,
+        explorationSource,
+        staticRoutesAdded,
         phaseResults,
         tierResults,
         fallbackUsed,
@@ -12573,8 +13791,15 @@ module.exports = {
   countTestsInContent,
   countSkippedTestsInContent,
   buildRouteAccessSummary,
+  resolveApiBaseURL,
+  gateBlockedRoleSpecs,
+  mergeFailedPreAuthRoles,
+  applyRoleScopedAuthTags,
+  tierBGrepSource,
   synthesizeExplorationArtifactFromContext,
   allCredentialsCoveredByPreAuth,
+  hasVerifiedStorageState,
+  firstProtectedRoute,
   mergeCredentialInjectionRoles,
   shouldTrustDiscoveredAuthFlow,
   hasApiSurfaceForGeneration,

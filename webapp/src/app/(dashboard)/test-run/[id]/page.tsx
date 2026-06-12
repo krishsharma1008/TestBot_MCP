@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { TestRun, TestFailure, FailureVerdict, QaFinding, FindingSummary } from '@/lib/types/database';
+import type { TestRun, TestFailure, FailureVerdict, QaFinding, FindingSummary, ExplorationMeta } from '@/lib/types/database';
+import { explorationSourceLabel } from '@/lib/utils/exploration-source-label';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -460,6 +461,43 @@ function KpiCard({ label, value, sub, color, delay, loading }: {
         <span className={`text-3xl font-bold ${color}`}>{displayed}{sub}</span>
       )}
     </motion.div>
+  );
+}
+
+function ExplorationSummaryBar({ meta }: { meta: ExplorationMeta }) {
+  const routeCount = meta.explorationPhaseRouteCount ?? null;
+  const source = meta.explorationPhaseSource ?? null;
+  const added = meta.staticRoutesAdded ?? 0;
+  if (routeCount == null && source == null) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-[#8BA4C8]">
+      <span className="flex items-center gap-1.5">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#60A5FA] flex-shrink-0">
+          <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
+        </svg>
+        {routeCount != null ? (
+          <span><span className="text-[#D8E8FF] font-semibold">{routeCount}</span> routes explored</span>
+        ) : (
+          <span className="text-[#4A6280]">routes unknown</span>
+        )}
+      </span>
+      {added > 0 && (
+        <span className="group relative flex items-center gap-1">
+          <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-medium cursor-default">
+            +{added} from static analysis
+          </span>
+          <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-64 rounded-lg bg-[#0D1B2E] border border-white/10 px-3 py-2 text-[11px] text-[#BFD4F2] leading-relaxed shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            {added} route{added === 1 ? '' : 's'} were found in your source files but not visited by the browser during exploration. They have been added to the test surface with selector hints from your code.
+          </span>
+        </span>
+      )}
+      {source && (
+        <span className="flex items-center gap-1 text-[#4A6280]">
+          <span>·</span>
+          <span>Source: <span className="text-[#8BA4C8]">{explorationSourceLabel(source)}</span></span>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -3502,6 +3540,113 @@ function PipelineErrorBanner({ error, runId }: { error: PipelineErrorShape; runI
   );
 }
 
+// ─── Feature Coverage ────────────────────────────────────────────────────────
+
+interface FeatureStat { total: number; passed: number; failed: number }
+interface FeatureCoverageEntry {
+  slug: string; displayName: string
+  total: number; passed: number; failed: number
+  ui: FeatureStat | null; api: FeatureStat | null
+  smoke: FeatureStat | null; sanity: FeatureStat | null; regression: FeatureStat | null
+  positive: FeatureStat | null; negative: FeatureStat | null; boundary: FeatureStat | null
+}
+
+function StatPill({ label, stat, color }: { label: string; stat: FeatureStat; color: string }) {
+  const passColor = stat.passed === stat.total ? 'text-emerald-400' : stat.failed > 0 ? 'text-red-400' : 'text-[#8DA0BC]';
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/10 text-[11px] font-medium ${color}`}>
+      {label}
+      <span className="text-[#8DA0BC]/60">·</span>
+      <span className={passColor}>{stat.total}</span>
+      {stat.passed > 0 && <span className="text-emerald-400/80">✓{stat.passed}</span>}
+      {stat.failed > 0 && <span className="text-red-400/80">✗{stat.failed}</span>}
+    </span>
+  );
+}
+
+function FeatureCoverageSection({ featureCoverage }: { featureCoverage: Record<string, FeatureCoverageEntry> }) {
+  const [open, setOpen] = useState(true);
+  const PINNED = new Set(['auth', 'e2e']);
+  const entries = Object.values(featureCoverage).sort((a, b) => {
+    const aPin = PINNED.has(a.slug) ? 1 : 0;
+    const bPin = PINNED.has(b.slug) ? 1 : 0;
+    if (aPin !== bPin) return aPin - bPin;
+    return b.total - a.total;
+  });
+  if (entries.length === 0) return null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="glass-card rounded-2xl p-5">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between mb-0 group">
+        <h2 className="text-[#F0F6FF] font-semibold text-sm">Feature Coverage</h2>
+        <div className="flex items-center gap-2">
+          <span className="text-[#4A6280] text-xs">{open ? 'Click to collapse' : 'Click to expand'}</span>
+          <motion.svg animate={{ rotate: open ? 0 : -90 }} transition={{ duration: 0.2 }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#4A6280] flex-shrink-0">
+            <polyline points="6 9 12 15 18 9" />
+          </motion.svg>
+        </div>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+            <div className="mt-3 space-y-3">
+              {entries.map((feat) => {
+                const passRate = feat.total > 0 ? Math.round((feat.passed / feat.total) * 100) : 0;
+                const rateColor = passRate >= 80 ? 'text-emerald-400' : passRate >= 50 ? 'text-amber-400' : 'text-red-400';
+                const hasTiers = feat.smoke || feat.sanity || feat.regression;
+                const hasNature = feat.positive || feat.negative || feat.boundary;
+                const hasTypes = feat.ui || feat.api;
+                return (
+                  <div key={feat.slug} className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-2.5">
+                    {/* Header row */}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#F0F6FF] font-semibold text-sm">{feat.displayName}</span>
+                        <span className="text-[#4A6280] text-xs">{feat.total} tests</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {feat.passed > 0 && <span className="text-emerald-400 text-xs font-medium">✓ {feat.passed} passed</span>}
+                        {feat.failed > 0 && <span className="text-red-400 text-xs font-medium">✗ {feat.failed} failed</span>}
+                        <span className={`text-xs font-semibold tabular-nums ${rateColor}`}>{passRate}%</span>
+                      </div>
+                    </div>
+                    {/* By type */}
+                    {hasTypes && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[#8DA0BC]/60 text-[11px] w-16 shrink-0">By type</span>
+                        {feat.ui  && <StatPill label="UI"  stat={feat.ui}  color="text-[#C8DEFF]" />}
+                        {feat.api && <StatPill label="API" stat={feat.api} color="text-[#8BA4C8]" />}
+                      </div>
+                    )}
+                    {/* By execution tier */}
+                    {hasTiers && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[#8DA0BC]/60 text-[11px] w-16 shrink-0">Tiers</span>
+                        {feat.smoke      && <StatPill label="Smoke"      stat={feat.smoke}      color="text-[#FDE68A]" />}
+                        {feat.sanity     && <StatPill label="Sanity"     stat={feat.sanity}     color="text-[#93C5FD]" />}
+                        {feat.regression && <StatPill label="Regression" stat={feat.regression} color="text-[#C8DEFF]" />}
+                      </div>
+                    )}
+                    {/* By test nature */}
+                    {hasNature && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[#8DA0BC]/60 text-[11px] w-16 shrink-0">Nature</span>
+                        {feat.positive && <StatPill label="Positive" stat={feat.positive} color="text-emerald-300" />}
+                        {feat.negative && <StatPill label="Negative" stat={feat.negative} color="text-red-300"     />}
+                        {feat.boundary && <StatPill label="Boundary" stat={feat.boundary} color="text-amber-300"   />}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function TestRunDetailPage() {
@@ -4120,7 +4265,9 @@ export default function TestRunDetailPage() {
         />
       )}
 
-      {workspaceBinding && workspaceBinding.status === 'skipped' && (
+      {workspaceBinding && workspaceBinding.status === 'skipped' &&
+        workspaceBinding.reason !== 'workspace_not_found' &&
+        workspaceBinding.reason !== 'no_project_identity' && (
         <WorkspaceBindingBanner binding={workspaceBinding} />
       )}
 
@@ -4287,6 +4434,10 @@ export default function TestRunDetailPage() {
         <KpiCard label="Pass Rate" value={passRate} sub="%" color={passRate >= 70 ? 'text-emerald-400' : passRate >= 40 ? 'text-amber-400' : 'text-red-400'} delay={320} loading={isRunningPhase && !hasLiveStats} />
       </div>
 
+      {testRun.exploration_meta && (
+        <ExplorationSummaryBar meta={testRun.exploration_meta} />
+      )}
+
       {/* Tier pills (Phase D) — Tier A/B/C segmentation from MCP. Only shown
           when the run reported a tier breakdown. */}
       {testRun.tier_results && Object.keys(testRun.tier_results).length > 0 && (
@@ -4320,6 +4471,13 @@ export default function TestRunDetailPage() {
           </div>
         </div>
       )}
+
+      {(() => {
+        const fc = testRun.coverage_metrics?.featureCoverage as Record<string, FeatureCoverageEntry> | null | undefined;
+        return fc && Object.keys(fc).length > 0
+          ? <FeatureCoverageSection featureCoverage={fc} />
+          : null;
+      })()}
 
       <QaFindingsSection summary={findingSummary} findings={qaFindings} />
 

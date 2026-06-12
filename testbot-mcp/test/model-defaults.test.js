@@ -9,15 +9,15 @@ function read(relPath) {
   return fs.readFileSync(path.join(repoRoot, relPath), 'utf-8');
 }
 
-test('webapp and browser-use runtime defaults use gpt-5.5-mini', () => {
+test('webapp and browser-use runtime defaults use gpt-5.4-mini provider routing', () => {
   const modelDefaults = read('webapp/src/lib/model-defaults.ts');
   const browserDriver = read('testbot-mcp/src/browser-use-driver.js');
   const browserRunner = read('testbot-mcp/scripts/browser_use_runner.py');
   const pricing = read('webapp/src/lib/pricing.ts');
   const llmProxy = read('webapp/src/app/api/llm-proxy/chat/completions/route.ts');
 
-  assert.match(modelDefaults, /DEFAULT_OPENAI_MODEL\s*=\s*'gpt-5\.5-mini'/);
-  assert.match(modelDefaults, /'gpt-5\.5-mini':\s*'gpt-5-mini'/);
+  assert.match(modelDefaults, /DEFAULT_OPENAI_MODEL\s*=\s*'gpt-5\.4-mini'/);
+  assert.match(modelDefaults, /'gpt-5\.5-mini':\s*'gpt-5\.4-mini'/);
   assert.match(modelDefaults, /resolveProviderOpenAIModel/);
   assert.match(browserDriver, /HEALIX_BROWSER_USE_MODEL:\s*process\.env\.HEALIX_BROWSER_USE_MODEL\s*\|\|\s*'gpt-5\.5-mini'/);
   assert.match(browserRunner, /HEALIX_BROWSER_USE_MODEL",\s*"gpt-5\.5-mini"/);
@@ -43,7 +43,6 @@ test('old OpenAI model defaults are not used by runtime configuration', () => {
   const forbidden = [
     /process\.env\.OPENAI_MODEL\s*\|\|\s*['"`]gpt-4\.1-mini['"`]/,
     /OPENAI_MODEL=gpt-4o\b/,
-    /OPENAI_MODEL=gpt-5\.4-mini\b/,
     /default:\s*`gpt-4o`/,
     /defaults to gpt-4o/i,
   ];
@@ -70,14 +69,11 @@ test('gpt-5 family calls do not send unsupported custom temperature on fallback 
   assert.match(browserRunner, /kwargs\["temperature"\] = 0/);
 });
 
-test('per-agent generation quality uses agent-scoped category expectations', () => {
+test('per-agent generation quality uses feature-based agent dispatch', () => {
   const openaiGenerator = read('webapp/src/lib/test-generation/openai-generator.ts');
-  const dashboardRunPage = read('webapp/src/app/(dashboard)/test-run/[id]/page.tsx');
 
-  assert.match(openaiGenerator, /requiredCategoriesForAgentScope/);
-  assert.match(openaiGenerator, /agentScope:\s*scopedAgent/);
-  assert.match(openaiGenerator, /agent === 'api'[\s\S]*api_contract[\s\S]*api_stress/);
-  assert.match(openaiGenerator, /agent === 'smoke'[\s\S]*ui_flow/);
-  assert.match(dashboardRunPage, /AGENT_CATEGORY_SCOPE/);
-  assert.match(dashboardRunPage, /inferAgentRequiredCategories/);
+  // Feature-based agents should exist in the new generator
+  assert.match(openaiGenerator, /generateAuthTests|generateFeatureUITests|generateFeatureAPITests|generateE2ETests/);
+  // agentType dispatch should be present
+  assert.match(openaiGenerator, /agentType|FeatureAgentType/);
 });

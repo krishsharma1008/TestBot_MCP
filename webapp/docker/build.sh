@@ -45,7 +45,7 @@ if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]
 fi
 
 # Default APP_URL if not set
-NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
+NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3030}"
 
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}Building $IMAGE_NAME:$IMAGE_TAG${NC}"
@@ -83,8 +83,8 @@ if [[ "$*" == *"--run"* ]]; then
     echo ""
   fi
 
-  echo -e "${YELLOW}→ Starting container on http://localhost:3000${NC}"
-  docker run --rm -p 3000:3000 \
+  echo -e "${YELLOW}→ Starting container on http://localhost:3030${NC}"
+  docker run --rm -p 3030:3030 \
     --env-file "$ENV_FILE" \
     --name healix-webapp \
     "$IMAGE_NAME:$IMAGE_TAG"

@@ -1,11 +1,12 @@
 /**
  * Structured PRD parser — converts free-form PRD text into a `ParsedPRD`
- * with features → user stories → acceptance criteria. Each AC is tagged
- * with `id` (e.g. "F1.S1.AC1"), `kind` (positive/negative/boundary),
- * `authRequired`, and a `roleHint` when the AC is role-scoped.
+ * with features → user stories → acceptance criteria. Each AC is a pure
+ * requirement statement tagged with `id` (e.g. "F1.S1.AC1"), `authRequired`,
+ * and a `roleHint` when the AC is role-scoped. The positive/negative/boundary
+ * `kind` now lives on the generated test case (see TestCaseKind), not the AC.
  *
  * The returned structure is the input to `openai-generator.ts`, where each
- * AC produces one `test(...)` block tagged `[REQ:F1.S1.AC1]`.
+ * AC produces one or more `test(...)` blocks tagged `[REQ:F1.S1.AC1][kind]`.
  */
 
 import { createHash } from 'crypto'
@@ -36,7 +37,6 @@ OUTPUT FORMAT — reply with a single JSON object and NOTHING else:
           "acceptanceCriteria": [
             {
               "id": "F1.S1.AC1",
-              "kind": "positive" | "negative" | "boundary",
               "authRequired": true | false,
               "roleHint": "<role-name or empty string>",
               "text": "<AC text copied verbatim from the PRD>"
@@ -56,7 +56,6 @@ OUTPUT FORMAT — reply with a single JSON object and NOTHING else:
 
 RULES:
 - Preserve AC wording verbatim. Do not paraphrase.
-- Include at least one "negative" and one "boundary" AC per story where plausible.
 - "authRequired: true" means the AC can only be exercised by a logged-in user.
 - If the AC names a specific role (admin, manager, etc.), set "roleHint" to that role.
 - If the PRD is thin, infer missing stories conservatively — do NOT hallucinate features.
@@ -169,12 +168,35 @@ function splitPRDIntoChunks(text: string, maxChars = 5000): string[] {
   return chunks.length > 0 ? chunks : [text]
 }
 
+// README boilerplate sections frequently get mis-parsed as "features" — e.g. a
+// repo's "Technologies Used" or "Local Setup Instructions" heading becomes a
+// feature with a hallucinated user story (run 1780925226135-3xfian). These are
+// never testable product behaviour, so we drop any feature whose name matches a
+// known non-feature section heading.
+//
+// PHRASE_RE matches strongly-indicative phrases anywhere in the heading (so
+// "Technologies Used" and "Local Setup Instructions" are caught, not just exact
+// matches). EXACT_RE matches ambiguous single words ("setup", "build") ONLY when
+// they are the entire heading, so legitimate features like "Account Setup" or
+// "Build a Workflow" survive.
+const NON_FEATURE_PHRASE_RE =
+  /\b(?:technolog(?:y|ies)|tech\s*stack|installation|getting\s*started|prerequisites?|folder\s*structure|project\s*structure|directory\s*structure|table\s*of\s*contents?|changelog|licen[sc]e|contributing|acknowledg(?:e?ments?)|local\s*setup|setup\s*instructions?|steps?\s*to\s*set\s*?up|how\s*to\s*(?:run|install|use|set\s*?up))\b/i
+const NON_FEATURE_EXACT_RE =
+  /^\s*(?:setup|build(?:ing)?|deployment|configuration|credits|references?|resources?|dependenc(?:y|ies))\s*$/i
+
+function isNonFeatureSection(name?: string): boolean {
+  if (!name) return false
+  const trimmed = name.trim()
+  return NON_FEATURE_PHRASE_RE.test(trimmed) || NON_FEATURE_EXACT_RE.test(trimmed)
+}
+
 function mergeParsedPRDChunks(chunks: ParsedPRD[]): ParsedPRD {
   const personas = new Map<string, { name: string; description: string }>()
   const nonFunctional = new Map<string, { kind: 'perf' | 'a11y' | 'i18n' | 'security'; text: string }>()
   const features: PRDFeature[] = []
   for (const chunk of chunks) {
     for (const feature of chunk.features || []) {
+      if (isNonFeatureSection(feature?.name)) continue
       if ((feature.userStories || []).some((story) => (story.acceptanceCriteria || []).length > 0)) {
         features.push(feature)
       }
@@ -230,9 +252,6 @@ function regexFallbackParsedPRD(chunk: string, chunkIndex: number): ParsedPRD {
     .slice(0, 30)
   const criteria = (acLines.length > 0 ? acLines : lines.slice(0, 8)).map((text, index) => ({
     id: `F${chunkIndex}.S1.AC${index + 1}`,
-    kind: /invalid|error|cannot|unauthorized|forbidden|reject|missing/i.test(text)
-      ? 'negative' as const
-      : (/boundary|empty|whitespace|null|max|min|required/i.test(text) ? 'boundary' as const : 'positive' as const),
     authRequired: /login|auth|role|admin|viewer|member|user|account|dashboard/i.test(text),
     roleHint: inferRoleHint(text),
     text,
@@ -341,13 +360,8 @@ function normalizeAC(raw: unknown, storyId: string, index: number): AcceptanceCr
   const a = (raw ?? {}) as Record<string, unknown>
   const text = String(a.text || '').trim()
   if (!text) return null
-  const kindRaw = String(a.kind || 'positive').toLowerCase()
-  const kind = (['positive', 'negative', 'boundary'] as const).includes(kindRaw as 'positive')
-    ? (kindRaw as 'positive' | 'negative' | 'boundary')
-    : 'positive'
   return {
     id: String(a.id || `${storyId}.AC${index}`).trim(),
-    kind,
     authRequired: a.authRequired === true,
     roleHint: typeof a.roleHint === 'string' && a.roleHint.trim() ? a.roleHint.trim() : undefined,
     text,

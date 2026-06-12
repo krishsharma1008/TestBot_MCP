@@ -18,7 +18,7 @@ export async function POST() {
       return NextResponse.json({ error: 'No billing account found' }, { status: 400 })
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3030'
     const session = await getStripe().billingPortal.sessions.create({
       customer: customerId,
       return_url: `${appUrl}/plan-billing`,

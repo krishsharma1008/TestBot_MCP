@@ -326,12 +326,22 @@ async function fillFirstVisible(page, selectors = [], value, timeoutMs = 10_000)
 
 function shouldAcceptLoginVerification({
   urlChanged = false,
-  successIndicatorVisible = false,
+  successIndicatorVisible = false, // advisory only — never sufficient on its own
   authStateEvidence = null,
   failureVisible = false,
+  loginNetworkFailed = false,
 } = {}) {
   if (failureVisible) return false;
-  return Boolean(urlChanged || successIndicatorVisible || authStateEvidence?.hasAuthState);
+  // A failed auth network request (login POST hit ERR_CONNECTION_REFUSED or 5xx)
+  // means authentication never actually happened — require a real auth artifact.
+  if (loginNetworkFailed) return Boolean(authStateEvidence?.hasAuthState);
+  // A success-locator match ALONE is not trustworthy: login pages routinely
+  // contain words like "Dashboard"/"Login" that match generic success locators
+  // (the RBAC demo's login heading is literally "Login to Dashboard"). Require a
+  // real signal — navigation away from the login page, or an auth artifact
+  // (cookie / localStorage / sessionStorage token). successIndicatorVisible is
+  // retained only as a label for the verification signal, not for acceptance.
+  return Boolean(urlChanged || authStateEvidence?.hasAuthState);
 }
 
 async function waitForLoginVerification({
@@ -342,6 +352,7 @@ async function waitForLoginVerification({
   authFlow,
   credentials,
   timeoutMs = 25_000,
+  getAuthFailure = null,
 } = {}) {
   const start = Date.now();
   const successLocators = buildSuccessLocators(authFlow, credentials);
@@ -362,6 +373,8 @@ async function waitForLoginVerification({
     const marker = await isAnyLocatorVisible(page, successLocators, 500);
     const authStateEvidence = await collectAuthStateEvidence(page, context, baseURL);
     const urlChanged = finalPathname !== loginPathname;
+    const authFailure = typeof getAuthFailure === 'function' ? getAuthFailure() : null;
+    const loginNetworkFailed = Boolean(authFailure);
 
     last = {
       finalPathname,
@@ -376,6 +389,7 @@ async function waitForLoginVerification({
       successIndicatorVisible: marker.visible,
       authStateEvidence,
       failureVisible,
+      loginNetworkFailed,
     })) {
       return {
         ok: true,
@@ -391,6 +405,17 @@ async function waitForLoginVerification({
       return {
         ok: false,
         reason: `Login failed on ${loginPathname}: ${failureText}`,
+        terminal: true,
+      };
+    }
+
+    // The auth request itself failed and no real session was established —
+    // fail fast rather than waiting for the full timeout on a login that
+    // physically cannot complete (e.g. backend unreachable / wrong port).
+    if (loginNetworkFailed && !authStateEvidence?.hasAuthState && !urlChanged) {
+      return {
+        ok: false,
+        reason: `Login request failed (${authFailure.type}): ${authFailure.detail}`,
         terminal: true,
       };
     }
@@ -426,6 +451,27 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page = await context.newPage();
+
+  // Track failures of the auth request triggered by submitting the login form.
+  // A connection refusal / 5xx here means the credentials were never actually
+  // checked, so any post-submit "success" UI is illusory. Reset per attempt.
+  let authNetworkFailure = null;
+  const AUTH_REQUEST_RE = /(login|sign-?in|auth|authenticate|session|token)/i;
+  page.on('requestfailed', (req) => {
+    try {
+      if (req.method() === 'POST' && AUTH_REQUEST_RE.test(req.url())) {
+        authNetworkFailure = { type: 'network', detail: `${req.url()} :: ${req.failure() && req.failure().errorText}` };
+      }
+    } catch { /* ignore */ }
+  });
+  page.on('response', (resp) => {
+    try {
+      const req = resp.request();
+      if (req.method() === 'POST' && AUTH_REQUEST_RE.test(resp.url()) && resp.status() >= 500) {
+        authNetworkFailure = { type: 'http', detail: `${resp.status()} ${resp.url()}` };
+      }
+    } catch { /* ignore */ }
+  });
 
   try {
     const cleanAuthFlow = sanitizeAuthFlow(authFlow);
@@ -484,33 +530,110 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
         const fieldTimeout = isDiscovered ? 15_000 : 8_000;
         const usernameFill = await fillFirstVisible(page, userFieldCandidates, credentials.username, fieldTimeout);
         if (!usernameFill.ok) throw new Error(usernameFill.reason);
+
+        // Two-step (email-first) flow: the gate found only the username field.
+        // Click Continue/Next to reveal the password field before trying to fill it.
+        if (formGate.via === 'username') {
+          const continueSelectors = [
+            'button[type="submit"]',
+            'input[type="submit"]',
+            'button:has-text("Continue")',
+            'button:has-text("Next")',
+            'button:has-text("Sign in")',
+            'button:has-text("Log in")',
+          ];
+          // Press Enter on the username field. Some apps trap the Enter keypress
+          // with e.preventDefault() and require a button click instead — using
+          // .catch() would miss those because press() resolves without error
+          // even when the app ignores the key. Instead, press Enter, then probe
+          // whether the password field appeared within 1s. If not, fall back to
+          // clicking the first matching submit-style button.
+          await page.locator(usernameFill.selector).first().press('Enter').catch(() => null);
+          const quickPassCheck = await pageHasCredentialForm(page, [], passFieldCandidates, 1_000);
+          if (!quickPassCheck.ok) {
+            for (const sel of continueSelectors) {
+              try {
+                const btn = page.locator(sel).first();
+                if ((await btn.count().catch(() => 0)) > 0) {
+                  await btn.click({ timeout: 5_000 });
+                  break;
+                }
+              } catch { /* try next */ }
+            }
+          }
+
+          // Wait up to 4 s for the password field to appear after the step-1 submit.
+          const passGate = await pageHasCredentialForm(page, [], passFieldCandidates, 4_000);
+          if (!passGate.ok) {
+            // Password field never appeared — passwordless / magic-link app.
+            return {
+              ok: false,
+              noLoginForm: true,
+              reason: 'two_step_no_password_field: username submitted but no password field appeared — app may use magic-link or SSO',
+            };
+          }
+        }
+
         const passwordFill = await fillFirstVisible(page, passFieldCandidates, credentials.password, 10_000);
         if (!passwordFill.ok) throw new Error(passwordFill.reason);
         // Both credential fields filled — this is a genuine login form. Record
         // it so a later "no form found anywhere" verdict can't be reported when
         // the real issue was a credential rejection on a confirmed form.
         sawLoginForm = true;
+        // Clear any stale auth-request failure from a prior candidate so the
+        // verification only reacts to THIS submit's network outcome.
+        authNetworkFailure = null;
 
         // Wait for SPA navigation to complete. Supabase fires router.replace() in the
         // .then() of signInWithPassword — this is async and fires AFTER the API response,
         // so networkidle can resolve before the redirect. waitForURL is the only reliable
-        // signal that the auth flow has actually completed. Pressing Enter is
-        // more reliable than only looking for button[type=submit], because many
-        // SPA forms use untyped <button> elements or custom UI wrappers.
+        // signal that the auth flow has actually completed.
+        //
+        // Submit by CLICKING the submit button first. Many forms (e.g. the RBAC
+        // demo) wire the action to a <button> onClick and do NOT submit on Enter,
+        // so press('Enter') silently no-ops — and because press() resolves without
+        // throwing, an Enter-then-catch-click pattern never reaches the click. We
+        // click when a submit-style control exists and only fall back to Enter
+        // when there is none (or the click fails).
         await Promise.all([
           page.waitForURL(
             (url) => { try { return url.pathname !== loginPathname; } catch { return false; } },
             { timeout: 20_000 }
           ).catch(() => null),
-          page.locator(passwordFill.selector).first().press('Enter').catch(async () => {
-            const submit = page.locator([
+          (async () => {
+            // Try submit controls in priority order. Crucially, include
+            // `<button type="button">` — React forms commonly wire submit to an
+            // onClick handler on a type="button" element (the RBAC demo's
+            // "Submit" is exactly this), which a `:not([type="button"])` filter
+            // would wrongly exclude. Text matches come before the broad button
+            // fallback so we don't click an unrelated control.
+            const submitCandidates = [
               'button[type="submit"]',
               'input[type="submit"]',
-              'button:not([type="reset"]):not([type="button"])',
-            ].join(', ')).first();
-            const count = await submit.count().catch(() => 0);
-            if (count > 0) await submit.click({ timeout: 10_000 });
-          }),
+              'button:has-text("Log in")',
+              'button:has-text("Login")',
+              'button:has-text("Sign in")',
+              'button:has-text("Sign In")',
+              'button:has-text("Submit")',
+              'button:has-text("Continue")',
+              'button:has-text("Next")',
+              'button:not([type="reset"])',
+            ];
+            let clicked = false;
+            for (const sel of submitCandidates) {
+              try {
+                const btn = page.locator(sel).first();
+                if ((await btn.count().catch(() => 0)) > 0 && await btn.isVisible().catch(() => false)) {
+                  await btn.click({ timeout: 8_000 });
+                  clicked = true;
+                  break;
+                }
+              } catch { /* try next candidate */ }
+            }
+            if (!clicked) {
+              await page.locator(passwordFill.selector).first().press('Enter').catch(() => {});
+            }
+          })(),
         ]);
 
         // Allow middleware chain redirects (e.g. /admin -> / for non-admin
@@ -527,6 +650,7 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
           authFlow: effectiveAuthFlow,
           credentials,
           timeoutMs: effectiveAuthFlow?.successIndicator ? 30_000 : 25_000,
+          getAuthFailure: () => authNetworkFailure,
         });
 
         if (!verification.ok) {
@@ -575,6 +699,48 @@ async function driveLogin({ baseURL, authFlow, credentials, storageStatePath }) 
   }
 }
 
+/**
+ * Lightweight session probe — opens a Playwright context pre-loaded with a
+ * storageState file, navigates to a protected route, and checks whether the
+ * browser stays on that route (authenticated) or gets redirected to a login
+ * path (expired/corrupt state).
+ *
+ * Returns { authenticated: true } when the page reaches the target without
+ * landing on a known login path. Returns { authenticated: false, reason } when
+ * the state appears stale or Playwright is unavailable.
+ */
+async function probeStorageState({
+  baseURL,
+  storageStatePath,
+  protectedPath = '/',
+  timeoutMs = 10_000,
+} = {}) {
+  if (!storageStatePath) return { authenticated: false, reason: 'no storageStatePath provided' };
+  let chromium;
+  try {
+    ({ chromium } = require('playwright'));
+  } catch {
+    return { authenticated: false, reason: 'playwright not installed' };
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ storageState: storageStatePath });
+    const page = await context.newPage();
+    const targetUrl = new URL(protectedPath, baseURL).href;
+    await page.goto(targetUrl, { waitUntil: 'load', timeout: timeoutMs });
+    const finalPathname = (() => { try { return new URL(page.url()).pathname; } catch { return '/'; } })();
+    const isLoginPage = COMMON_LOGIN_PATHS.some((p) => finalPathname === p || finalPathname.startsWith(p + '?'));
+    return isLoginPage
+      ? { authenticated: false, reason: `redirected to login page ${finalPathname}` }
+      : { authenticated: true };
+  } catch (err) {
+    return { authenticated: false, reason: `probe error: ${err.message}` };
+  } finally {
+    try { await browser.close(); } catch { /* ignore */ }
+  }
+}
+
 async function injectCredentials({
   projectPath,
   baseURL,
@@ -587,19 +753,37 @@ async function injectCredentials({
   }
   ensureAuthDir(projectPath);
 
-  const roles = [];
-  for (const cred of credentials) {
-    if (!cred?.username || !cred?.password) continue;
-    const role = normalizeRoleLabel(cred.role || cred.name || 'user');
-    const storageStatePath = stateFileFor(projectPath, role);
+  const settled = await Promise.allSettled(
+    credentials
+      .filter((cred) => cred?.username && cred?.password)
+      .map(async (cred) => {
+        const role = normalizeRoleLabel(cred.role || cred.name || 'user');
+        const storageStatePath = stateFileFor(projectPath, role);
+        const result = await driveLogin({ baseURL, authFlow, credentials: cred, storageStatePath });
+        return { role, storageStatePath, result };
+      }),
+  );
 
-    const result = await driveLogin({ baseURL, authFlow, credentials: cred, storageStatePath });
+  const roles = [];
+  for (const outcome of settled) {
+    if (outcome.status === 'rejected') {
+      Logger.warn('CredentialsInjector', 'Unexpected driveLogin rejection (should not happen — driveLogin never throws)', { reason: outcome.reason?.message });
+      continue;
+    }
+    const { role, storageStatePath, result } = outcome.value;
     if (result.ok) {
       Logger.info('CredentialsInjector', `Login verified for role=${role}`, { storageStatePath });
       roles.push({ role, name: role, storageStatePath, loginVerified: true });
     } else {
-      Logger.warn('CredentialsInjector', `Login failed for role=${role}`, { reason: result.reason });
-      roles.push({ role, name: role, storageStatePath: null, loginVerified: false, reason: result.reason });
+      Logger.warn('CredentialsInjector', `Login failed for role=${role}`, { reason: result.reason, noLoginForm: result.noLoginForm || false });
+      roles.push({
+        role,
+        name: role,
+        storageStatePath: null,
+        loginVerified: false,
+        reason: result.reason,
+        ...(result.noLoginForm ? { noLoginForm: true } : {}),
+      });
     }
   }
   return roles;
@@ -607,6 +791,7 @@ async function injectCredentials({
 
 module.exports = {
   injectCredentials,
+  probeStorageState,
   authDirFor,
   stateFileFor,
   buildLoginCandidates,

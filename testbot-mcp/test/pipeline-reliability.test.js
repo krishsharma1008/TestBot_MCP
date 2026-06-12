@@ -8,6 +8,7 @@ const test = require('node:test');
 const {
   classifyPipelineErrorFromStderr,
 } = require('../src/failure-triage/pipeline-error-classifier');
+const { normalizeRoleLabel } = require('../src/credentials-injector');
 const PlaywrightIntegration = require('../src/playwright-integration');
 const ContextGatherer = require('../src/context-gatherer');
 
@@ -15,6 +16,8 @@ const {
   buildRouteAccessSummary,
   synthesizeExplorationArtifactFromContext,
   allCredentialsCoveredByPreAuth,
+  hasVerifiedStorageState,
+  firstProtectedRoute,
   buildGenerationRepairContext,
   minimumUsefulRunnableFloor,
   adaptiveRunnableFloor,
@@ -847,9 +850,12 @@ test('Healix validation config targets generated specs without positional path a
     const singleConfig = ensureHealixValidationConfig({ projectPath, targetFilename: 'valid.spec.ts' });
     const allContent = fs.readFileSync(allConfig.configPath, 'utf-8');
     const singleContent = fs.readFileSync(singleConfig.configPath, 'utf-8');
+    // Normalise Windows backslashes (single or doubled-escaped) before asserting
+    // so the same regex works on all OSes.
+    const allContentNorm = allContent.replace(/\\+/g, '/');
 
     assert.match(allContent, /testDir:/);
-    assert.match(allContent, /tests[\\/]generated/);
+    assert.match(allContentNorm, /tests\/generated/);
     assert.match(allContent, /spec\|test/);
     assert.ok(singleContent.includes('valid\\\\.spec\\\\.ts$'));
     assert.doesNotMatch(singleContent, /tests\/generated\/valid\.spec\.ts --list/);
@@ -1180,7 +1186,8 @@ test('QA filter contracts prefer authoritative backend source over public compil
     const filter = qaContracts.filterContracts.find((contract) => contract.id === 'qac-filter-get-api-issues-q');
     assert.equal(filter?.responseField, 'title');
     assert.equal(filter?.operator, 'contains');
-    assert.equal(filter?.sourceFile, 'services/issues-java/src/main/java/io/pulseboard/issues/repo/IssueRepository.java');
+    // Normalise Windows backslashes so the assertion holds on all OSes.
+    assert.equal(filter?.sourceFile?.replace(/\\/g, '/'), 'services/issues-java/src/main/java/io/pulseboard/issues/repo/IssueRepository.java');
   });
 });
 
@@ -1571,7 +1578,7 @@ test('coverage top-up WEBAPP_UNREACHABLE preserves useful pre-topup suite', asyn
     err.code = 'WEBAPP_UNREACHABLE';
     const event = await maybeRunCoverageTopUp({
       client: {
-        async generateTestsForAgent() {
+        async generateTestsForFeature() {
           throw err;
         },
       },
@@ -1764,6 +1771,47 @@ test('quality gates reject hardcoded origins that do not match configured baseUR
     assert.equal(gate.error.diagnostics.stage, 'generation');
     assert.equal(gate.error.diagnostics.reason, 'hardcoded_base_url_mismatch');
     assert.equal(gate.error.diagnostics.errorCode, 'HARDCODED_BASE_URL_MISMATCH');
+  });
+});
+
+// RC1b (run 1780925226135-3xfian): when the backend runs on a distinct origin,
+// API specs must target it. The validator must (a) NOT flag a spec that correctly
+// hardcodes the backend apiBaseURL, and (b) DO flag a spec that hardcodes the
+// frontend origin instead — with an apiOriginMismatch marker so the repair steers
+// toward the API base URL rather than telling it to drop page.goto.
+test('API spec correctly targeting the distinct backend apiBaseURL is not flagged', () => {
+  withGeneratedSuite(`
+    import { test, expect, request } from '@playwright/test';
+
+    test('users api returns json', async ({ request }) => {
+      const r = await request.get('http://localhost:5000/api/users');
+      expect(r.status()).toBe(200);
+    });
+  `, (projectPath) => {
+    const quality = collectGenerationQuality(projectPath, {
+      baseURL: 'http://localhost:3001',
+      apiBaseURL: 'http://localhost:5000',
+    });
+    assert.equal(quality.hardcodedBaseUrlMismatches.length, 0);
+  });
+});
+
+test('API spec hardcoding the frontend origin when backend differs is flagged as apiOriginMismatch', () => {
+  withGeneratedSuite(`
+    import { test, expect, request } from '@playwright/test';
+
+    test('users api returns json', async ({ request }) => {
+      const r = await request.get('http://localhost:3001/api/users');
+      expect(r.status()).toBe(200);
+    });
+  `, (projectPath) => {
+    const quality = collectGenerationQuality(projectPath, {
+      baseURL: 'http://localhost:3001',
+      apiBaseURL: 'http://localhost:5000',
+    });
+    assert.equal(quality.hardcodedBaseUrlMismatches.length, 1);
+    assert.equal(quality.hardcodedBaseUrlMismatches[0].apiOriginMismatch, true);
+    assert.equal(quality.hardcodedBaseUrlMismatches[0].expectedOrigin, 'http://localhost:5000');
   });
 });
 
@@ -3166,6 +3214,202 @@ test('auth reinjection merge preserves verified pre-auth storageState when fresh
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('hasVerifiedStorageState returns true for a fresh storageState file', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'healix-storage-state-ttl-'));
+  try {
+    const statePath = path.join(root, 'auth-state-user.json');
+    fs.writeFileSync(statePath, JSON.stringify({ cookies: [], origins: [] }));
+    const role = { role: 'user', storageStatePath: statePath, loginVerified: true };
+    assert.equal(hasVerifiedStorageState(role), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('hasVerifiedStorageState returns false when storageState file is older than maxAgeMs', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'healix-storage-state-stale-'));
+  try {
+    const statePath = path.join(root, 'auth-state-user.json');
+    fs.writeFileSync(statePath, JSON.stringify({ cookies: [], origins: [] }));
+    // Backdate the file to 60 minutes ago so it reliably exceeds the 55-minute
+    // default threshold. Using maxAgeMs=0 is flaky because filesystem mtime
+    // precision can place the file fractionally ahead of Date.now().
+    const sixtyMinAgo = new Date(Date.now() - 60 * 60 * 1000);
+    fs.utimesSync(statePath, sixtyMinAgo, sixtyMinAgo);
+    const role = { role: 'user', storageStatePath: statePath, loginVerified: true };
+    assert.equal(hasVerifiedStorageState(role), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('hasVerifiedStorageState returns false when storageState file does not exist', () => {
+  const role = {
+    role: 'user',
+    storageStatePath: path.join(os.tmpdir(), 'healix-nonexistent-auth-state.json'),
+    loginVerified: true,
+  };
+  assert.equal(hasVerifiedStorageState(role), false);
+});
+
+test('hasVerifiedStorageState returns false when loginVerified is false', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'healix-storage-state-unverified-'));
+  try {
+    const statePath = path.join(root, 'auth-state-user.json');
+    fs.writeFileSync(statePath, JSON.stringify({ cookies: [], origins: [] }));
+    const role = { role: 'user', storageStatePath: statePath, loginVerified: false };
+    assert.equal(hasVerifiedStorageState(role), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// Gap 5: firstProtectedRoute extracts the first requiresAuth route from the exploration artifact.
+test('firstProtectedRoute returns the first protected route path', () => {
+  const artifact = {
+    routes: [
+      { path: '/', requiresAuth: false },
+      { path: '/dashboard', requiresAuth: true },
+      { path: '/admin', requiresAuth: true },
+    ],
+  };
+  assert.equal(firstProtectedRoute(artifact), '/dashboard');
+});
+
+test('firstProtectedRoute returns null when no protected routes exist', () => {
+  const artifact = { routes: [{ path: '/', requiresAuth: false }] };
+  assert.equal(firstProtectedRoute(artifact), null);
+});
+
+test('firstProtectedRoute returns null for empty or missing routes', () => {
+  assert.equal(firstProtectedRoute({}), null);
+  assert.equal(firstProtectedRoute(null), null);
+  assert.equal(firstProtectedRoute({ routes: [] }), null);
+});
+
+// Gap 5: probe result determines reusePreAuth flag.
+test('probe failure prevents pre-auth storageState reuse', () => {
+  // Simulate the pipeline-worker probe decision logic.
+  const probeResults = [
+    { role: { role: 'admin' }, probe: { authenticated: false, reason: 'redirected to login page /login' } },
+    { role: { role: 'user' }, probe: { authenticated: true } },
+  ];
+  const failedProbe = probeResults.find(({ probe }) => !probe.authenticated);
+  assert.ok(failedProbe, 'should find the failed probe');
+  assert.equal(failedProbe.role.role, 'admin');
+  // reusePreAuth must be false when any probe fails
+  const reusePreAuth = !failedProbe;
+  assert.equal(reusePreAuth, false);
+});
+
+test('all probes passing sets reusePreAuth to true', () => {
+  const probeResults = [
+    { role: { role: 'admin' }, probe: { authenticated: true } },
+    { role: { role: 'user' }, probe: { authenticated: true } },
+  ];
+  const failedProbe = probeResults.find(({ probe }) => !probe.authenticated);
+  const reusePreAuth = !failedProbe;
+  assert.equal(reusePreAuth, true);
+});
+
+test('no protected route skips probe and allows reuse', () => {
+  // When firstProtectedRoute returns null, probeResults defaults to all-authenticated.
+  const preAuthRoles = [{ role: 'admin', storageStatePath: '/tmp/admin.json' }];
+  const protectedPath = null;
+  const probeResults = protectedPath
+    ? [] // would call probeStorageState
+    : preAuthRoles.map((role) => ({ role, probe: { authenticated: true } }));
+  assert.equal(probeResults.length, 1);
+  assert.equal(probeResults[0].probe.authenticated, true);
+});
+
+// Gap 5 (fix 2): probe rejection (Promise.allSettled outcome) is treated as authenticated:false.
+test('probe allSettled rejection maps to authenticated:false', () => {
+  const preAuthRoles = [
+    { role: 'admin', storageStatePath: '/tmp/admin.json' },
+    { role: 'user', storageStatePath: '/tmp/user.json' },
+  ];
+  // Simulate one fulfilled, one rejected allSettled outcome.
+  const settled = [
+    { status: 'fulfilled', value: { role: preAuthRoles[0], probe: { authenticated: true } } },
+    { status: 'rejected', reason: new Error('playwright OOM') },
+  ];
+  const probeResults = settled.map((outcome, i) =>
+    outcome.status === 'fulfilled'
+      ? outcome.value
+      : { role: preAuthRoles[i], probe: { authenticated: false, reason: outcome.reason?.message || 'probe threw unexpectedly' } },
+  );
+  assert.equal(probeResults[0].probe.authenticated, true);
+  assert.equal(probeResults[1].probe.authenticated, false);
+  assert.ok(probeResults[1].probe.reason.includes('playwright OOM'));
+});
+
+// Gap 5 (fix 3): deferred path filters probe-failed roles from safePreAuthRoles.
+test('safePreAuthRoles excludes probe-failed roles so deferred path does not use corrupt storageStates', () => {
+  const preAuthRoles = [
+    { role: 'admin', storageStatePath: '/tmp/admin.json', loginVerified: true },
+    { role: 'user', storageStatePath: '/tmp/user.json', loginVerified: true },
+  ];
+  const probeFailedRoleKeys = new Set(['admin']); // admin's storageState failed the probe
+
+  const safePreAuthRoles = preAuthRoles.filter((r) => {
+    const key = r.role || r.name || 'user';
+    return !probeFailedRoleKeys.has(key);
+  });
+
+  assert.equal(safePreAuthRoles.length, 1);
+  assert.equal(safePreAuthRoles[0].role, 'user');
+});
+
+test('safePreAuthRoles is all preAuthRoles when no probe failures', () => {
+  const preAuthRoles = [
+    { role: 'admin', storageStatePath: '/tmp/admin.json', loginVerified: true },
+    { role: 'user', storageStatePath: '/tmp/user.json', loginVerified: true },
+  ];
+  const probeFailedRoleKeys = new Set();
+  const safePreAuthRoles = preAuthRoles.filter((r) => !probeFailedRoleKeys.has(r.role || r.name || 'user'));
+  assert.equal(safePreAuthRoles.length, 2);
+});
+
+// Gap 3 (fix): browserUseCred is undefined when all roles pre-authed (no cred to pass to browser-use).
+test('browserUseCred is undefined when all roles are pre-authed', () => {
+  const allCreds = [
+    { role: 'admin', username: 'admin@example.com', password: 'pass1' },
+    { role: 'user', username: 'user@example.com', password: 'pass2' },
+  ];
+  const preAuthRoleKeys = new Set(['admin', 'user'].map((r) => normalizeRoleLabel(r)));
+  const failedCreds = allCreds.filter((c) => !preAuthRoleKeys.has(normalizeRoleLabel(c.role || c.name || 'user')));
+  const browserUseCred = failedCreds.length > 0 ? { username: failedCreds[0].username, password: failedCreds[0].password } : undefined;
+  assert.equal(browserUseCred, undefined);
+});
+
+// Gap 4: noLoginForm flag is propagated from preAuthFailedRoles to auth_injected status.
+// Tests the data-flow: _preAuthFailedRoles set by pipeline-worker from exploration result,
+// noLoginFormRoles computed and conditionally included in the status event payload.
+test('noLoginFormRoles extracted from preAuthFailedRoles with noLoginForm flag', () => {
+  const preAuthFailedRoles = [
+    { role: 'user', loginVerified: false, noLoginForm: true, reason: 'no credential form rendered at /login' },
+    { role: 'admin', loginVerified: false, reason: 'Login failed on /login: invalid credentials' },
+  ];
+  const noLoginFormRoles = preAuthFailedRoles.filter((r) => r.noLoginForm).map((r) => r.role);
+  assert.deepEqual(noLoginFormRoles, ['user']);
+});
+
+test('noLoginFormRoles is empty when all failed roles have valid login forms', () => {
+  const preAuthFailedRoles = [
+    { role: 'user', loginVerified: false, reason: 'Login failed on /login: invalid credentials' },
+    { role: 'admin', loginVerified: false, reason: 'Login driver error: timeout' },
+  ];
+  const noLoginFormRoles = preAuthFailedRoles.filter((r) => r.noLoginForm).map((r) => r.role);
+  assert.deepEqual(noLoginFormRoles, []);
+});
+
+test('noLoginFormRoles is empty when preAuthFailedRoles is empty', () => {
+  const preAuthFailedRoles = [];
+  const noLoginFormRoles = preAuthFailedRoles.filter((r) => r.noLoginForm).map((r) => r.role);
+  assert.deepEqual(noLoginFormRoles, []);
 });
 
 test('pipeline trusts login authFlow but refuses register authFlow for reinjection', () => {

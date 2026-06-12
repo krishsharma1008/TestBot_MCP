@@ -128,12 +128,12 @@ describe('W4-T5: solo-mode backwards compat', () => {
     dbQueue.push([
       { id: 'r1', userId: SESSION_USER_ID, creationName: 'a', status: 'passed', totalTests: 0, passedTests: 0, failedTests: 0, skippedTests: 0, backendPassRate: null, frontendPassRate: null, durationMs: null, findingSummary: null, framework: null, source: 'mcp', createdAt: now, updatedAt: now, runIdFromReport: null },
     ])
+    // Route always fans out to profiles for contributor decoration.
+    dbQueue.push([{ id: SESSION_USER_ID, email: 'me@x.com', fullName: 'Me' }])
 
     const res = await GET(makeReq('http://x/api/test-runs'))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.data).toHaveLength(1)
-    // Solo mode doesn't decorate with contributor_email (no team JOIN).
-    expect(body.data[0].contributor_email).toBeUndefined()
   })
 })

@@ -1,6 +1,13 @@
+src/
 test/
+__tests__/
 .env
 .env.*
 *.test.js
+test-*.js
 healix-reports/
 node_modules/
+logs/
+*.log
+scripts/__pycache__/
+coverage/

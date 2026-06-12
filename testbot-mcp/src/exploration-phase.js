@@ -21,9 +21,9 @@ const fs = require('fs');
 const path = require('path');
 const Logger = require('./logger');
 const { driveExploration } = require('./browser-use-driver');
-const { exploreWithPlaywright, enrichRoutesWithDOM } = require('./playwright-explorer');
-const { injectCredentials } = require('./credentials-injector');
-const { isUnsafeAuthFlow, sanitizeAuthFlow } = require('./auth-flow-utils');
+const { exploreWithPlaywright, enrichRoutesWithDOM, enrichAllRoutesWithDOM } = require('./playwright-explorer');
+const { injectCredentials, normalizeRoleLabel } = require('./credentials-injector');
+const { isUnsafeAuthFlow, sanitizeAuthFlow, chooseBetterAuthFlow } = require('./auth-flow-utils');
 
 const EMPTY_ARTIFACT = Object.freeze({
   routes: [],
@@ -54,6 +54,60 @@ async function _applyDOMEnrichment(artifact, { baseURL, preAuthRoles }) {
     Logger.warn('ExplorationPhase', 'DOM enrichment pass failed (non-fatal)', { reason: err.message });
     return artifact;
   }
+}
+
+/**
+ * Merge a secondary (browser-use gap-fill) artifact into the primary
+ * (Playwright) artifact. The primary is authoritative: gap-fill only contributes
+ * routes/forms/keyFlows the primary crawl did not already find. New routes are
+ * tagged so downstream consumers can see they came from the LLM gap-fill pass.
+ */
+function mergeGapFillArtifact(primary = {}, gapFill = {}) {
+  const routes = Array.isArray(primary?.routes) ? [...primary.routes] : [];
+  const seenRoutes = new Set(routes.map((r) => r?.path).filter(Boolean));
+  for (const r of Array.isArray(gapFill?.routes) ? gapFill.routes : []) {
+    if (!r?.path) continue;
+    if (!seenRoutes.has(r.path)) {
+      seenRoutes.add(r.path);
+      routes.push({ ...r, source: r.source || 'browser-use-gapfill' });
+    } else if (r.requiresAuth || r.requiredRole) {
+      // If the gap-fill source carries a truthy auth signal for a route already
+      // in the primary artifact, preserve it — the primary Playwright pass
+      // defaults to requiresAuth:false when navigating under a pre-auth session.
+      const existing = routes.find((pr) => pr?.path === r.path);
+      if (existing) {
+        existing.requiresAuth = existing.requiresAuth || r.requiresAuth;
+        existing.requiredRole = existing.requiredRole || r.requiredRole;
+      }
+    }
+  }
+
+  const forms = Array.isArray(primary?.forms) ? [...primary.forms] : [];
+  const formKeys = new Set(forms.map((f) => `${f?.route}::${(f?.fields || []).join(',')}`));
+  for (const f of Array.isArray(gapFill?.forms) ? gapFill.forms : []) {
+    const key = `${f?.route}::${(f?.fields || []).join(',')}`;
+    if (!formKeys.has(key)) { formKeys.add(key); forms.push(f); }
+  }
+
+  const keyFlows = Array.isArray(primary?.keyFlows) ? [...primary.keyFlows] : [];
+  const flowNames = new Set(keyFlows.map((k) => k?.name).filter(Boolean));
+  for (const kf of Array.isArray(gapFill?.keyFlows) ? gapFill.keyFlows : []) {
+    if (kf?.name && !flowNames.has(kf.name)) { flowNames.add(kf.name); keyFlows.push(kf); }
+  }
+
+  const observedErrors = [...new Set([
+    ...(Array.isArray(primary?.observedErrors) ? primary.observedErrors : []),
+    ...(Array.isArray(gapFill?.observedErrors) ? gapFill.observedErrors : []),
+  ])];
+
+  return {
+    ...primary,
+    routes,
+    forms,
+    keyFlows,
+    observedErrors,
+    authFlow: chooseBetterAuthFlow(primary?.authFlow || null, gapFill?.authFlow || null),
+  };
 }
 
 function primaryCredential(credentials) {
@@ -112,11 +166,12 @@ function artifactHasUsefulContext(artifact = {}) {
   return Boolean(usefulRouteCount > 0 || formCount > 0 || keyFlowCount > 0);
 }
 
-async function runPlaywrightFallback({ baseURL, credsForAgent, preAuthRoles }) {
+async function runPlaywrightFallback({ baseURL, credsForAgent, preAuthRoles, seedRoutes = [] }) {
   const fallback = await exploreWithPlaywright({
     baseURL,
     credentials: credsForAgent,
     storageStatePaths: preAuthRoles,
+    seedRoutes,
     onHeartbeat: () => { /* noop */ },
   });
   if (!fallback.available) return fallback;
@@ -133,6 +188,8 @@ async function runExplorationPhase({
   projectPath,
   skipExploration = false,
   totalTimeoutMs = 120_000,
+  knownRoutes = [],
+  prdFeatures = [],
 }) {
   if (skipExploration) {
     Logger.info('ExplorationPhase', 'skipExploration=true — using empty artifact');
@@ -144,7 +201,6 @@ async function runExplorationPhase({
   }
 
   const cred = primaryCredential(credentials);
-  const credsForAgent = cred ? { username: cred.username, password: cred.password } : undefined;
 
   // Pre-authenticate ALL roles before exploration so every role's protected
   // routes are reachable. We use fallback selectors (no authFlow yet) for a
@@ -152,6 +208,7 @@ async function runExplorationPhase({
   // Playwright heuristic explorer which runs one walk per role and merges the
   // results. browser-use handles its own login via the improved task prompt.
   let preAuthRoles = [];
+  let preAuthFailedRoles = [];
   if (cred && projectPath) {
     try {
       const allCreds = Array.isArray(credentials) ? credentials : [cred];
@@ -162,102 +219,199 @@ async function runExplorationPhase({
         authFlow: null,
       });
       preAuthRoles = injected.filter((r) => r.loginVerified && r.storageStatePath);
+      preAuthFailedRoles = injected.filter((r) => !r.loginVerified);
       if (preAuthRoles.length > 0) {
         Logger.info('ExplorationPhase', `Pre-auth login succeeded for ${preAuthRoles.length} role(s) — explorer will start authenticated`, {
           roles: preAuthRoles.map((r) => r.role),
         });
       } else {
-        Logger.info('ExplorationPhase', 'Pre-auth login could not be verified for any role — exploring as unauthenticated');
+        const allNoLoginForm = injected.length > 0 && injected.every((r) => r.noLoginForm);
+        if (allNoLoginForm) {
+          Logger.warn('ExplorationPhase', 'Pre-auth skipped — sign-in route not found for any role. Check HEALIX_LOGIN_URL config or verify the app\'s login path');
+        } else {
+          Logger.info('ExplorationPhase', 'Pre-auth login could not be verified for any role — exploring as unauthenticated');
+        }
       }
     } catch (preAuthErr) {
       Logger.warn('ExplorationPhase', 'Pre-auth attempt failed (best-effort)', { reason: preAuthErr.message });
     }
   }
 
-  // Prefer browser-use when its deps are in place; fall back to heuristic
-  // Playwright exploration so the MCP works out of the box without requiring
-  // an OPENAI_API_KEY on the user's machine.
-  let result = await driveExploration({
-    targetUrl: baseURL,
-    credentials: preAuthRoles.length > 0 ? undefined : credsForAgent,
-    allCredentials: Array.isArray(credentials) ? credentials : (cred ? [cred] : []),
-    preAuthRoleCount: preAuthRoles.length,
-    totalTimeoutMs,
-    onHeartbeat: () => { /* noop — heartbeats could be surfaced to status later */ },
-  });
-  let source = 'browser-use';
-
-  if (result.available) {
-    if (artifactHasUsefulContext(result.artifact)) {
-      // Playwright DOM enrichment runs after browser-use to capture labels,
-      // select options, button disabled state, headings, and error probe text.
-      result = {
-        ...result,
-        artifact: await _applyDOMEnrichment(result.artifact, { baseURL, preAuthRoles }),
-      };
-      source = 'browser-use+playwright-enrichment';
-    } else {
-      Logger.warn('ExplorationPhase', 'browser-use returned no usable context — falling back to Playwright heuristic', {
-        observedErrors: result.artifact?.observedErrors || [],
-      });
-      const fallback = await runPlaywrightFallback({ baseURL, credsForAgent, preAuthRoles });
-      if (fallback.available) {
-        const fallbackArtifact = fallback.artifact || {};
-        const browserAuthFlow = result.artifact?.authFlow || null;
-        const observedErrors = [
-          ...(Array.isArray(result.artifact?.observedErrors) ? result.artifact.observedErrors : []),
-          'browser-use returned no usable context; used Playwright heuristic fallback',
-          ...(Array.isArray(fallbackArtifact.observedErrors) ? fallbackArtifact.observedErrors : []),
-        ];
-        result = {
-          ...fallback,
-          artifact: {
-            ...fallbackArtifact,
-            authFlow: fallbackArtifact.authFlow || browserAuthFlow,
-            observedErrors,
-          },
-        };
-        source = 'browser-use-empty+playwright-heuristic+enrichment';
-      } else {
-        Logger.warn('ExplorationPhase', 'No exploration available after empty browser-use result — degrading to empty artifact', {
-          fallbackReason: fallback.reason,
-        });
-        return {
-          artifact: {
-            ...EMPTY_ARTIFACT,
-            observedErrors: [
-              ...(Array.isArray(result.artifact?.observedErrors) ? result.artifact.observedErrors : []),
-              `Playwright fallback unavailable after empty browser-use result: ${fallback.reason || 'unknown'}`,
-            ],
-          },
-          source: 'unavailable',
-          reason: fallback.reason || 'browser-use returned no usable context',
-          preAuthRoles,
-        };
-      }
-    }
-  } else {
-    Logger.info('ExplorationPhase', 'browser-use unavailable — falling back to Playwright heuristic', {
-      reason: result.reason,
+  // Phase A: Parallel Playwright enrichment over all known static routes.
+  // Runs before browser-use so the LLM agent can focus on gap-filling only.
+  let phaseAEnrichments = new Map();
+  const parallelEnrichmentEnabled = process.env.HEALIX_PARALLEL_ENRICHMENT !== '0';
+  if (parallelEnrichmentEnabled && Array.isArray(knownRoutes) && knownRoutes.length > 0) {
+    Logger.info('ExplorationPhase', 'Phase A: parallel Playwright enrichment over static routes', {
+      routeCount: knownRoutes.length,
     });
-    const fallback = await runPlaywrightFallback({ baseURL, credsForAgent, preAuthRoles });
-    if (fallback.available) {
-      result = fallback;
-      source = 'playwright-heuristic+enrichment';
-    } else {
-      Logger.warn('ExplorationPhase', 'No exploration available — degrading to empty artifact', {
-        browserUseReason: result.reason,
-        fallbackReason: fallback.reason,
+    try {
+      const concurrency = Math.max(1, parseInt(process.env.HEALIX_ENRICHMENT_CONCURRENCY || '3', 10));
+      const timeBudgetMs = Math.max(10_000, parseInt(process.env.HEALIX_ENRICHMENT_BUDGET_MS || '90000', 10));
+      // Derive priority paths by keyword-matching PRD feature names against known
+      // route paths. Features have { name } shape; routes have { path } shape.
+      const prdPaths = (() => {
+        if (!Array.isArray(prdFeatures) || !prdFeatures.length) return [];
+        const routePaths = knownRoutes.map((r) => (typeof r === 'string' ? r : r?.path || ''));
+        const matched = new Set();
+        for (const f of prdFeatures) {
+          const name = (typeof f === 'string' ? f : f?.name || '').toLowerCase();
+          const keywords = name.split(/[\s\-_/]+/).filter((w) => w.length >= 4);
+          for (const rp of routePaths) {
+            if (keywords.some((kw) => rp.toLowerCase().includes(kw))) matched.add(rp);
+          }
+        }
+        return Array.from(matched);
+      })();
+      const phaseA = await enrichAllRoutesWithDOM({
+        routes: knownRoutes.map((r) => (typeof r === 'string' ? { path: r } : r)),
+        baseURL,
+        storageStatePaths: preAuthRoles,
+        concurrency,
+        timeBudgetMs,
+        priorityPaths: prdPaths,
+        onHeartbeat: () => {},
       });
-      return {
-        artifact: { ...EMPTY_ARTIFACT },
-        source: 'unavailable',
-        reason: fallback.reason || result.reason,
-      };
+      phaseAEnrichments = phaseA.enrichments;
+      if (phaseA.timedOut) {
+        Logger.warn('ExplorationPhase', 'Phase A enrichment hit time budget before completing all routes', {
+          enriched: phaseAEnrichments.size,
+          total: knownRoutes.length,
+        });
+      } else {
+        Logger.info('ExplorationPhase', 'Phase A enrichment complete', { enriched: phaseAEnrichments.size });
+      }
+    } catch (phaseAErr) {
+      Logger.warn('ExplorationPhase', 'Phase A enrichment failed (non-fatal)', { reason: phaseAErr.message });
     }
   }
 
-  const artifact = normalizeExplorationArtifact(result.artifact, source);
+  // Only withhold credentials for roles that successfully pre-authed.
+  // If admin pre-authed but user failed, still pass the user credential to
+  // browser-use so it can attempt login for that role's routes.
+  const allCreds = Array.isArray(credentials) ? credentials : (cred ? [cred] : []);
+  const preAuthRoleKeys = new Set(preAuthRoles.map((r) => normalizeRoleLabel(r.role || r.name || 'user')));
+  const failedCreds = allCreds.filter((c) => !preAuthRoleKeys.has(normalizeRoleLabel(c.role || c.name || 'user')));
+  const browserUseCred = failedCreds.length > 0 ? { username: failedCreds[0].username, password: failedCreds[0].password } : undefined;
+
+  // -------------------------------------------------------
+  // PRIMARY explorer: the deterministic Playwright crawl. It is seeded with the
+  // statically-known routes (Step 1/2) and runs one authenticated walk per role,
+  // so it always produces the base artifact — regardless of whether browser-use
+  // is installed. This is the workhorse that should reach ~60-80% coverage.
+  // -------------------------------------------------------
+  const playwright = await runPlaywrightFallback({
+    baseURL,
+    credsForAgent: browserUseCred,
+    preAuthRoles,
+    seedRoutes: knownRoutes,
+  });
+
+  let result;
+  let source;
+  if (playwright.available) {
+    result = playwright;
+    source = 'playwright-primary';
+  } else {
+    result = { available: true, artifact: { ...EMPTY_ARTIFACT, observedErrors: [`playwright primary unavailable: ${playwright.reason || 'unknown'}`] } };
+    source = 'playwright-unavailable';
+  }
+
+  // -------------------------------------------------------
+  // SECONDARY explorer: browser-use surgical gap-fill. It is fed the union of
+  // statically-known routes and everything the primary crawl already discovered,
+  // so its prompt's "ALREADY MAPPED" set is accurate and it spends its LLM steps
+  // only on genuine gaps (dynamic nav, role-gated menus, multi-step flows).
+  // Optional: degrades silently when browser-use is not installed.
+  // -------------------------------------------------------
+  const alreadyMapped = [...new Set([
+    ...(Array.isArray(knownRoutes) ? knownRoutes.map((r) => (typeof r === 'string' ? r : r?.path)) : []),
+    ...((result.artifact?.routes || []).map((r) => r?.path)),
+  ].filter(Boolean))].map((p) => ({ path: p }));
+
+  let gapFill;
+  try {
+    gapFill = await driveExploration({
+      targetUrl: baseURL,
+      credentials: browserUseCred,
+      allCredentials: allCreds,
+      preAuthRoleCount: preAuthRoles.length,
+      preAuthRoles,
+      totalTimeoutMs,
+      knownRoutes: alreadyMapped,
+      prdFeatures: Array.isArray(prdFeatures) ? prdFeatures : [],
+      onHeartbeat: () => { /* noop — heartbeats could be surfaced to status later */ },
+    });
+  } catch (buErr) {
+    gapFill = { available: false, reason: buErr.message };
+  }
+
+  if (gapFill?.available && artifactHasUsefulContext(gapFill.artifact)) {
+    const before = (result.artifact?.routes || []).length;
+    const merged = mergeGapFillArtifact(result.artifact || { ...EMPTY_ARTIFACT }, gapFill.artifact);
+    const added = (merged.routes || []).length - before;
+    result = { ...result, artifact: merged };
+    // Enrich any net-new routes the gap-fill discovered.
+    if (added > 0) {
+      result = { ...result, artifact: await _applyDOMEnrichment(result.artifact, { baseURL, preAuthRoles }) };
+    }
+    source = playwright.available ? 'playwright-primary+browser-use-gapfill' : 'browser-use';
+    Logger.info('ExplorationPhase', `browser-use gap-fill added ${added} route(s) beyond the primary crawl`, {
+      primaryRoutes: before,
+      gapFillRoutes: (gapFill.artifact?.routes || []).length,
+    });
+  } else if (!playwright.available) {
+    // Neither the primary crawl nor browser-use produced anything usable.
+    Logger.warn('ExplorationPhase', 'No exploration available — primary crawl and browser-use both failed', {
+      playwrightReason: playwright.reason,
+      gapFillReason: gapFill?.reason,
+    });
+    return {
+      artifact: {
+        ...EMPTY_ARTIFACT,
+        observedErrors: [`exploration unavailable: ${playwright.reason || gapFill?.reason || 'unknown'}`],
+      },
+      source: 'unavailable',
+      reason: playwright.reason || gapFill?.reason || 'exploration unavailable',
+      preAuthRoles,
+    };
+  } else if (gapFill && !gapFill.available) {
+    Logger.info('ExplorationPhase', 'browser-use gap-fill unavailable — using Playwright primary crawl only', {
+      reason: gapFill.reason,
+    });
+  }
+
+  // Merge Phase A enrichments into the live artifact. Live browser data wins on
+  // conflict — Phase A data only fills gaps where the live pass has no DOM data.
+  let mergedArtifact = result.artifact || {};
+  if (phaseAEnrichments.size > 0) {
+    const liveRoutes = Array.isArray(mergedArtifact.routes) ? mergedArtifact.routes : [];
+    const livePathSet = new Set(liveRoutes.map((r) => r.path));
+    // Enrich existing live routes that lack DOM data
+    const enrichedLive = liveRoutes.map((r) => {
+      if (phaseAEnrichments.has(r.path) && !r.labels && !r.buttons) {
+        return { ...phaseAEnrichments.get(r.path), ...r };
+      }
+      return r;
+    });
+    // Add Phase A routes not found by the live browser pass. Use the auth
+    // signal from knownRoutes (static analysis) rather than defaulting to false.
+    const knownRouteAuthMap = new Map(
+      (Array.isArray(knownRoutes) ? knownRoutes : [])
+        .filter((r) => r?.path)
+        .map((r) => [r.path, { requiresAuth: r.requiresAuth === true, requiredRole: r.requiredRole || null }])
+    );
+    const extraRoutes = [];
+    for (const [routePath, dom] of phaseAEnrichments) {
+      if (!livePathSet.has(routePath)) {
+        const auth = knownRouteAuthMap.get(routePath) || { requiresAuth: false, requiredRole: null };
+        extraRoutes.push({ path: routePath, requiresAuth: auth.requiresAuth, requiredRole: auth.requiredRole, source: 'phase_a_enrichment', ...dom });
+      }
+    }
+    mergedArtifact = { ...mergedArtifact, routes: [...enrichedLive, ...extraRoutes] };
+  }
+
+  const artifact = normalizeExplorationArtifact(mergedArtifact, source);
 
   if (statusDir) {
     try {
@@ -271,7 +425,7 @@ async function runExplorationPhase({
     }
   }
 
-  return { artifact, source, preAuthRoles };
+  return { artifact, source, preAuthRoles, preAuthFailedRoles };
 }
 
 module.exports = {
@@ -279,4 +433,5 @@ module.exports = {
   EMPTY_ARTIFACT,
   normalizeExplorationArtifact,
   artifactHasUsefulContext,
+  mergeGapFillArtifact,
 };

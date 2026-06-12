@@ -11,6 +11,7 @@ import { runAbuseDetection } from '@/lib/abuse-detector'
 import { trackProjectUsage } from '@/lib/project-hash'
 import { logBlockedRequest } from '@/lib/security-logger'
 import { computeCoverageMetrics } from '@/lib/coverage'
+import { computeFeatureCoverage } from '@/lib/test-generation/feature-coverage'
 import {
   hasRealFindings,
   persistPreparedQaCorpus,
@@ -453,11 +454,20 @@ export async function POST(request: NextRequest) {
     // Coverage Intelligence — computed at ingest time
     const overallPassRate = total_tests > 0 ? Math.round((passed_tests / total_tests) * 100) : 0
     const rawTests: ReportTestWithAI[] = report.tests || []
+    let featureCoveragePayload = null
+    try {
+      if (rawTests.length > 0) featureCoveragePayload = computeFeatureCoverage(rawTests)
+    } catch {
+      // non-fatal — coverage stats failing must never break ingest
+    }
     const coverageMetricsPayload = rawTests.length > 0
-      ? computeCoverageMetrics(
-          rawTests.map(t => ({ name: t.title ?? t.name ?? '', suite: t.suite ?? t.file ?? '', status: t.status ?? 'unknown' })),
-          overallPassRate,
-        )
+      ? {
+          ...computeCoverageMetrics(
+            rawTests.map(t => ({ name: t.title ?? t.name ?? '', suite: t.suite ?? t.file ?? '', status: t.status ?? 'unknown' })),
+            overallPassRate,
+          ),
+          featureCoverage: featureCoveragePayload,
+        }
       : null
 
     const projectName = creation_name || report.metadata?.projectName || 'Untitled Test Run'

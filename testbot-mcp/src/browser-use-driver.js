@@ -23,6 +23,7 @@
 const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const Logger = require('./logger');
 
 const RUNNER_SCRIPT = path.join(__dirname, '..', 'scripts', 'browser_use_runner.py');
@@ -76,21 +77,34 @@ async function calibrateStepTimeoutS({ openaiApiKey, calibrationPromptUrl } = {}
 }
 
 function resolvePython() {
+  // Resolve to the concrete interpreter executable (sys.executable) rather than
+  // a launcher alias like `py`. Spawning the real python.exe with a script path
+  // bypasses shebang handling — critical on Windows, where `py runner.py` honors
+  // the script's `#!/usr/bin/env python3` shebang and delegates to the PATH
+  // `python`/`python3`, which is often the Microsoft Store stub (exit 9009).
+  // Using `-c` (no script file) means no shebang is consulted during probing.
+  const probe = (cmd) => {
+    try {
+      const res = spawnSync(cmd, ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf-8' });
+      if (res.status === 0) {
+        const exe = (res.stdout || '').trim();
+        return exe || cmd;
+      }
+    } catch { /* not runnable */ }
+    return null;
+  };
+
   const configured = process.env.HEALIX_BROWSER_USE_PYTHON || process.env.BROWSER_USE_PYTHON;
   if (configured) {
-    try {
-      const res = spawnSync(configured, ['--version'], { stdio: 'ignore' });
-      if (res.status === 0) return configured;
-    } catch { /* fall through to PATH candidates */ }
+    const exe = probe(configured);
+    if (exe) return exe;
   }
   const candidates = process.platform === 'win32'
     ? ['py', 'python', 'python3']
     : ['python3', 'python'];
   for (const cmd of candidates) {
-    try {
-      const res = spawnSync(cmd, ['--version'], { stdio: 'ignore' });
-      if (res.status === 0) return cmd;
-    } catch { /* try next */ }
+    const exe = probe(cmd);
+    if (exe) return exe;
   }
   return null;
 }
@@ -104,6 +118,31 @@ function isBrowserUseInstalled(pythonCmd) {
   } catch {
     return false;
   }
+}
+
+async function autoInstallBrowserUse(pythonCmd) {
+  const runAsync = (cmd, args, timeoutMs) => new Promise((resolve) => {
+    let stderr = '';
+    const proc = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    const timer = setTimeout(() => {
+      try { proc.kill('SIGKILL'); } catch { /* ignore */ }
+      resolve({ status: -1, stderr: 'timed out' });
+    }, timeoutMs);
+    proc.stderr.on('data', (chunk) => { stderr += chunk.toString('utf-8'); });
+    proc.on('close', (code) => { clearTimeout(timer); resolve({ status: code ?? -1, stderr }); });
+    proc.on('error', (err) => { clearTimeout(timer); resolve({ status: -1, stderr: err.message }); });
+  });
+
+  Logger.info('BrowserUseDriver', 'browser-use not installed — auto-installing via pip (this may take ~30s)...');
+  const pipResult = await runAsync(pythonCmd, ['-m', 'pip', 'install', 'browser-use', '--quiet'], 120_000);
+  if (pipResult.status !== 0) {
+    return { success: false, reason: `pip install browser-use failed: ${pipResult.stderr.slice(0, 300)}` };
+  }
+  // Best-effort: install Playwright chromium browser binaries that browser-use needs.
+  // Non-fatal — browser-use may already have a browser or handle this on first run.
+  Logger.info('BrowserUseDriver', 'Installing Playwright chromium for browser-use...');
+  await runAsync(pythonCmd, ['-m', 'playwright', 'install', 'chromium'], 120_000);
+  return { success: true };
 }
 
 function readEnvValueFromFile(envPath, key) {
@@ -141,6 +180,9 @@ function driveExploration({
   totalTimeoutMs = DEFAULT_TIMEOUT_MS,
   onHeartbeat,
   stepTimeoutS = null, // injected by tests; otherwise calibrated at runtime
+  knownRoutes = [],
+  prdFeatures = [],
+  preAuthRoles = [],
 } = {}) {
   return new Promise(async (resolve) => {
     if (!targetUrl) {
@@ -159,12 +201,20 @@ function driveExploration({
     }
 
     if (!isBrowserUseInstalled(pythonCmd)) {
-      resolve({
-        available: false,
-        reason: 'browser-use package not installed',
-        pythonCmd,
-      });
-      return;
+      const installed = await autoInstallBrowserUse(pythonCmd);
+      if (!installed.success) {
+        resolve({ available: false, reason: installed.reason, pythonCmd });
+        return;
+      }
+      if (!isBrowserUseInstalled(pythonCmd)) {
+        resolve({
+          available: false,
+          reason: 'browser-use auto-install reported success but import still fails — try: pip install browser-use',
+          pythonCmd,
+        });
+        return;
+      }
+      Logger.info('BrowserUseDriver', 'browser-use auto-install complete');
     }
 
     // Derive the LLM proxy URL from the dashboard URL so the Python runner
@@ -191,6 +241,26 @@ function driveExploration({
     }
     if (!calibratedStepTimeoutS) calibratedStepTimeoutS = STEP_TIMEOUT_MIN_S;
     Logger.info('BrowserUseDriver', `Adaptive step timeout calibrated to ${calibratedStepTimeoutS}s`);
+
+    // Hand browser-use a THROWAWAY COPY of the pre-auth storageState, never the
+    // canonical `.healix/auth-state-<role>.json`. browser-use opens a persistent
+    // profile and forcibly writes the session back to the storage_state path on
+    // exit — if pointed at the real file, an agent that wanders off-app (e.g. to
+    // google.com) overwrites and corrupts the session the test-execution phase
+    // relies on. The copy absorbs any such writeback and is discarded.
+    let browserUseStatePath = '';
+    try {
+      const verified = (Array.isArray(preAuthRoles) ? preAuthRoles : [])
+        .find((r) => r?.storageStatePath && fs.existsSync(r.storageStatePath));
+      if (verified) {
+        const tmp = path.join(os.tmpdir(), `healix-bu-state-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`);
+        fs.copyFileSync(verified.storageStatePath, tmp);
+        browserUseStatePath = tmp;
+      }
+    } catch (copyErr) {
+      Logger.warn('BrowserUseDriver', 'Could not copy pre-auth storageState for browser-use; gap-fill will run unauthenticated', { reason: copyErr.message });
+      browserUseStatePath = '';
+    }
 
     const env = {
       ...process.env,
@@ -220,6 +290,26 @@ function driveExploration({
       // Set HEALIX_BROWSER_HEADLESS=false in the environment to open a visible
       // browser window (useful when debugging exploration failures locally).
       HEALIX_BROWSER_HEADLESS: process.env.HEALIX_BROWSER_HEADLESS ?? 'true',
+      // Known routes and PRD features for surgical gap-fill mode in browser-use.
+      // Capped at 60 paths to keep env size sane.
+      HEALIX_KNOWN_ROUTES: Array.isArray(knownRoutes) && knownRoutes.length > 0
+        ? JSON.stringify(
+            knownRoutes
+              .slice(0, 60)
+              .map((r) => (typeof r === 'string' ? r : r?.path || ''))
+              .filter(Boolean)
+          )
+        : '',
+      HEALIX_PRD_FEATURES: Array.isArray(prdFeatures) && prdFeatures.length > 0
+        ? JSON.stringify(
+            prdFeatures
+              .map((f) => (typeof f === 'string' ? f : f?.name || f?.title || ''))
+              .filter(Boolean)
+          )
+        : '',
+      // Pre-auth storageState (a throwaway copy — see above) so browser-use's
+      // secondary gap-fill runs authenticated without risking the canonical file.
+      HEALIX_PREAUTH_STORAGE_STATE: browserUseStatePath,
     };
 
     let settled = false;
@@ -240,6 +330,11 @@ function driveExploration({
       if (settled) return;
       settled = true;
       clearTimeout(killTimer);
+      // Discard the throwaway storageState copy (and any session browser-use
+      // wrote back into it) so it never lingers or leaks into later runs.
+      if (browserUseStatePath) {
+        try { fs.unlinkSync(browserUseStatePath); } catch { /* already gone */ }
+      }
       resolve(payload);
     };
 
@@ -296,10 +391,4 @@ function driveExploration({
 
 module.exports = {
   driveExploration,
-  resolvePython,
-  isBrowserUseInstalled,
-  calibrateStepTimeoutS,
-  STEP_TIMEOUT_MIN_S,
-  STEP_TIMEOUT_MAX_S,
-  RUNNER_SCRIPT,
 };

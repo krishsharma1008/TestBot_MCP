@@ -26,9 +26,10 @@ const {
   sanitizeAuthFlow,
   scoreAuthFlowCandidate,
 } = require('./auth-flow-utils');
+const { normalizeRoleLabel } = require('./credentials-injector');
 
-const MAX_ROUTES_PER_WALK = 20;
-const MAX_CLICK_PROBES_PER_WALK = 8;
+const MAX_ROUTES_PER_WALK = 60;
+const MAX_CLICK_PROBES_PER_WALK = 20;
 const GOTO_TIMEOUT_MS = 15_000;
 const SETTLE_WAIT_MS = 800;
 const CLICK_PROBE_TIMEOUT_MS = 1_500;
@@ -60,6 +61,33 @@ function urlForRoute(baseURL, routePath) {
 
 function isAuthishRoute(routePath) {
   return /(^|\/|#)(login|sign-in|signin|auth|register|signup|sign-up)(\/|$|\?)/i.test(String(routePath || ''));
+}
+
+/**
+ * After navigating to a route during DOM enrichment, decide whether the page
+ * bounced to the login screen — i.e. the session for the route's required role
+ * is missing/invalid and the protected page redirected us to auth.
+ *
+ * Recording the login DOM as a protected route's content is the RC3 regression:
+ * the generator then gets login selectors (email/password/Submit) for a
+ * dashboard route and falls back to an ungrounded `main` locator. When this
+ * returns true, callers skip DOM capture and flag the route un-enriched so the
+ * static-analysis hints survive instead.
+ *
+ * Returns false for routes that are themselves login/auth pages (landing there
+ * is expected) and for anything that can't be evaluated.
+ */
+function landedOnLoginPage(page, route) {
+  // The route itself is a login/auth page — landing there is expected.
+  if (isAuthishRoute(route?.path)) return false;
+  let landedKey = '';
+  try {
+    const landed = new URL(page.url());
+    landedKey = `${landed.pathname}${landed.hash || ''}`;
+  } catch {
+    return false;
+  }
+  return isAuthishRoute(landedKey);
 }
 
 function queueContainsRoute(queue, routeKey, baseURL) {
@@ -301,7 +329,7 @@ function _buildAuthFlowCandidate({ resolvedPathname, signals }) {
  * Walk up to MAX_ROUTES_PER_WALK routes in a single browser context.
  * Returns the raw walk results (routes, forms, authFlow, keyFlows, observedErrors).
  */
-async function _walkRoutes({ browser, contextOptions, baseURL, origin, credentials, onHeartbeat }) {
+async function _walkRoutes({ browser, contextOptions, baseURL, origin, credentials, seedRoutes = [], onHeartbeat }) {
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
 
@@ -322,9 +350,18 @@ async function _walkRoutes({ browser, contextOptions, baseURL, origin, credentia
     if (!href || !sameOrigin(href, origin)) return;
     const routeKey = routeKeyFromUrl(href, baseURL);
     if (!routeKey || visitedPaths.has(routeKey) || queueContainsRoute(queue, routeKey, baseURL)) return;
-    if (queue.length + routes.length >= MAX_ROUTES_PER_WALK) return;
+    if (visitedPaths.size >= MAX_ROUTES_PER_WALK) return;
     queue.push(new URL(href, baseURL).toString());
   };
+
+  // Seed the queue with routes known from static code analysis. Protected
+  // routes are often reached only via programmatic navigation (e.g. a SPA's
+  // router.navigate() after login) with no anchor from the landing page, so a
+  // link-following crawl starting at baseURL alone would never visit them.
+  for (const seed of Array.isArray(seedRoutes) ? seedRoutes : []) {
+    const seedPath = typeof seed === 'string' ? seed : seed?.path;
+    if (seedPath) enqueueUrl(urlForRoute(baseURL, seedPath));
+  }
 
   try {
     while (queue.length && routes.length < MAX_ROUTES_PER_WALK) {
@@ -389,7 +426,7 @@ async function _walkRoutes({ browser, contextOptions, baseURL, origin, credentia
         enqueueUrl(a.href);
       }
 
-      if (remainingClickProbes > 0 && (routes.length <= 2 || queue.length < 2)) {
+      if (remainingClickProbes > 0 && queue.length < 3) {
         const maxClicks = Math.min(4, remainingClickProbes);
         const clickDiscovery = await _discoverClickRoutes(page, { resetUrl: page.url(), maxClicks });
         remainingClickProbes -= clickDiscovery.attempted || 0;
@@ -489,7 +526,7 @@ function _mergeWalks(walks) {
  *   per role so that role-specific routes are all discovered.
  * @param {Function} [opts.onHeartbeat]
  */
-async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths = [], onHeartbeat } = {}) {
+async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths = [], seedRoutes = [], onHeartbeat } = {}) {
   if (!baseURL) {
     return { available: false, reason: 'No baseURL provided to playwright-explorer' };
   }
@@ -525,6 +562,7 @@ async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths =
             baseURL,
             origin,
             credentials,
+            seedRoutes,
             onHeartbeat,
           });
           walks.push({ role, ...walk });
@@ -541,6 +579,7 @@ async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths =
         baseURL,
         origin,
         credentials,
+        seedRoutes,
         onHeartbeat,
       });
       walks.push({ role: null, ...walk });
@@ -556,7 +595,7 @@ async function exploreWithPlaywright({ baseURL, credentials, storageStatePaths =
 }
 
 const ENRICH_GOTO_TIMEOUT_MS = 8_000;
-const MAX_ENRICH_ROUTES = 8;
+const MAX_ENRICH_ROUTES = 40;
 
 async function _enrichRouteDOM(page) {
   return page.evaluate(() => {
@@ -618,8 +657,15 @@ async function enrichRoutesWithDOM({ baseURL, routes = [], storageStatePaths = [
         if (typeof onHeartbeat === 'function') {
           try { onHeartbeat({ type: 'heartbeat', path: route.path }); } catch { /* ignore */ }
         }
-        const dom = await _enrichRouteDOM(page).catch(() => null);
-        if (dom) enrichments[route.path] = dom;
+        if ((route.requiresAuth || route.requiredRole) && landedOnLoginPage(page, route)) {
+          // Protected route bounced to login — the required role's session is
+          // missing. Do NOT record the login DOM as this route's content; flag
+          // it un-enriched so static hints survive (see landedOnLoginPage).
+          enrichments[route.path] = { redirectedToLogin: true, unenriched: true };
+        } else {
+          const dom = await _enrichRouteDOM(page).catch(() => null);
+          if (dom) enrichments[route.path] = dom;
+        }
       } catch { /* non-fatal — skip route */ }
     }
 
@@ -643,10 +689,135 @@ async function enrichRoutesWithDOM({ baseURL, routes = [], storageStatePaths = [
   return { enrichments, errorProbe };
 }
 
+/**
+ * Phase A parallel enrichment: visits ALL provided routes across `concurrency`
+ * browser contexts simultaneously, respecting a shared time budget.
+ * Routes are ordered by PRD-feature relevance (priorityPaths) then alphabetically.
+ * Returns `{ enrichments: Map<path, domData>, timedOut: boolean }`.
+ *
+ * This is the primary enrichment path for the inverted exploration model.
+ * The existing `enrichRoutesWithDOM` (single context, capped at MAX_ENRICH_ROUTES)
+ * is kept for the post-browser-use enrichment pass.
+ */
+async function enrichAllRoutesWithDOM({
+  routes = [],
+  baseURL,
+  storageStatePaths = [],
+  concurrency = 3,
+  timeBudgetMs = 90_000,
+  priorityPaths = [],
+  onHeartbeat,
+} = {}) {
+  if (!routes.length || !baseURL) return { enrichments: new Map(), timedOut: false };
+
+  let chromium;
+  try { ({ chromium } = require('playwright')); } catch { return { enrichments: new Map(), timedOut: false }; }
+
+  const prioritySet = new Set(priorityPaths);
+  const sortedRoutes = [...routes].sort((a, b) => {
+    const aPriority = prioritySet.has(a.path) ? 0 : 1;
+    const bPriority = prioritySet.has(b.path) ? 0 : 1;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return (a.path || '').localeCompare(b.path || '');
+  });
+
+  // Map each verified role to its storageState file so a route gated for a
+  // specific role is enriched under THAT role's session — an RBAC app must not
+  // explore admin- and user-gated pages under a single session.
+  const roleStateMap = new Map();
+  const validStates = [];
+  for (const s of Array.isArray(storageStatePaths) ? storageStatePaths : []) {
+    if (s?.storageStatePath && fs.existsSync(s.storageStatePath)) {
+      const label = normalizeRoleLabel(s.role || s.name || 'user');
+      if (!roleStateMap.has(label)) roleStateMap.set(label, s.storageStatePath);
+      validStates.push(s.storageStatePath);
+    }
+  }
+  const defaultState = validStates[0] || null;
+
+  const stateForRoute = (route) => {
+    if (route?.requiredRole) {
+      const label = normalizeRoleLabel(route.requiredRole);
+      if (roleStateMap.has(label)) return roleStateMap.get(label);
+    }
+    // Auth-gated route with no role-specific session, or any unmatched route:
+    // fall back to any authenticated session; public routes use no session.
+    return route?.requiresAuth ? defaultState : (defaultState || null);
+  };
+
+  // Partition routes by the session they should be visited under, then split
+  // each partition into round-robin buckets (one browser context per bucket).
+  const partitions = new Map(); // storageStatePath|'' -> routes[]
+  for (const route of sortedRoutes) {
+    const key = stateForRoute(route) || '';
+    if (!partitions.has(key)) partitions.set(key, []);
+    partitions.get(key).push(route);
+  }
+
+  const buckets = []; // { storageStatePath|null, routes[] }
+  for (const [statePath, partRoutes] of partitions) {
+    const n = Math.max(1, Math.min(concurrency, partRoutes.length));
+    const partBuckets = Array.from({ length: n }, () => []);
+    partRoutes.forEach((route, i) => partBuckets[i % n].push(route));
+    for (const b of partBuckets) {
+      if (b.length) buckets.push({ storageStatePath: statePath || null, routes: b });
+    }
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  const enrichments = new Map();
+  let timedOut = false;
+  const deadline = Date.now() + timeBudgetMs;
+
+  try {
+    await Promise.all(buckets.map(async ({ storageStatePath, routes: bucketRoutes }) => {
+      if (!bucketRoutes.length) return;
+      const contextOptions = storageStatePath ? { storageState: storageStatePath } : {};
+      const context = await browser.newContext(contextOptions);
+      const page = await context.newPage();
+      try {
+        for (const route of bucketRoutes) {
+          if (Date.now() >= deadline) {
+            timedOut = true;
+            break;
+          }
+          const url = urlForRoute(baseURL, route.path);
+          try {
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: ENRICH_GOTO_TIMEOUT_MS });
+            await page.waitForTimeout(SETTLE_WAIT_MS);
+            await _scrollToReveal(page);
+            if (typeof onHeartbeat === 'function') {
+              try { onHeartbeat({ type: 'heartbeat', path: route.path }); } catch { /* ignore */ }
+            }
+            if ((route.requiresAuth || route.requiredRole) && landedOnLoginPage(page, route)) {
+              // Protected route bounced to login — its role session is missing.
+              // Skip the login DOM so the generator keeps static dashboard hints
+              // instead of login selectors (see landedOnLoginPage).
+              enrichments.set(route.path, { redirectedToLogin: true, unenriched: true });
+            } else {
+              const dom = await _enrichRouteDOM(page).catch(() => null);
+              if (dom) enrichments.set(route.path, dom);
+            }
+          } catch { /* non-fatal — skip route */ }
+        }
+      } finally {
+        try { await context.close(); } catch { /* ignore */ }
+      }
+    }));
+  } finally {
+    try { await browser.close(); } catch { /* ignore */ }
+  }
+
+  return { enrichments, timedOut };
+}
+
 module.exports = {
   exploreWithPlaywright,
   enrichRoutesWithDOM,
+  enrichAllRoutesWithDOM,
   _buildAuthFlowCandidate,
   _mergeWalks,
   _routeKeyFromUrl: routeKeyFromUrl,
+  _landedOnLoginPage: landedOnLoginPage,
+  _isAuthishRoute: isAuthishRoute,
 };

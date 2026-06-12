@@ -31,20 +31,15 @@ const DEFAULT_TIMEOUT_MS = Number.isFinite(ENV_OVERRIDE) && ENV_OVERRIDE > 0
 // validate / phase endpoints (which MUST stay fast) doesn't accidentally
 // tighten generation.
 const ENDPOINT_TIMEOUTS_MS = {
-  validate: 6_000,
   phase: 4_000,
-  ingest: 60_000,
   analyze: 600_000,          // 10 min — gpt-5.5-mini high-reasoning triage
-  planExploration: 600_000,  // 10 min
   parsePRD: 600_000,         // 10 min
-  generateTests: 1_200_000,  // 20 min — legacy monolithic code-gen
-  // Per-agent chunked generation. Localhost-first: each agent slice routinely
-  // needs minutes under gpt-5.5-mini high-reasoning (frontend and error agents
-  // especially). Override via HEALIX_WEBAPP_TIMEOUT_MS if you need a tighter
-  // global ceiling. The old 55s value was a Vercel-hobby accommodation.
-  generateTestsForAgent: 600_000,
-  // P1.5 planner pre-pass. Same 10 min ceiling as generateTestsForAgent —
-  // planning can fan out acceptance criteria across the whole app.
+  // Per-feature chunked generation. Each feature slice (UI, API, auth, or E2E
+  // agent) routinely needs minutes under gpt-5.5-mini high-reasoning.
+  // Override via HEALIX_WEBAPP_AGENT_TIMEOUT_MS if you need a tighter ceiling.
+  // The old 55s value was a Vercel-hobby accommodation.
+  generateTestsForFeature: 600_000,
+  // P1.5 planner pre-pass (legacy, kept for graceful 404 handling).
   planGeneration: 600_000,
   // P2-g async generation. The enqueue call should return in well under a
   // second — it only writes a row and returns a jobId — so this timeout is
@@ -70,7 +65,7 @@ function computePollBackoffMs(consecutiveNoChangeIterations, baseIntervalMs) {
 
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'partial', 'failed']);
 
-const KNOWN_AGENTS = Object.freeze(['smoke', 'frontend', 'api', 'workflow', 'error', 'expansion']);
+const KNOWN_AGENT_TYPES = Object.freeze(['auth', 'ui', 'api', 'e2e']);
 
 function getFetch() {
   return global.fetch || require('node-fetch');
@@ -114,16 +109,16 @@ class WebappClient {
   // Returns the effective timeout for a given endpoint key, bumping the
   // Vercel-capped limits when the webapp is local.
   _timeout(key) {
-    if (key === 'generateTestsForAgent') {
+    if (key === 'generateTestsForFeature') {
       const agentOverride = Number(process.env.HEALIX_WEBAPP_AGENT_TIMEOUT_MS);
       if (Number.isFinite(agentOverride) && agentOverride > 0) {
         return agentOverride;
       }
     }
-    if (this._isLocal && (key === 'generateTestsForAgent' || key === 'planGeneration')) {
-      return key === 'generateTestsForAgent'
-        ? ENDPOINT_TIMEOUTS_MS.generateTestsForAgent
-        : 600_000; // no Vercel cap for local planner; per-agent generation is bounded by the pipeline when available
+    if (this._isLocal && (key === 'generateTestsForFeature' || key === 'planGeneration')) {
+      return key === 'generateTestsForFeature'
+        ? ENDPOINT_TIMEOUTS_MS.generateTestsForFeature
+        : 600_000; // no Vercel cap for local planner; per-feature generation is bounded by the pipeline when available
     }
     if (this._isLocal && key === 'phase') {
       return Math.max(ENDPOINT_TIMEOUTS_MS.phase, Number(process.env.HEALIX_LOCAL_PHASE_TIMEOUT_MS || 15000));
@@ -242,49 +237,25 @@ class WebappClient {
     return payload;
   }
 
-  async validateKey() {
-    this._assertKey('/api/mcp-auth/validate');
-    return this._post(
-      '/api/mcp-auth/validate',
-      { api_key: this.apiKey },
-      { timeoutMs: ENDPOINT_TIMEOUTS_MS.validate }
-    );
-  }
-
-  async generateTests({ context, prd, parsedPRD, explorationArtifact, roles, testType, projectInfo, options }) {
-    this._assertKey('/api/generate-tests');
-    return this._post(
-      '/api/generate-tests',
-      {
-        api_key: this.apiKey,
-        context,
-        prd: prd || '',
-        parsedPRD: parsedPRD || null,
-        explorationArtifact: explorationArtifact || null,
-        roles: roles || [],
-        testType,
-        projectInfo,
-        options,
-      },
-      { timeoutMs: ENDPOINT_TIMEOUTS_MS.generateTests }
-    );
-  }
 
   /**
-   * Per-agent chunked generation. The MCP fans out 5 parallel calls (one per
-   * agent) so each request fits inside Vercel Hobby's 60-second ceiling.
+   * Feature-based test generation. One call per feature + agentType pair.
    *
    * Contract:
-   *   - Body sends `agents: [agent]` so the webapp runs only that agent.
-   *   - Timeout is 55s (5s margin under Vercel's hard 60s cap), so we error
-   *     out as WEBAPP_TIMEOUT before the platform returns a 504 HTML page.
-   *   - Agent name is validated client-side to avoid a wasted round-trip.
+   *   - Body sends `agentType` + `featureId` so the webapp runs the specific
+   *     feature agent (auth | ui | api | e2e).
+   *   - `featureManifest` is only needed for the 'e2e' agentType and carries
+   *     the exported action-function signatures from each feature's actions file.
+   *   - Timeout defaults to the same generous ceiling as the old per-agent call.
    *
-   * Same return shape as `generateTests` (tests[], generationMeta, agentRuns);
-   * just narrower — typically a single agent's tests.
+   * Return shape: { tests[], generationMeta, agentRuns, byType, count, success }
    */
-  async generateTestsForAgent({
-    agent,
+  async generateTestsForFeature({
+    featureId,
+    featureSlug,
+    agentType,
+    featureManifest,
+    specs,
     context,
     prd,
     parsedPRD,
@@ -298,42 +269,95 @@ class WebappClient {
     transportRetryMaxElapsedMs,
   }) {
     this._assertKey('/api/generate-tests');
-    if (!KNOWN_AGENTS.includes(agent)) {
+    if (!KNOWN_AGENT_TYPES.includes(agentType)) {
       const err = new Error(
-        `generateTestsForAgent: unknown agent "${agent}". Allowed: ${KNOWN_AGENTS.join(', ')}`
+        `generateTestsForFeature: unknown agentType "${agentType}". Allowed: ${KNOWN_AGENT_TYPES.join(', ')}`
       );
-      err.code = 'INVALID_AGENT';
+      err.code = 'INVALID_AGENT_TYPE';
       throw err;
     }
     const effectiveTransportTimeoutMs = Number.isFinite(Number(transportTimeoutMs)) && Number(transportTimeoutMs) > 0
       ? Number(transportTimeoutMs)
-      : this._timeout('generateTestsForAgent');
+      : this._timeout('generateTestsForFeature');
+    const body = {
+      api_key: this.apiKey,
+      agentType,
+      featureId: featureId || null,
+      featureSlug: featureSlug || undefined,
+      context: context || {},
+      prd: prd || '',
+      parsedPRD: parsedPRD || null,
+      explorationArtifact: explorationArtifact || null,
+      roles: roles || [],
+      testType,
+      projectInfo,
+      options,
+    };
+    // Only include featureManifest when non-empty (e2e agent)
+    if (Array.isArray(featureManifest) && featureManifest.length > 0) {
+      body.featureManifest = featureManifest;
+    }
+    // Include pre-planned specs when provided by the scenario planner
+    if (Array.isArray(specs) && specs.length > 0) {
+      body.specs = specs;
+    }
     return this._post(
       '/api/generate-tests',
-      {
-        api_key: this.apiKey,
-        agents: [agent],
-        context,
-        prd: prd || '',
-        parsedPRD: parsedPRD || null,
-        explorationArtifact: explorationArtifact || null,
-        roles: roles || [],
-        testType,
-        projectInfo,
-        options,
-      },
+      body,
       {
         timeoutMs: effectiveTransportTimeoutMs,
         // Long-running generation POSTs are not idempotent at the transport
-        // layer. If the socket drops after minutes, retrying duplicates the
-        // whole agent and burns the pipeline budget. Retry only immediate
-        // connection flakes.
+        // layer. Retry only immediate connection flakes.
         retryDelaysMs: Array.isArray(transportRetryDelaysMs) && transportRetryDelaysMs.length > 0
           ? transportRetryDelaysMs
           : [0, 1000],
         retryMaxElapsedMs: Number.isFinite(Number(transportRetryMaxElapsedMs))
           ? Number(transportRetryMaxElapsedMs)
           : 15_000,
+      }
+    );
+  }
+
+  /**
+   * Scenario planner — Phase 1 of two-phase test generation.
+   *
+   * Calls /api/generate-tests/cases with one PRDFeature + exploration artifact
+   * and returns TestCaseSpec[] describing WHAT to test (no code).
+   *
+   * Return shape: { success, featureId, specs: TestCaseSpec[] }
+   */
+  async planFeatureTestCases({
+    feature,
+    explorationArtifact,
+    context,
+    testType,
+    prd,
+    projectInfo,
+    transportTimeoutMs,
+    transportRetryDelaysMs,
+  } = {}) {
+    this._assertKey('/api/generate-tests/cases');
+    const effectiveTimeoutMs = Number.isFinite(Number(transportTimeoutMs)) && Number(transportTimeoutMs) > 0
+      ? Number(transportTimeoutMs)
+      : 120_000;   // planning is faster than generation — 2 min ceiling
+    const body = {
+      api_key: this.apiKey,
+      feature,
+      explorationArtifact: explorationArtifact || null,
+      context: context || null,
+      testType: testType || 'both',
+      prd: prd || '',
+      projectInfo: projectInfo || {},
+    };
+    return this._post(
+      '/api/generate-tests/cases',
+      body,
+      {
+        timeoutMs: effectiveTimeoutMs,
+        retryDelaysMs: Array.isArray(transportRetryDelaysMs) && transportRetryDelaysMs.length > 0
+          ? transportRetryDelaysMs
+          : [0, 1000],
+        retryMaxElapsedMs: 15_000,
       }
     );
   }
@@ -449,20 +473,24 @@ class WebappClient {
   }
 
   /**
-   * P2-g async generation entry point. Enqueues a job and returns immediately.
+   * Async generation entry point. Enqueues a job on the Inngest orchestrator
+   * and returns immediately with a jobId.
    *
-   * Body sends the same shape as `generateTestsForAgent` plus `async: true`.
+   * The Inngest orchestrator fans out generation per feature using
+   * `parsedPRD.features[]`. The caller polls `/api/generate-tests/jobs/{jobId}`
+   * for partial results.
+   *
    * The `x-healix-async: 1` header lets the webapp's `/api/generate-tests`
    * route branch into the async-enqueue code path without inspecting the body.
    *
    * Return shapes:
-   *   - 202 → { mode: 'async', jobId, status, agentsRequested[] }
+   *   - 202 → { mode: 'async', jobId, status }
    *   - 200 → { mode: 'sync',  payload }  (older webapp didn't accept async;
-   *           the caller falls back to the sync codegen path — do NOT throw).
+   *           the caller falls back to the sync feature-based path).
    *   - non-2xx → throw with the usual err.code shape.
    *   - AbortError → throw with err.code === 'WEBAPP_TIMEOUT'.
    */
-  async generateTestsAsync({ agents, context, prd, parsedPRD, explorationArtifact, roles, projectInfo, options, plan } = {}) {
+  async generateTestsAsync({ context, prd, parsedPRD, explorationArtifact, roles, projectInfo, options, featurePlans, idempotencyKey } = {}) {
     this._assertKey('/api/generate-tests');
     const path = '/api/generate-tests';
     const url = `${this.dashboardUrl}${path}`;
@@ -472,7 +500,6 @@ class WebappClient {
     const body = {
       api_key: this.apiKey,
       async: true,
-      agents: Array.isArray(agents) ? agents : undefined,
       context: context || {},
       prd: prd || '',
       parsedPRD: parsedPRD || null,
@@ -480,8 +507,19 @@ class WebappClient {
       roles: roles || [],
       projectInfo: projectInfo || {},
       options: options || {},
-      plan: plan || null,
+      // Per-feature scenario plans (FeatureTestPlan[]) produced before enqueue.
+      // The Inngest agent selects its feature's specs from this array.
+      featurePlans: Array.isArray(featurePlans) ? featurePlans : [],
     };
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': this.apiKey || '',
+      'x-healix-async': '1',
+    };
+    if (idempotencyKey) {
+      headers['x-idempotency-key'] = idempotencyKey;
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), limit);
@@ -489,11 +527,7 @@ class WebappClient {
     try {
       response = await fetchFn(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey || '',
-          'x-healix-async': '1',
-        },
+        headers,
         body: JSON.stringify(body),
         signal: controller.signal,
       });
@@ -857,19 +891,6 @@ class WebappClient {
     );
   }
 
-  async planExploration({ explorationArtifact, parsedPRD }) {
-    this._assertKey('/api/exploration/plan');
-    return this._post(
-      '/api/exploration/plan',
-      {
-        api_key: this.apiKey,
-        explorationArtifact,
-        parsedPRD: parsedPRD || null,
-      },
-      { timeoutMs: ENDPOINT_TIMEOUTS_MS.planExploration }
-    );
-  }
-
   async analyzeFailures(failures) {
     this._assertKey('/api/analyze-failures');
     if (!Array.isArray(failures) || failures.length === 0) return { analyses: [] };
@@ -881,13 +902,6 @@ class WebappClient {
       },
       { timeoutMs: ENDPOINT_TIMEOUTS_MS.analyze }
     );
-  }
-
-  async ingestTestRun(runPayload) {
-    this._assertKey('/api/test-runs/ingest');
-    return this._post('/api/test-runs/ingest', runPayload, {
-      timeoutMs: ENDPOINT_TIMEOUTS_MS.ingest,
-    });
   }
 
   async _get(path, { timeoutMs } = {}) {
@@ -1271,6 +1285,6 @@ class WebappClient {
 }
 
 module.exports = WebappClient;
-module.exports.KNOWN_AGENTS = KNOWN_AGENTS;
+module.exports.KNOWN_AGENT_TYPES = KNOWN_AGENT_TYPES;
 module.exports.ENDPOINT_TIMEOUTS_MS = ENDPOINT_TIMEOUTS_MS;
 module.exports.computePollBackoffMs = computePollBackoffMs;

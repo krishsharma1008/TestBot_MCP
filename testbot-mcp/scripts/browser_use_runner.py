@@ -72,7 +72,7 @@ _ARTIFACT_TEMPLATE = {
 }
 
 _PROVIDER_MODEL_ALIASES = {
-    "gpt-5.5-mini": "gpt-5-mini",
+    "gpt-5.5-mini": "gpt-5.4-mini",
 }
 
 
@@ -80,7 +80,8 @@ def _provider_model(model):
     return _PROVIDER_MODEL_ALIASES.get(model, model)
 
 
-def _build_task(target_url, username, password, preauth_verified=False):
+def _build_task(target_url, username, password, preauth_verified=False,
+                known_routes=None, prd_features=None):
     all_roles_raw = os.environ.get("HEALIX_ALL_ROLES", "")
     roles_note = (
         f" The app has multiple roles ({all_roles_raw}) — note any role-specific pages."
@@ -119,6 +120,37 @@ def _build_task(target_url, username, password, preauth_verified=False):
         login_block = f"\nSTEP 1 — Start at {target_url}.\n"
         nav_start = "STEP 2"
 
+    # Surgical gap-fill mode: known routes from static analysis are already mapped
+    # by Playwright enrichment. Focus browser-use on what static analysis cannot see.
+    gap_fill_block = ""
+    if known_routes:
+        routes_list = ", ".join(known_routes[:40])
+        features_note = ""
+        if prd_features:
+            features_note = f"\nPRD features to cover: {', '.join(prd_features[:15])}"
+        gap_fill_block = (
+            f"\nALREADY MAPPED ({len(known_routes)} routes from static analysis):\n"
+            f"  {routes_list}\n"
+            f"YOUR JOB: Find routes NOT in that list. Focus on:\n"
+            f"  - Sidebar / nav items rendered from a database\n"
+            f"  - Routes only visible after completing a multi-step flow\n"
+            f"  - Role-specific pages not reachable from the root{features_note}\n"
+        )
+        nav_instruction = (
+            f"\n{nav_start} — GAP-FILL (find routes NOT in the already-mapped list above):\n"
+            "  Click sidebar items, dropdowns, and dynamic nav menus.\n"
+            "  On each new page: collect the path and up to 5 interactive elements,\n"
+            "  then IMMEDIATELY move to the next. Do NOT re-visit mapped paths.\n"
+        )
+    else:
+        nav_instruction = (
+            f"\n{nav_start} — NAVIGATE (visit up to 12 distinct routes):\n"
+            "  Click every link in the sidebar, top navbar, or main menu.\n"
+            "  On each page: scroll to the bottom once, collect the page path and\n"
+            "  up to 5 interactive elements, then IMMEDIATELY move to the next link.\n"
+            "  Do NOT re-visit paths already recorded.\n"
+        )
+
     return (
         f"GOAL: Rapidly map the route structure of {target_url}.\n"
         f"SPEED RULE: Spend at most 10 seconds per page. Breadth over depth.\n"
@@ -133,11 +165,8 @@ def _build_task(target_url, username, password, preauth_verified=False):
         '"keyFlows":[{"name":string,"steps":[{"action":string,"target":string,"value":string|null}],"endCondition":string}],'
         '"observedErrors":[string]}\n'
         f"{login_block}"
-        f"\n{nav_start} — NAVIGATE (visit up to 12 distinct routes):\n"
-        "  Click every link in the sidebar, top navbar, or main menu.\n"
-        "  On each page: scroll to the bottom once, collect the page path and\n"
-        "  up to 5 interactive elements, then IMMEDIATELY move to the next link.\n"
-        "  Do NOT re-visit paths already recorded.\n"
+        f"{gap_fill_block}"
+        f"{nav_instruction}"
         "\nSTEP 3 — FORMS: For each page with a non-login form, record its fields.\n"
         "\nSTEP 4 — FLOWS: Identify up to 3 key user flows (e.g. create, edit, delete).\n"
         "\nSTEP 5 — OUTPUT the JSON via final/done. Do NOT include any text outside the JSON block.\n"
@@ -299,7 +328,30 @@ async def _drive_agent(target_url, username, password, timeout_s):
     except ValueError:
         preauth_verified = False
 
-    task = _build_task(target_url, username, password, preauth_verified=preauth_verified)
+    # Load known routes and PRD features for surgical gap-fill mode.
+    known_routes = None
+    prd_features = None
+    gap_fill_enabled = os.environ.get("HEALIX_BROWSER_USE_GAP_FILL", "1") not in ("0", "false")
+    if gap_fill_enabled:
+        try:
+            raw_routes = os.environ.get("HEALIX_KNOWN_ROUTES", "")
+            if raw_routes:
+                known_routes = json.loads(raw_routes)
+                if not isinstance(known_routes, list):
+                    known_routes = None
+        except (json.JSONDecodeError, Exception):
+            known_routes = None
+        try:
+            raw_features = os.environ.get("HEALIX_PRD_FEATURES", "")
+            if raw_features:
+                prd_features = json.loads(raw_features)
+                if not isinstance(prd_features, list):
+                    prd_features = None
+        except (json.JSONDecodeError, Exception):
+            prd_features = None
+
+    task = _build_task(target_url, username, password, preauth_verified=preauth_verified,
+                       known_routes=known_routes, prd_features=prd_features)
     if preauth_verified:
         _emit({"type": "progress", "message": "pre-auth storageState verified; browser-use will not retry login"})
 
@@ -341,7 +393,19 @@ async def _drive_agent(target_url, username, password, timeout_s):
         if "browser_profile" in sig_params:
             try:
                 from browser_use.browser.profile import BrowserProfile  # type: ignore
-                agent_kwargs["browser_profile"] = BrowserProfile(headless=headless)
+                profile_kwargs = {"headless": headless}
+                # Load the pre-auth storageState so the secondary gap-fill runs
+                # as an authenticated session and can reach protected routes.
+                storage_state = os.environ.get("HEALIX_PREAUTH_STORAGE_STATE", "").strip()
+                if storage_state and os.path.isfile(storage_state):
+                    try:
+                        from inspect import signature as _sig
+                        if "storage_state" in _sig(BrowserProfile).parameters:
+                            profile_kwargs["storage_state"] = storage_state
+                            _emit({"type": "progress", "message": "browser-use loaded pre-auth storageState for authenticated gap-fill"})
+                    except Exception:
+                        pass  # older BrowserProfile without storage_state support
+                agent_kwargs["browser_profile"] = BrowserProfile(**profile_kwargs)
             except Exception:
                 pass  # older version without BrowserProfile — leave default
     except Exception:
@@ -358,11 +422,11 @@ async def _drive_agent(target_url, username, password, timeout_s):
 
     _emit({"type": "progress", "message": "agent launched"})
 
-    max_steps = 10
+    max_steps = 20
     try:
-        max_steps = max(3, min(20, int(os.environ.get("HEALIX_BROWSER_USE_MAX_STEPS", "10"))))
+        max_steps = max(3, min(30, int(os.environ.get("HEALIX_BROWSER_USE_MAX_STEPS", "20"))))
     except ValueError:
-        max_steps = 10
+        max_steps = 20
 
     try:
         result = await asyncio.wait_for(agent.run(max_steps=max_steps), timeout=timeout_s)

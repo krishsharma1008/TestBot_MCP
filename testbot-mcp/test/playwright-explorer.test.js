@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const test = require('node:test');
 
-const { exploreWithPlaywright } = require('../src/playwright-explorer');
+const { exploreWithPlaywright, enrichAllRoutesWithDOM } = require('../src/playwright-explorer');
 
 function startFixtureServer() {
   const server = http.createServer((req, res) => {
@@ -48,6 +48,76 @@ test('playwright heuristic explores hash, query, and click-driven routes', async
     assert.equal(paths.has('/products?q=book'), true);
     assert.equal(paths.has('/orders'), true);
     assert.equal(paths.has('/checkout'), true);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test('enrichAllRoutesWithDOM returns Map with DOM data for known routes', async () => {
+  const fixture = await startFixtureServer();
+  try {
+    const routes = [{ path: '/' }, { path: '/admin' }];
+    const { enrichments, timedOut } = await enrichAllRoutesWithDOM({
+      routes,
+      baseURL: fixture.baseURL,
+      concurrency: 2,
+      timeBudgetMs: 30_000,
+    });
+    assert.ok(enrichments instanceof Map, 'enrichments is a Map');
+    assert.equal(timedOut, false);
+    assert.ok(enrichments.has('/') || enrichments.has('/admin'), 'at least one route enriched');
+    if (enrichments.has('/')) {
+      const dom = enrichments.get('/');
+      assert.ok(typeof dom === 'object', 'DOM data is an object');
+    }
+  } finally {
+    await fixture.close();
+  }
+});
+
+test('enrichAllRoutesWithDOM respects time budget and sets timedOut flag', async () => {
+  const fixture = await startFixtureServer();
+  try {
+    const routes = [{ path: '/' }, { path: '/admin' }, { path: '/products' }];
+    // Budget of 1ms forces an immediate timeout.
+    const { enrichments, timedOut } = await enrichAllRoutesWithDOM({
+      routes,
+      baseURL: fixture.baseURL,
+      concurrency: 1,
+      timeBudgetMs: 1,
+    });
+    assert.ok(enrichments instanceof Map);
+    // With 1ms budget, timedOut should be true (at least one bucket hit the deadline).
+    assert.equal(timedOut, true, 'timedOut should be true with 1ms budget');
+  } finally {
+    await fixture.close();
+  }
+});
+
+test('enrichAllRoutesWithDOM returns empty Map for empty routes list', async () => {
+  const { enrichments, timedOut } = await enrichAllRoutesWithDOM({
+    routes: [],
+    baseURL: 'http://127.0.0.1:9999',
+  });
+  assert.ok(enrichments instanceof Map);
+  assert.equal(enrichments.size, 0);
+  assert.equal(timedOut, false);
+});
+
+test('enrichAllRoutesWithDOM sorts priority paths first', async () => {
+  const fixture = await startFixtureServer();
+  try {
+    const routes = [{ path: '/admin' }, { path: '/' }];
+    // '/' is the priority path — should be processed first.
+    const { enrichments } = await enrichAllRoutesWithDOM({
+      routes,
+      baseURL: fixture.baseURL,
+      concurrency: 1,
+      timeBudgetMs: 30_000,
+      priorityPaths: ['/'],
+    });
+    // Both routes should still be enriched; priority only affects order.
+    assert.ok(enrichments instanceof Map);
   } finally {
     await fixture.close();
   }

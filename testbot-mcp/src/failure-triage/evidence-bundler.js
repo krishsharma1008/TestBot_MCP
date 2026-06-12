@@ -82,6 +82,8 @@ function findAcceptanceCriterion(title, parsedPRD) {
   const tagMatch = /\[REQ:([A-Za-z0-9.]+)\]/.exec(title);
   if (!tagMatch) return null;
   const fullTag = tagMatch[1];
+  const kindMatch = /\[(positive|negative|boundary)\]/i.exec(title);
+  const testCaseKind = kindMatch ? kindMatch[1].toLowerCase() : null;
 
   const features = Array.isArray(parsedPRD.features) ? parsedPRD.features : [];
   for (const f of features) {
@@ -96,7 +98,7 @@ function findAcceptanceCriterion(title, parsedPRD) {
             text: redact(String(ac.text || ac.description || '')).slice(0, 600),
             authRequired: !!ac.authRequired,
             roleHint: ac.roleHint || null,
-            kind: ac.kind || null,
+            kind: testCaseKind,
           };
         }
       }
@@ -105,7 +107,7 @@ function findAcceptanceCriterion(title, parsedPRD) {
 
   // Fall back to partial-match — spec might have been generated against a
   // stale PRD. Better to return "unknown AC" than nothing at all.
-  return { tag: fullTag, text: null, unmatched: true };
+  return { tag: fullTag, text: null, kind: testCaseKind, unmatched: true };
 }
 
 /**
@@ -318,10 +320,4 @@ async function bundleFailures({ failures = [], tests = [], projectPath, runId })
 
 module.exports = {
   bundleFailures,
-  bundleOne, // exported for unit tests
-  extractTestBlock,
-  findAcceptanceCriterion,
-  findExplorationRoute,
-  resolveTierAndRole,
-  redact,
 };

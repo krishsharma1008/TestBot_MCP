@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OpenAI Test Generator - Backend Implementation
  * Ported from testbot-mcp/src/test-generator-openai.js
  * 
@@ -16,6 +16,8 @@ import {
   validateGrounding,
   renderGroundingErrors,
   buildGroundingCorrection,
+  contextHasMainLandmark,
+  buildObservedRoleMap,
 } from './grounding-validator'
 import type {
   AgentName,
@@ -32,7 +34,16 @@ import type {
   ApiEndpoint,
   MockableApiContract,
   Role,
+  TestCaseKind,
+  PRDFeature,
+  FeatureAgentType,
+  FeatureManifest,
+  TestCaseSpec,
 } from './types'
+import { tagTestContent, normalizeAgentTypeForTags } from './tag-utils'
+import { validateSpecCoverage } from './spec-validator'
+
+const TEST_CASE_KINDS: TestCaseKind[] = ['positive', 'negative', 'boundary']
 
 const GENERATED_TEST_FILE_SCHEMA = z.object({
   filename: z.string().min(1).max(180).optional(),
@@ -131,11 +142,29 @@ export class OpenAITestGenerator {
   setAbortSignal(signal: AbortSignal | undefined): void {
     this.abortSignal = signal ?? null
   }
-  // P1.5 — per-agent plan slice supplied by the planner pass. When non-null,
-  // each generate*Tests method prepends an "ONLY generate tests for these
-  // targets" preamble to its user prompt so the output stays scoped to what
-  // the planner selected. Null preserves the open-ended prompt (back-compat).
-  private agentPlanSlice: Record<string, unknown> | null = null
+  // Feature-based generation: the PRDFeature currently being generated (ui/api agents).
+  // Null for agents that span all features (auth, e2e).
+  private activeFeature: PRDFeature | null = null
+  // Pre-resolved unique slug for the active feature (deduped by the caller).
+  // When set it overrides the name-derived slug so generated filenames match
+  // the playwright.config testMatch patterns.
+  private activeFeatureSlug: string | null = null
+  // Feature manifest passed to the e2e agent so it knows which action functions
+  // are available from sibling *-actions.ts files.
+  private featureManifest: FeatureManifest[] = []
+  // Whether the explored app exposes a `main` ARIA landmark. Set per-run in
+  // generateTests() from the captured context + exploration artifact. When
+  // false, normalizeGeneratedContent() rewrites `page.locator('main')` (and
+  // `[role="main"]` / `getByRole('main')`) to `body` so scoped assertions
+  // resolve instead of dead-hanging for the full test timeout on apps (CRA,
+  // plain MUI/<div> layouts) that have no <main> element.
+  private appHasMainLandmark = false
+  // Accessible-name → observed ARIA roles, computed per-run from context + the
+  // exploration artifact. normalizeGeneratedContent() uses it to reconcile
+  // `getByRole('button', { name: X })` to `getByRole('tab', …)` when X is
+  // observed only as a tab (e.g. MUI <Tab> labels the artifact also lists as
+  // "buttons") — otherwise the button query matches nothing and hangs.
+  private observedRoleMap: Map<string, Set<string>> = new Map()
 
   constructor(config: OpenAITestGeneratorConfig = {}) {
     const envMaxTokens = Number.parseInt(process.env.OPENAI_MAX_TOKENS || '', 10)
@@ -184,7 +213,7 @@ export class OpenAITestGenerator {
         Number.isFinite(Number(config.timeout)) && Number(config.timeout) > 0
           ? Number(config.timeout)
           : Number.isFinite(Number(process.env.OPENAI_TIMEOUT_MS)) &&
-              Number(process.env.OPENAI_TIMEOUT_MS) > 0
+            Number(process.env.OPENAI_TIMEOUT_MS) > 0
             ? Number(process.env.OPENAI_TIMEOUT_MS)
             : 540_000,
     }
@@ -224,26 +253,31 @@ export class OpenAITestGenerator {
       testType = 'both',
       projectInfo = {},
       options = {},
-      agentsAllowlist,
     } = params
 
-    // Allowlist helper: when the caller scopes the request to a subset of
-    // agents (MCP per-agent chunked mode), gate every agent branch by
-    // membership. No allowlist → run whatever the existing rule-based
-    // conditions allow (back-compat).
-    const agentAllowed = (agent: 'smoke' | 'frontend' | 'api' | 'workflow' | 'error' | 'expansion') =>
-      !agentsAllowlist || agentsAllowlist.has(agent)
+    // Resolve the active feature from featureId param.
+    const resolvedFeature: PRDFeature | null = (() => {
+      if (!params.featureId || !parsedPRD) return null
+      return parsedPRD.features?.find((f) => f.id === params.featureId) ?? null
+    })()
 
     // Track the structured inputs so downstream prompt builders can reference them.
     this.parsedPRD = parsedPRD
     this.explorationArtifact = explorationArtifact
+    // Decide once whether `main`-scoped selectors are safe for this app. Drives
+    // the normalizer's main→body rewrite (see normalizeGeneratedContent).
+    this.appHasMainLandmark = contextHasMainLandmark(context, explorationArtifact)
+    // Observed accessible-name → roles, for tab-as-button reconciliation.
+    this.observedRoleMap = buildObservedRoleMap(context, explorationArtifact)
     this.roles = roles
     this.agentRuns = []
-    this.onAgentComplete = typeof params.onAgentComplete === 'function' ? params.onAgentComplete : null
-    this.agentPlanSlice =
-      params.agentPlanSlice && typeof params.agentPlanSlice === 'object'
-        ? params.agentPlanSlice
+    this.activeFeature = resolvedFeature
+    this.activeFeatureSlug =
+      typeof params.featureSlug === 'string' && params.featureSlug.trim()
+        ? params.featureSlug.trim()
         : null
+    this.featureManifest = Array.isArray(params.featureManifest) ? params.featureManifest : []
+    this.onAgentComplete = typeof params.onAgentComplete === 'function' ? params.onAgentComplete : null
 
     const strictAIGeneration =
       options.strictAIGeneration === true || this.config.strictAIGeneration === true
@@ -273,7 +307,7 @@ export class OpenAITestGenerator {
     if (!isOpenAIReady) {
       if (strictAIGeneration) {
         const strictError = new Error('OpenAI API key missing in strict AI generation mode')
-        ;(strictError as NodeJS.ErrnoException).code = 'OPENAI_KEY_MISSING'
+          ; (strictError as NodeJS.ErrnoException).code = 'OPENAI_KEY_MISSING'
         throw strictError
       }
       if (this.config.fallbackOnFailure) {
@@ -284,94 +318,51 @@ export class OpenAITestGenerator {
       return this.generatedFiles
     }
 
-    // API-only repos (backend without a frontend) collapse to backend generation
-    // only, regardless of the requested testType. Frontend/workflow passes are
-    // skipped because there is no UI to drive.
-    const apiOnly = projectInfo.apiOnly === true
-    const effectiveTestType: 'frontend' | 'backend' | 'both' = apiOnly ? 'backend' : testType
-
     try {
-      // Agents fan out in parallel via Promise.allSettled so one agent's
-      // failure (or slowness) doesn't block the others. The method-level
-      // `onAgentComplete` hook still fires per-agent; the dispatcher assembles
-      // per-agent telemetry from `this.agentRuns`, which each method already
-      // appends to on completion.
-      //
-      // Each branch is gated by (a) the legacy rule-based condition (apiOnly,
-      // includeSmoke, effectiveTestType, etc.) AND (b) the optional
-      // agentsAllowlist — when the MCP chunks a request to one agent, only
-      // that agent actually runs.
+      // Dispatch to the appropriate agent method based on params.agentType.
+      // ui and api for the same feature can run in parallel via Promise.allSettled.
+      const agentType = params.agentType
       const agentTasks: Array<{ agent: AgentName; run: Promise<unknown> }> = []
 
-      if (agentAllowed('smoke') && options.includeSmoke !== false && !apiOnly) {
-        agentTasks.push({ agent: 'smoke', run: this.generateSmokeTests(context, projectInfo) })
+      if (agentType === 'auth') {
+        agentTasks.push({ agent: 'auth', run: this.generateAuthTests(context, prd, projectInfo) })
+      } else if (agentType === 'ui') {
+        agentTasks.push({ agent: 'ui', run: this.generateFeatureUITests(context, prd, projectInfo, params.specs) })
+      } else if (agentType === 'api') {
+        agentTasks.push({ agent: 'api', run: this.generateFeatureAPITests(context, prd, projectInfo, params.specs) })
+      } else if (agentType === 'e2e') {
+        agentTasks.push({ agent: 'e2e', run: this.generateE2ETests(context, prd, projectInfo) })
       }
-
-      if (
-        agentAllowed('frontend') &&
-        !apiOnly &&
-        (effectiveTestType === 'frontend' || effectiveTestType === 'both')
-      ) {
-        agentTasks.push({ agent: 'frontend', run: this.generateFrontendTests(context, prd, projectInfo) })
-      }
-
-      if (agentAllowed('api') && (effectiveTestType === 'backend' || effectiveTestType === 'both')) {
-        agentTasks.push({ agent: 'api', run: this.generateBackendTests(context, prd, projectInfo) })
-      }
-
-      if (
-        agentAllowed('workflow') &&
-        !apiOnly &&
-        options.includeWorkflows !== false &&
-        (context.workflows?.length ?? 0) > 0
-      ) {
-        agentTasks.push({ agent: 'workflow', run: this.generateWorkflowTests(context, prd, projectInfo) })
-      }
-
-      if (agentAllowed('error') && options.includeErrorStates) {
-        if (
-          (!Array.isArray(context.errorScenarios) || context.errorScenarios.length === 0) &&
-          options.allowSyntheticErrorScenarios === true
-        ) {
-          const synthesised = this.synthesiseErrorScenarios(context)
-          if (synthesised.length > 0) {
-            context.errorScenarios = synthesised
-          }
-        }
-        if ((context.errorScenarios?.length ?? 0) > 0) {
-          agentTasks.push({ agent: 'error', run: this.generateErrorTests(context, projectInfo) })
-        }
-      }
+      // No agentType (legacy call) — no tasks; fall through to fallback if needed.
 
       // allSettled ensures one agent's throw doesn't cancel siblings. Each
       // generate*Tests method already captures its own errors into
       // this.agentRuns via callOpenAIForTests, so rejections here are typically
       // unexpected bugs — surface them into generationMeta.agentFailures for
       // triage but keep the surviving agents' output.
-      const settled = await Promise.allSettled(agentTasks.map((t) => t.run))
-      const agentFailures = this.generationMeta.agentFailures ?? []
-      settled.forEach((s, i) => {
-        if (s.status === 'rejected') {
-          const reason = s.reason as (Error & { code?: string }) | undefined
-          agentFailures.push({
-            agent: agentTasks[i].agent,
-            code: reason?.code ?? null,
-            message: reason?.message ?? String(reason ?? 'unknown agent failure'),
-          })
+      if (agentTasks.length > 0) {
+        const settled = await Promise.allSettled(agentTasks.map((t) => t.run))
+        const agentFailures = this.generationMeta.agentFailures ?? []
+        settled.forEach((s, i) => {
+          if (s.status === 'rejected') {
+            const reason = s.reason as (Error & { code?: string }) | undefined
+            agentFailures.push({
+              agent: agentTasks[i].agent,
+              code: reason?.code ?? null,
+              message: reason?.message ?? String(reason ?? 'unknown agent failure'),
+            })
+          }
+        })
+        if (agentFailures.length > 0) {
+          this.generationMeta.agentFailures = agentFailures
         }
-      })
-      if (agentFailures.length > 0) {
-        this.generationMeta.agentFailures = agentFailures
       }
 
-      // A single scoped agent (MCP per-agent chunked mode) plausibly emits 0
-      // tests — its precondition may not apply (e.g. `workflow` agent with an
-      // empty `context.workflows[]`), or its prompt may have parsed to nothing
-      // this round. The MCP aggregates across all 5 agent calls, so per-call
-      // emptiness is not a failure. Detecting scope before the guards below
-      // lets us short-circuit with a clean empty-success response instead of
-      // 422ing every agent and tanking the whole run.
-      const isAgentScopedCall = !!agentsAllowlist && agentsAllowlist.size === 1
+      // A feature-scoped call (one agent for one feature) may legitimately produce
+      // 0 tests when the feature has no relevant ACs for that agent type. The
+      // orchestrator aggregates across all feature×agent pairs, so per-call
+      // emptiness is not a failure here.
+      const isAgentScopedCall = !!agentType
 
       if (this.generatedFiles.length === 0 && this.config.fallbackOnFailure && !strictAIGeneration) {
         this.generationMeta.fallbackReason = 'invalid_generation'
@@ -380,13 +371,9 @@ export class OpenAITestGenerator {
 
       if (strictAIGeneration && this.generatedFiles.length === 0 && !isAgentScopedCall) {
         const strictError = new Error('Strict AI generation produced no valid files')
-        ;(strictError as NodeJS.ErrnoException).code = 'AI_GENERATION_INSUFFICIENT'
+          ; (strictError as NodeJS.ErrnoException).code = 'AI_GENERATION_INSUFFICIENT'
         throw strictError
       }
-
-      const scopedAgent = agentsAllowlist && agentsAllowlist.size === 1
-        ? Array.from(agentsAllowlist)[0]
-        : null
 
       let generationQuality = this.evaluateSuiteQuality({
         testType,
@@ -394,22 +381,15 @@ export class OpenAITestGenerator {
         strictAIGeneration,
         context,
         coverageProfile: options.coverageProfile || 'qa-max',
-        agentScope: scopedAgent,
+        agentScope: agentType ?? null,
       })
 
-      // Expansion loop runs for both aggregated and per-agent scoped calls.
-      // For agent-scoped runs we clamp the floor to a per-agent share of
-      // `minGeneratedTests` so each slice aims for its own quota rather than
-      // fighting to hit the global minimum alone.
+      // Expansion loop for both aggregated and per-agent scoped calls.
       if (strictAIGeneration && minGeneratedTests > 0) {
         const maxExpansionAttempts = Math.max(
           0,
           Math.min(6, Number(options.maxExpansionAttempts ?? 4))
         )
-        // Per-agent floor: for scoped calls, divide the global minimum across
-        // the number of agent tasks so each slice aims for its own quota.
-        // Clamped to [5, 20] so tiny or huge global floors stay sensible per
-        // agent. For aggregated calls we keep the original global minimum.
         const perAgentFloor = isAgentScopedCall
           ? Math.max(5, Math.min(20, Math.ceil(minGeneratedTests / Math.max(1, agentTasks.length))))
           : minGeneratedTests
@@ -438,24 +418,20 @@ export class OpenAITestGenerator {
             strictAIGeneration,
             context,
             coverageProfile: options.coverageProfile || 'qa-max',
-            agentScope: scopedAgent,
+            agentScope: agentType ?? null,
           })
         }
       }
 
       this.generationMeta.generationQuality = generationQuality
-      // When the call is scoped to a subset of agents (MCP per-agent chunked
-      // mode), a single agent cannot plausibly fill every required category
-      // (e.g. the `smoke` agent has no business producing `api_contract`
-      // tests). The aggregation happens on the MCP side across all 5 agent
-      // responses, so the per-call gate here is meaningless and only serves
-      // to fail every scoped call with 422. Skip it for scoped callers.
+      // Skip global quality gate for single-agent scoped calls — the aggregation
+      // happens in the orchestrator across all agents.
       if (!isAgentScopedCall && !generationQuality.valid) {
         const qualityError = new Error(
           `Generation quality gates failed: ${generationQuality.errors.join(', ')}`
         )
-        ;(qualityError as NodeJS.ErrnoException).code =
-          generationQuality.errorCode || 'AI_GENERATION_INSUFFICIENT'
+          ; (qualityError as NodeJS.ErrnoException).code =
+            generationQuality.errorCode || 'AI_GENERATION_INSUFFICIENT'
         throw qualityError
       }
 
@@ -467,102 +443,83 @@ export class OpenAITestGenerator {
     }
   }
 
-  /**
-   * P1.5 — prepend an "ONLY generate tests for these targets" preamble when
-   * the planner has supplied a per-agent slice. Keeps the call site tidy:
-   * every agent does `this.applyPlanPreamble(userPrompt)` at its boundary.
-   */
-  private applyPlanPreamble(userPrompt: string): string {
-    const slice = this.agentPlanSlice
-    if (!slice || typeof slice !== 'object' || Object.keys(slice).length === 0) {
-      return userPrompt
-    }
-    // Bounded serialization — slice is already capped upstream, but we
-    // still clamp defensively so a malformed blob can't blow up the prompt.
-    let sliceJson: string
-    try {
-      sliceJson = JSON.stringify(slice).slice(0, 6000)
-    } catch {
-      return userPrompt
-    }
-    const preamble = [
-      'PLAN SCOPE:',
-      'ONLY generate tests for these targets:',
-      sliceJson,
-      'Stay strictly within the listed pages, endpoints, workflows, or flows. Do not invent new targets.',
-      '',
-    ].join('\n')
-    return `${preamble}\n${userPrompt}`
+  /** Returns a URL-safe slug from the active feature name, e.g. "billing" or "user-profile". */
+  private getFeatureSlug(): string {
+    if (this.activeFeatureSlug) return this.activeFeatureSlug
+    if (!this.activeFeature) return 'feature'
+    return (
+      this.activeFeature.name
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '') || 'feature'
+    )
   }
 
-  private async generateSmokeTests(context: CapturedContext, projectInfo: ProjectInfo) {
-    const systemPrompt = this.buildSmokeSystemPrompt()
-    const userPrompt = this.applyPlanPreamble(this.buildSmokeUserPrompt(context, projectInfo))
+  // ─── New feature-scoped agent methods ────────────────────────────────────
 
-    const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'smoke', {
-      context,
-      projectInfo,
-    })
-
-    const finalTests =
-      tests.length > 0
-        ? tests
-        : this.config.fallbackOnFailure
-          ? this.buildFallbackTestsForType('smoke', context, projectInfo, {
-              reason: 'invalid_smoke_generation',
-            })
-          : []
-
-    for (const test of finalTests) {
-      this.storeTestFile(test)
-    }
-  }
-
-  private async generateFrontendTests(
+  private async generateAuthTests(
     context: CapturedContext,
     prd: string | undefined,
     projectInfo: ProjectInfo
   ) {
-    const pages = context.pages || []
-    if (pages.length === 0 && !prd) return
+    const systemPrompt = this.buildAuthSystemPrompt(projectInfo)
+    const userPrompt = this.buildAuthUserPrompt(context, prd, projectInfo)
 
-    const systemPrompt = this.buildFrontendSystemPrompt(projectInfo)
-    const userPrompt = this.applyPlanPreamble(
-      this.buildFrontendUserPrompt(context, prd, projectInfo),
-    )
-
-    const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'frontend', {
+    const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'auth', {
       context,
       prd,
       projectInfo,
     })
 
-    const finalTests =
-      tests.length > 0
-        ? tests
-        : this.config.fallbackOnFailure
-          ? this.buildFallbackTestsForType('frontend', context, projectInfo, {
-              reason: 'invalid_frontend_generation',
-            })
-          : []
-
-    for (const test of finalTests) {
+    for (const test of tests) {
       this.storeTestFile(test)
     }
   }
 
-  private async generateBackendTests(
+  private async generateFeatureUITests(
     context: CapturedContext,
     prd: string | undefined,
-    projectInfo: ProjectInfo
+    projectInfo: ProjectInfo,
+    specs?: TestCaseSpec[]
   ) {
-    const endpoints = context.apiEndpoints || []
-    if (endpoints.length === 0 && !prd) return
+    const uiSpecs = specs?.filter((s) => s.agentType === 'ui')
+    const systemPrompt = this.buildFeatureUISystemPrompt(projectInfo)
+    const userPrompt = uiSpecs?.length
+      ? this.buildSpecsDrivenUserPrompt(uiSpecs, 'ui', context, prd, projectInfo)
+      : this.buildFeatureUIUserPrompt(context, prd, projectInfo)
 
-    const systemPrompt = this.buildBackendSystemPrompt(projectInfo)
-    const userPrompt = this.applyPlanPreamble(
-      this.buildBackendUserPrompt(context, prd, projectInfo),
-    )
+    const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'ui', {
+      context,
+      prd,
+      projectInfo,
+    })
+
+    if (uiSpecs?.length && tests.length > 0 && this.generationMeta) {
+      const result = validateSpecCoverage(uiSpecs, tests, this.activeFeature?.id ?? '', 'ui')
+      if (!this.generationMeta.specValidation) this.generationMeta.specValidation = []
+      this.generationMeta.specValidation.push(result)
+    }
+
+    for (const test of tests) {
+      this.storeTestFile(test)
+    }
+  }
+
+  private async generateFeatureAPITests(
+    context: CapturedContext,
+    prd: string | undefined,
+    projectInfo: ProjectInfo,
+    specs?: TestCaseSpec[]
+  ) {
+    const apiSpecs = specs?.filter((s) => s.agentType === 'api')
+    const endpoints = context.apiEndpoints || []
+    if (endpoints.length === 0 && !prd && !apiSpecs?.length) return
+
+    const systemPrompt = this.buildFeatureAPISystemPrompt(projectInfo)
+    const userPrompt = apiSpecs?.length
+      ? this.buildSpecsDrivenUserPrompt(apiSpecs, 'api', context, prd, projectInfo)
+      : this.buildFeatureAPIUserPrompt(context, prd, projectInfo)
 
     const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'api', {
       context,
@@ -570,123 +527,32 @@ export class OpenAITestGenerator {
       projectInfo,
     })
 
-    const finalTests =
-      tests.length > 0
-        ? tests
-        : this.config.fallbackOnFailure
-          ? this.buildFallbackTestsForType('api', context, projectInfo, {
-              reason: 'invalid_api_generation',
-            })
-          : []
+    if (apiSpecs?.length && tests.length > 0 && this.generationMeta) {
+      const result = validateSpecCoverage(apiSpecs, tests, this.activeFeature?.id ?? '', 'api')
+      if (!this.generationMeta.specValidation) this.generationMeta.specValidation = []
+      this.generationMeta.specValidation.push(result)
+    }
 
-    for (const test of finalTests) {
+    for (const test of tests) {
       this.storeTestFile(test)
     }
   }
 
-  private async generateWorkflowTests(
+  private async generateE2ETests(
     context: CapturedContext,
     prd: string | undefined,
     projectInfo: ProjectInfo
   ) {
-    const workflows = context.workflows || []
-    if (workflows.length === 0) return
+    const systemPrompt = this.buildE2ESystemPrompt(projectInfo)
+    const userPrompt = this.buildE2EUserPrompt(context, prd, projectInfo)
 
-    const systemPrompt = this.buildWorkflowSystemPrompt(projectInfo)
-    const userPrompt = this.applyPlanPreamble(
-      this.buildWorkflowUserPrompt(context, prd, projectInfo),
-    )
-
-    const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'workflow', {
+    const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'e2e', {
       context,
       prd,
       projectInfo,
     })
 
-    const finalTests =
-      tests.length > 0
-        ? tests
-        : this.config.fallbackOnFailure
-          ? this.buildFallbackTestsForType('workflow', context, projectInfo, {
-              reason: 'invalid_workflow_generation',
-            })
-          : []
-
-    for (const test of finalTests) {
-      this.storeTestFile(test)
-    }
-  }
-
-  private synthesiseErrorScenarios(
-    context: CapturedContext,
-  ): Array<{ scenario: string; trigger: string; expectedError: string }> {
-    const out: Array<{ scenario: string; trigger: string; expectedError: string }> = []
-    const endpoints = Array.isArray(context.apiEndpoints) ? context.apiEndpoints : []
-
-    for (const ep of endpoints.slice(0, 12)) {
-      const route = `${String(ep.method || 'GET').toUpperCase()} ${ep.path || '/'}`
-      const authed = ep.requiresAuth === true || ep.authRequired === true
-      if (authed) {
-        out.push({
-          scenario: `${route} rejects unauthenticated requests`,
-          trigger: 'Call the endpoint without an Authorization header or session cookie',
-          expectedError: 'HTTP 401 or 403 with a structured error body',
-        })
-      }
-      if (/post|put|patch/i.test(String(ep.method || ''))) {
-        out.push({
-          scenario: `${route} rejects malformed payloads`,
-          trigger: 'Send an empty body, a body missing required fields, or wrong types',
-          expectedError: 'HTTP 400 with a validation error message',
-        })
-      }
-      out.push({
-        scenario: `${route} handles non-existent resources`,
-        trigger: 'Reference an id that does not exist in the system',
-        expectedError: 'HTTP 404 with a not-found error body',
-      })
-    }
-
-    const pages = Array.isArray(context.pages) ? context.pages : []
-    for (const page of pages.slice(0, 6)) {
-      if (!page?.path) continue
-      out.push({
-        scenario: `${page.path} renders a safe state when backend dependencies fail`,
-        trigger: 'Intercept the page’s data-fetch requests and respond with 500',
-        expectedError: 'The page shows an error region or fallback UI instead of crashing',
-      })
-    }
-
-    const seen = new Set<string>()
-    return out.filter((row) => {
-      const key = `${row.scenario}|${row.trigger}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-  }
-
-  private async generateErrorTests(context: CapturedContext, projectInfo: ProjectInfo) {
-    const systemPrompt = this.buildErrorTestSystemPrompt()
-    const userPrompt = this.applyPlanPreamble(
-      this.buildErrorTestUserPrompt(context, projectInfo),
-    )
-
-    const tests = await this.callOpenAIForTests(systemPrompt, userPrompt, 'error', {
-      context,
-      projectInfo,
-    })
-
-    const finalTests =
-      tests.length > 0
-        ? tests
-        : this.config.fallbackOnFailure
-          ? this.buildFallbackTestsForType('error', context, projectInfo, {
-              reason: 'invalid_error_generation',
-            })
-          : []
-
-    for (const test of finalTests) {
+    for (const test of tests) {
       this.storeTestFile(test)
     }
   }
@@ -754,21 +620,10 @@ Rules:
     }
   }
 
-  buildSmokeSystemPrompt(): string {
-    return `You are an expert Playwright test engineer. Generate comprehensive smoke tests that verify an application's basic health and functionality.
+  // ─── Shared anti-pattern section used by multiple prompts ───────────────
 
-## Guidelines
-- Import Playwright primitives from the Healix fixture: \`import { test, expect } from './__healix-fixture'\`. Do NOT import from '@playwright/test' — the fixture wraps Playwright with splash-bypass and storageState auto-load required for auth-gated apps.
-- Playwright globals: ONLY \`test(...)\` and \`expect(...)\` are defined. To group tests use \`test.describe(...)\`. To set up/tear down use \`test.beforeEach\`/\`test.afterEach\`. NEVER use bare \`describe\`, \`it\`, \`beforeEach\`, \`afterEach\` — they are undefined in Playwright and the file will fail to load with "ReferenceError: describe is not defined".
-- Tests should be fast and reliable
-- Focus on critical paths that indicate the app is working
-- Include console error detection
-- Test responsive design with different viewports
-- Use proper async/await patterns
-- Add descriptive test names and comments
-- Splash / intro screens: if the app may show a splash or intro overlay on first visit, wait for it to disappear before asserting page content. Use \`page.waitForSelector('main:not([aria-hidden="true"])', { timeout: 8000 }).catch(() => {})\` or wait for a known landmark to become visible. Never assert on content that may be hidden behind a splash.
-
-## Anti-patterns — NEVER do these
+  private buildAntiPatternsSection(): string {
+    return `## Anti-patterns — NEVER do these
 
 ### 1. Select option visibility
 \`<option>\` elements inside a closed \`<select>\` are ALWAYS hidden in Playwright. Never call \`toBeVisible()\` or \`getByText()\` on individual option elements.
@@ -777,59 +632,54 @@ Rules:
 - To interact with a select: \`await page.locator('select').selectOption({ label: 'Option Label' })\`
 
 ### 2. Ambiguous short role names — always use exact: true
-\`getByRole('button', { name: 'X' })\` without \`exact: true\` matches any button whose accessible name **contains** that string as a substring — including image buttons, icon buttons, or any element whose aria-label contains those characters. Always pass \`exact: true\` for single-character or short button names.
+\`getByRole('button', { name: 'X' })\` without \`exact: true\` matches any button whose accessible name **contains** that string as a substring. Always pass \`exact: true\` for single-character or short button names.
 - WRONG: \`page.getByRole('button', { name: 'S' }).click()\`
 - RIGHT: \`page.getByRole('button', { name: 'S', exact: true }).click()\`
 
 ### 3. Hardcoded database-driven counts
-Never assert an exact count of items whose number comes from a live database (product cards, list rows, gallery images). The DB may hold more rows than the context shows. Assert presence of specific known identifiers, or use \`toBeGreaterThan(0)\`.
+Never assert an exact count of items whose number comes from a live database. Assert presence of specific known identifiers, or use \`toBeGreaterThan(0)\`.
 - WRONG: \`await expect(page.locator('.product-card')).toHaveCount(4)\`
 - RIGHT: \`await expect(page.locator('.product-card').first()).toBeVisible()\`
 
 ### 4. Exact text matches on marketing/CMS copy
-Hero taglines, descriptions, and CMS-managed text often have trailing punctuation (period, dash) that differs from what a PRD excerpt shows. Use the default partial match instead of \`{ exact: true }\` for long marketing strings.
+Hero taglines and CMS-managed text often have trailing punctuation that differs from PRD excerpts. Use the default partial match instead of \`{ exact: true }\` for long marketing strings.
 - WRONG: \`page.getByText('Welcome to our platform', { exact: true })\`
 - RIGHT: \`page.getByText('Welcome to our platform')\`
 
 ### 5. Assuming initial disabled state without verifying
-Some apps pre-select a default value on load (e.g., auto-picking the first option in a selector), which immediately enables a submit button. Do NOT assert \`toBeDisabled()\` on action buttons at page load unless you have confirmed the app requires a user action first. Assert \`toBeEnabled()\` after the user action instead.
+Some apps pre-select a default value on load which immediately enables a submit button. Do NOT assert \`toBeDisabled()\` on action buttons at page load unless confirmed.
 - WRONG: \`await expect(page.getByRole('button', { name: /submit/i })).toBeDisabled()\`
 - RIGHT: \`await page.locator('[data-option]').first().click(); await expect(submitBtn).toBeEnabled()\`
 
 ### 6. URL assertions for in-place error states
-Some apps render an error state inside the current page (with a "go back" button) instead of server-redirecting. Never assume a URL change when loading an invalid resource — check for the visible error message instead.
+Some apps render an error state inside the current page instead of server-redirecting. Check for the visible error message instead.
 - WRONG: \`await expect(page).toHaveURL(/\\/list\$/)\` after navigating to a non-existent detail URL
 - RIGHT: \`await expect(page.getByText(/not found/i)).toBeVisible()\`
 
 ### 7. Selectors that match both page body and persistent chrome (header/footer)
-Elements like nav links, social icons, or CTAs that appear in both the page body and a site-wide header or footer will cause strict-mode violations. Always scope to \`main\` (or the appropriate container) to target only the page-level instance.
+Elements that appear in both the page body and a site-wide header/footer cause strict-mode violations. Scope to a container, but pick one that actually exists: use \`main\` ONLY when a \`main\` landmark appears in CONTEXT_JSON for the route — many apps (Create React App, plain MUI/\`<div>\` layouts) have NO \`<main>\`, and \`page.locator('main')\` then matches nothing and hangs the assertion for the full timeout. When no \`main\` landmark is present, scope to \`body\` or a proven container instead.
 - WRONG: \`await expect(page.locator('a[href*="/contact"]')).toBeVisible()\`
-- RIGHT: \`await expect(page.locator('main a[href*="/contact"]').first()).toBeVisible()\`
+- RIGHT (no main landmark): \`await expect(page.locator('body').getByRole('link', { name: 'Contact' }).first()).toBeVisible()\`
 
 ### 8. State-conditional elements asserted in the wrong application state
-Many elements only exist in a specific app state (e.g., elements visible only when a shopping cart has items, or only when a form has an error). Ensure the app is in the correct state before asserting. Navigate or interact to reach that state; do not assume it.
+Ensure the app is in the correct state before asserting. Navigate or interact to reach that state.
 
 ### 9. Hardcoded UUIDs or numeric IDs in URLs
-Never construct a detail-page URL by embedding a hardcoded UUID or numeric ID (e.g., \`/shop/00000000-0000-0000-0000-000000000001\`, \`/products/42\`). That specific record may not exist in the live database — the page will render a not-found state and all downstream assertions will fail.
+Never construct a detail-page URL by embedding a hardcoded UUID or numeric ID. Navigate to the listing page first and extract a real URL.
 - WRONG: \`await page.goto('/shop/00000000-0000-0000-0000-000000000001')\`
-- RIGHT: navigate to the listing page first, then extract a real URL from a live link:
-\`\`\`ts
-await page.goto('/shop')
-const productLink = page.locator('a[href*="/shop/"]').first()
-const href = await productLink.getAttribute('href')
-await page.goto(href!)
-\`\`\`
-If you see UUID-shaped paths in the OBSERVED_FLOWS context (e.g., \`/shop/11111111-…\`), those were captured during exploration and **may no longer be valid**. Do not copy them verbatim into \`page.goto\` calls.
+- RIGHT: \`await page.goto('/shop'); const href = await page.locator('a[href*="/shop/"]').first().getAttribute('href'); await page.goto(href!)\``
+  }
 
-## Abstention Rule — Do Not Invent
+  private buildOutputFormatSection(exampleFilename: string): string {
+    return `## Abstention Rule — Do Not Invent
 If a specific route, UI element, button name, or data state is NOT explicitly present in \`CONTEXT_JSON\`, you MUST NOT invent or assume it exists. When grounding fails, fall back in this priority order:
 1. **URL reachability** (always works, never strict-mode issues): \`await expect(page).toHaveURL(/\\/expected-path/)\`
-2. **Single-element structural locator**: \`await expect(page.locator('main').first()).toBeVisible()\` — use ONE landmark, not a list. If \`main\` may not exist, use \`page.locator('[role="main"]').first()\` instead. Picking a single tag avoids the strict-mode failure mode of multi-match selectors.
+2. **Single-element structural locator**: \`await expect(page.locator('body').first()).toBeVisible()\` — \`body\` always exists. Do NOT fall back to \`page.locator('main')\` or \`page.locator('[role="main"]')\` unless a \`main\` landmark is present in CONTEXT_JSON; on apps without one (CRA, plain MUI/\`<div>\` layouts) those match nothing and hang for the full timeout. Picking a single tag avoids the strict-mode failure mode of multi-match selectors.
 3. **Console error absence** (already covered by listeners)
 
 HARD BANS in abstention fallbacks:
-- **Never use comma-separated CSS** like \`locator('main, form, body')\` or \`locator('nav, header')\` with \`toBeVisible()\`. Comma CSS matches multiple elements → strict-mode violation → test fails. If you genuinely need either-or, use \`.or()\` chaining: \`page.locator('main').or(page.locator('[role="main"]')).first()\`.
-- **Never use raw \`.first()\` on broad selectors** like \`locator('a, button').first()\` or \`getByRole('link').first()\` — \`.first()\` picks DOM order, often a hidden header/logo. If you must use \`.first()\`, scope it tightly: \`page.locator('main').getByRole('link').first()\` AND/OR chain \`.filter({ visible: true })\` when the framework supports it. For visibility checks, prefer a scoped landmark over a generic-element \`.first()\`.
+- **Never use comma-separated CSS** like \`locator('main, form, body')\` or \`locator('nav, header')\` with \`toBeVisible()\`. Comma CSS matches multiple elements → strict-mode violation → test fails. If you genuinely need either-or, use \`.or()\` chaining with a guaranteed-present fallback: \`page.locator('main').or(page.locator('body')).first()\`.
+- **Never use raw \`.first()\` on broad selectors** like \`locator('a, button').first()\` or \`getByRole('link').first()\` — \`.first()\` picks DOM order, often a hidden header/logo. If you must use \`.first()\`, scope it tightly to a container that exists (e.g. \`page.locator('body').getByRole('link').first()\` — use \`main\` only when a \`main\` landmark is present in CONTEXT_JSON) AND/OR chain \`.filter({ visible: true })\` when the framework supports it. For visibility checks, prefer a scoped container over a generic-element \`.first()\`.
 - **Never** fall back to \`getByRole('heading', { name: /something/i })\` with invented text — that re-introduces the hallucination this rule is meant to prevent.
 
 Silence (no assertion) is better than a hallucinated or strict-mode-violating selector.
@@ -838,7 +688,7 @@ Silence (no assertion) is better than a hallucinated or strict-mode-violating se
 Return a JSON array of test files:
 [
   {
-    "filename": "smoke.spec.ts",
+    "filename": "${exampleFilename}",
     "content": "// Full test file content"
   }
 ]
@@ -846,109 +696,40 @@ Return a JSON array of test files:
 IMPORTANT: Return ONLY valid JSON, no markdown code blocks or explanations.`
   }
 
-  buildSmokeUserPrompt(context: CapturedContext, projectInfo: ProjectInfo): string {
-    const payload = this.buildPrioritizedContextPayload({
-      context,
-      prd: undefined,
-      projectInfo,
-      testKind: 'smoke',
-    })
+  // ─── Auth agent prompt builders ──────────────────────────────────────────
 
-    return this.buildStructuredUserPrompt({
-      task: 'Generate deterministic smoke tests for core application health.',
-      requirements: [
-        'Cover application load, main route navigation, and key UI landmarks.',
-        'Include console error assertions and one mobile viewport check.',
-        'Prefer robust locators and deterministic assertions only.',
-        'Use bounded or defensive assertions for anything potentially dynamic: prefer `expect(locator).not.toBeEmpty()` over `expect(locator).toHaveText(\'Welcome\')` unless the exact string appears verbatim in CONTEXT_JSON. Never assert exact item counts or exact user-generated text strings unless they are explicitly present in CONTEXT_JSON.',
-      ],
-      payload,
-    })
-  }
-
-  buildFrontendSystemPrompt(projectInfo: ProjectInfo): string {
-    return `You are an expert Playwright test engineer specializing in frontend E2E testing. Generate comprehensive, production-ready tests.
+  buildAuthSystemPrompt(projectInfo: ProjectInfo): string {
+    return `You are an expert Playwright test engineer specialising in authentication flows. Generate tests for all auth-related behaviours.
 
 ## Guidelines
-- Import Playwright primitives from the Healix fixture: \`import { test, expect } from './__healix-fixture'\`. Do NOT import from '@playwright/test' — the fixture wraps Playwright with splash-bypass and storageState auto-load required for auth-gated apps.
-- Include proper assertions (visibility, content, accessibility)
-- Handle async operations with proper waits (avoid arbitrary timeouts)
-- Test both happy paths and error scenarios
-- Use accessible selectors (getByRole, getByLabel, getByText, getByTestId)
-- Add meaningful comments explaining test logic
-- Group related tests in \`test.describe(...)\` blocks. NEVER use bare \`describe(...)\` — it is NOT defined in Playwright and the file will fail to load with "ReferenceError: describe is not defined". Same for \`it(...)\` (use \`test(...)\` only) and \`beforeEach\`/\`afterEach\` (use \`test.beforeEach\`/\`test.afterEach\`).
-- Include proper test isolation
-- Splash / intro screens: always wait for the main content area to become interactive before asserting. If the app uses \`aria-hidden\` on \`<main>\` during a splash, use \`await page.waitForSelector('main:not([aria-hidden="true"])', { timeout: 8000 }).catch(() => {})\` after navigation. The __healix-fixture already injects sessionStorage keys to bypass known splash screens, but add the wait as a safety net.
+- Import Playwright primitives from the Healix fixture: \`import { test, expect } from './__healix-fixture'\`. Do NOT import from '@playwright/test'.
+- Playwright globals: ONLY \`test(...)\` and \`expect(...)\` are defined. Group tests with \`test.describe(...)\`. Use \`test.beforeEach\`/\`test.afterEach\`. NEVER use bare \`describe\`, \`it\`, \`beforeEach\`, \`afterEach\`.
+- Focus on: login flows, registration, logout, session expiry, role-based access, auth error states.
+- Emit THREE output files:
+  1. \`auth-actions.ts\` — exported async helper functions ONLY (no test(...) blocks). Each function takes \`page: import('@playwright/test').Page\` as first arg.
+  2. \`auth-ui.spec.ts\` — login/register/logout/session UI tests importing from \`./auth-actions\`.
+  3. \`auth-setup.ts\` — Playwright global setup using storageState API. Pattern:
+\`\`\`typescript
+import { test as setup } from '@playwright/test'
+import { loginAs } from './auth-actions'
 
-## Anti-patterns — NEVER do these
-
-### 1. Select option visibility
-\`<option>\` elements inside a closed \`<select>\` are ALWAYS hidden in Playwright. Never call \`toBeVisible()\` or \`getByText()\` on individual options.
-- WRONG: \`await expect(page.getByText('Option Label', { exact: true })).toBeVisible()\`
-- RIGHT: \`await expect(page.locator('select')).toContainText('Option Label')\`
-- To interact: \`await page.locator('select').selectOption({ label: 'Option Label' })\`
-
-### 2. Ambiguous short role names — always use exact: true
-Without \`exact: true\`, \`getByRole('button', { name: 'X' })\` matches every button whose accessible name **contains** the string as a substring. Always add \`exact: true\` for single-character or short names.
-- WRONG: \`page.getByRole('button', { name: 'S' }).click()\`
-- RIGHT: \`page.getByRole('button', { name: 'S', exact: true }).click()\`
-
-### 3. Hardcoded database-driven counts
-Never assert an exact count for collections sourced from a live database. Assert presence of specific known identifiers, or use \`toBeGreaterThan(0)\`.
-- WRONG: \`await expect(page.locator('.item-card')).toHaveCount(4)\`
-- RIGHT: \`await expect(page.locator('.item-card').first()).toBeVisible()\`
-
-### 4. Exact text on marketing/CMS copy
-Use default partial matching for long marketing strings — they may have trailing punctuation that differs from the PRD.
-- WRONG: \`page.getByText('Our hero tagline here', { exact: true })\`
-- RIGHT: \`page.getByText('Our hero tagline here')\`
-
-### 5. Assuming initial disabled state without verifying
-Apps may pre-select defaults on load, making action buttons immediately enabled. Do not assert \`toBeDisabled()\` at page load unless you have confirmed no default is pre-selected. Assert \`toBeEnabled()\` after the user makes a selection.
-- WRONG: \`await expect(submitBtn).toBeDisabled()\` immediately after navigation
-- RIGHT: \`await selectAnOption(); await expect(submitBtn).toBeEnabled()\`
-
-### 6. URL assertion for in-place error states
-When an invalid resource URL renders an error page in-place (not a server redirect), check for the error text instead of asserting a URL change.
-- WRONG: \`await expect(page).toHaveURL(/\\/list\$/)\` after a 404-type route
-- RIGHT: \`await expect(page.getByText(/not found/i)).toBeVisible()\`
-
-### 7. Selectors matching both page body and site chrome
-Elements in the main content that also appear in a global header or footer cause strict-mode violations. Scope to the correct container.
-- WRONG: \`page.locator('a[href*="/some-path"]')\` (matches header + body + footer)
-- RIGHT: \`page.locator('main a[href*="/some-path"]').first()\`
-
-### 8. State-conditional elements asserted in the wrong state
-Ensure the app is in the required state before asserting state-dependent elements (e.g., elements that only appear when a list is populated, a form has an error, or a specific workflow step is active).
-
-### 9. Hardcoded UUIDs or numeric IDs in URLs
-Never construct a detail-page URL by embedding a hardcoded UUID or numeric ID (e.g., \`/shop/00000000-0000-0000-0000-000000000001\`, \`/products/42\`). That record may not exist in the live database — the page will show a not-found state and all downstream assertions will fail.
-- WRONG: \`await page.goto('/products/00000000-0000-0000-0000-000000000001')\`
-- RIGHT: navigate to the listing first, extract a real link:
-\`\`\`ts
-await page.goto('/shop')
-const productLink = page.locator('a[href*="/shop/"]').first()
-const href = await productLink.getAttribute('href')
-await page.goto(href!)
+setup('authenticate as admin', async ({ page }) => {
+  await loginAs(page, { username: credentials.admin.username, password: credentials.admin.password })
+  await page.context().storageState({ path: '.healix/admin.json' })
+})
 \`\`\`
-UUID-shaped paths in OBSERVED_FLOWS were observed during exploration and **may no longer be valid** in the running database. Do not copy them verbatim into \`page.goto\` calls.
+- Tag the most critical happy-path test per AC group with @smoke in the title.
+- For AC with authRequired=true, append @auth to the test title.
+
+${this.buildAntiPatternsSection()}
 
 ## Framework: ${projectInfo.framework || 'React/Next.js'}
-## Base URL: ${projectInfo.baseURL || 'http://localhost:3000'}
+## Base URL: ${projectInfo.baseURL || 'http://localhost:3030'}
 
-## Output Format
-Return a JSON array of test files:
-[
-  {
-    "filename": "page-name.spec.ts",
-    "content": "// Full test file content with imports"
-  }
-]
-
-IMPORTANT: Return ONLY valid JSON, no markdown code blocks.`
+${this.buildOutputFormatSection('auth-ui.spec.ts')}`
   }
 
-  buildFrontendUserPrompt(
+  buildAuthUserPrompt(
     context: CapturedContext,
     prd: string | undefined,
     projectInfo: ProjectInfo
@@ -957,55 +738,157 @@ IMPORTANT: Return ONLY valid JSON, no markdown code blocks.`
       context,
       prd,
       projectInfo,
-      testKind: 'frontend',
+      testKind: 'auth',
     })
 
     return this.buildStructuredUserPrompt({
-      task: 'Generate interaction-heavy frontend Playwright tests for critical routes and forms.',
+      task: 'Generate auth-actions.ts, auth-ui.spec.ts, and auth-setup.ts covering all authentication acceptance criteria.',
       requirements: [
-        'Validate page load state, navigation transitions, and user input behavior.',
-        'Include at least one form validation scenario where forms are available.',
-        'Use selector ladder preference: testId -> role/name -> label -> placeholder -> text.',
-        'Add category tags in test titles/comments: [CAT:ui_flow], [CAT:form_validation], [CAT:workflow_journey] where applicable.',
+        'auth-actions.ts must export named async functions (no test blocks) used by both auth-ui.spec.ts and auth-setup.ts.',
+        'auth-ui.spec.ts must cover: login happy-path, login validation errors, registration, logout, and session/role-based access tests.',
+        'auth-setup.ts must use the Playwright setup() API with storageState to pre-authenticate each available role.',
+        'Tag the primary happy-path login test with @smoke in its title.',
+        'Use accessible selectors: getByRole, getByLabel, getByPlaceholder, getByTestId.',
       ],
       payload,
     })
   }
 
-  buildBackendSystemPrompt(projectInfo: ProjectInfo): string {
-    return `You are an expert API testing engineer. Generate comprehensive Playwright API tests.
+  // ─── Feature UI agent prompt builders ────────────────────────────────────
+
+  buildFeatureUISystemPrompt(projectInfo: ProjectInfo): string {
+    const slug = this.getFeatureSlug()
+    return `You are an expert Playwright test engineer specialising in feature-scoped UI testing. Generate tests for the current feature only.
 
 ## Guidelines
-- Import Playwright primitives from the Healix fixture: \`import { test, expect } from './__healix-fixture'\`.
-- Playwright globals: ONLY \`test(...)\` and \`expect(...)\` are defined. To group tests use \`test.describe(...)\`. NEVER use bare \`describe\`, \`it\`, \`beforeEach\`, \`afterEach\` — they are undefined in Playwright and the file will fail to load.
-- Use Playwright's request API for HTTP calls
-- Prefer deterministic assertions grounded in CONTEXT_JSON only
-- Test status codes, headers/content-type, and response body contracts
-- Include auth/authorization checks only when endpoint requires auth
-- Include negative/error cases without inventing undocumented status codes
-- Include at least one lightweight stress/burst test per API suite
-- Keep runtime bounded: use small burst sizes and clear thresholds
-- Include comments explaining each test category (contract/auth/error/stress)
+- Import Playwright primitives from the Healix fixture: \`import { test, expect } from './__healix-fixture'\`. Do NOT import from '@playwright/test'.
+- Playwright globals: ONLY \`test(...)\` and \`expect(...)\` are defined. Group tests with \`test.describe(...)\`. Use \`test.beforeEach\`/\`test.afterEach\`. NEVER use bare \`describe\`, \`it\`, \`beforeEach\`, \`afterEach\`.
+- Emit TWO output files:
+  1. \`${slug}-actions.ts\` — exported async helper functions ONLY (no test(...) blocks). Each function takes \`page: import('@playwright/test').Page\` as first arg. These will be imported by the E2E agent.
+  2. \`${slug}-ui.spec.ts\` — UI tests importing from \`./${slug}-actions\`.
+- For each acceptance criterion, generate positive, negative, and boundary test cases as appropriate.
+- Tag the most critical happy-path test per AC group with @smoke in the title.
+- For AC with authRequired=true, append @auth to the test title.
 
-## Base URL: ${projectInfo.baseURL || 'http://localhost:3000'}
+${this.buildAntiPatternsSection()}
 
-## Output Format
-Return a JSON array of test files:
-[
-  {
-    "filename": "api-resource.spec.ts",
-    "content": "// Full test file content"
-  }
-]
+## Framework: ${projectInfo.framework || 'React/Next.js'}
+## Base URL: ${projectInfo.baseURL || 'http://localhost:3030'}
 
-IMPORTANT: Return ONLY valid JSON, no markdown code blocks.`
+${this.buildOutputFormatSection(`${slug}-ui.spec.ts`)}`
   }
 
-  buildBackendUserPrompt(
+  buildFeatureUIUserPrompt(
     context: CapturedContext,
     prd: string | undefined,
     projectInfo: ProjectInfo
   ): string {
+    const slug = this.getFeatureSlug()
+    const payload = this.buildPrioritizedContextPayload({
+      context,
+      prd,
+      projectInfo,
+      testKind: 'ui',
+    })
+
+    return this.buildStructuredUserPrompt({
+      task: `Generate ${slug}-actions.ts and ${slug}-ui.spec.ts for the current feature's acceptance criteria.`,
+      requirements: [
+        `${slug}-actions.ts must export named async helper functions (no test blocks) for each significant UI interaction in this feature.`,
+        `${slug}-ui.spec.ts must import from './${slug}-actions' and cover positive, negative, and boundary cases for each AC.`,
+        'Tag the most critical happy-path test per AC group with @smoke in the title.',
+        'Use selector ladder preference: testId -> role/name -> label -> placeholder -> text.',
+        'Add [CAT:ui_flow] and [CAT:form_validation] category tags where applicable.',
+      ],
+      payload,
+    })
+  }
+
+  // ─── Feature API agent prompt builders ───────────────────────────────────
+
+  /**
+   * Resolve the origin that generated API specs should target for direct
+   * `request()` calls. In multi-service repos `projectInfo.baseURL` is the
+   * frontend (Playwright's primary), so relative API paths would wrongly
+   * resolve against the frontend port. Prefer an explicit `apiBaseURL`, then a
+   * detected backend/fullstack service, and fall back to `baseURL` when there
+   * is no separate backend (single-service / fullstack / api-only repos).
+   */
+  resolveApiBaseURL(projectInfo: ProjectInfo): string {
+    const fallback = projectInfo.baseURL || 'http://localhost:3030'
+    if (projectInfo.apiBaseURL) return projectInfo.apiBaseURL
+    const backend = (projectInfo.services || []).find(
+      (s) => s && (s.role === 'backend' || s.role === 'fullstack')
+    )
+    return backend?.baseURL || fallback
+  }
+
+  buildFeatureAPISystemPrompt(projectInfo: ProjectInfo): string {
+    const slug = this.getFeatureSlug()
+    const baseURL = projectInfo.baseURL || 'http://localhost:3030'
+    const apiBaseURL = this.resolveApiBaseURL(projectInfo)
+    // Only force absolute backend URLs when the API origin actually differs
+    // from the frontend. Same-origin repos keep clean relative paths so there
+    // is no behavior change for single-service / fullstack / api-only apps.
+    const apiOriginDiffers = apiBaseURL !== baseURL
+    const baseURLSection = apiOriginDiffers
+      ? `## URLs
+- Frontend Base URL (UI only): ${baseURL}
+- API Base URL: ${apiBaseURL}
+- The backend runs on a DIFFERENT origin than the frontend. Prefix EVERY \`request.get/post/put/delete/fetch\` call with the API Base URL above (e.g. \`request.get('${apiBaseURL}/api/...')\`). NEVER use relative API paths — they would resolve against the frontend port and fail.`
+      : `## Base URL: ${baseURL}`
+    return `You are an expert API testing engineer. Generate comprehensive Playwright API tests scoped to the current feature.
+
+## Guidelines
+- Import Playwright primitives from the Healix fixture: \`import { test, expect } from './__healix-fixture'\`.
+- Playwright globals: ONLY \`test(...)\` and \`expect(...)\` are defined. Group with \`test.describe(...)\`. NEVER use bare \`describe\`, \`it\`, \`beforeEach\`, \`afterEach\`.
+- Emit a single file: \`${slug}-api.spec.ts\`.
+- Use Playwright's request API for HTTP calls.
+- Test status codes, headers/content-type, and response body contracts for this feature's owned endpoints.
+- Include auth/authorization checks only when the endpoint requires auth.
+- Include negative/error cases without inventing undocumented status codes.
+- Include at least one lightweight stress/burst test (Promise.all with small N).
+- Scope strictly to this feature's acceptance criteria and endpoints.
+
+${baseURLSection}
+
+${this.buildOutputFormatSection(`${slug}-api.spec.ts`)}`
+  }
+
+  /**
+   * Hard endpoint-grounding rules for API agents. The API agent (and the
+   * scenario planner before it) tends to map UI-centric ACs to API tests that
+   * hit frontend SPA routes (/login, /admindashboard) instead of the real
+   * backend surface — those trip the ungrounded_api_endpoint gate and get the
+   * whole file quarantined (run 1780943240194-599omu). These rules force every
+   * request() onto a real endpoint and forbid treating page routes as endpoints.
+   */
+  apiEndpointGroundingRules(context: CapturedContext): string[] {
+    const isSyntheticHealth = (e: ApiEndpoint) =>
+      String(e?.method || 'GET').toUpperCase() === 'GET' &&
+      e?.path === '/api/health' &&
+      (e?.synthetic === true || e?.source === 'healix_fallback' || !e?.source)
+    const endpoints = (context.apiEndpoints || []).filter((e) => !isSyntheticHealth(e))
+    const rules = [
+      'Every request() call MUST target a path present in CONTEXT_JSON.context.apiEndpoints[] (same METHOD + path). That list is the COMPLETE backend surface — never call a path outside it.',
+      'NEVER call a frontend page route as an API endpoint. Routes like /login, /admindashboard, /userdashboard, /dashboard are SPA pages served by the frontend — hitting them returns HTML or 404. The real auth endpoint is in apiEndpoints (e.g. POST /api/auth/login), NOT /login.',
+      'Do NOT assert content-type text/html for an API request — backend endpoints return JSON. Expecting HTML means you are hitting a frontend page, which is wrong.',
+      'If an acceptance criterion is UI-only with no matching backend endpoint, SKIP it (the UI agent covers it) instead of inventing an endpoint.',
+    ]
+    if (endpoints.length > 0) {
+      const list = [...new Set(endpoints.map((e) => `${String(e.method || 'GET').toUpperCase()} ${e.path}`))]
+      rules.push(`The ONLY valid endpoints to test are: ${list.join(', ')}.`)
+    }
+    return rules
+  }
+
+  buildFeatureAPIUserPrompt(
+    context: CapturedContext,
+    prd: string | undefined,
+    projectInfo: ProjectInfo
+  ): string {
+    const slug = this.getFeatureSlug()
+    const apiOnly = projectInfo.apiOnly === true
     const payload = this.buildPrioritizedContextPayload({
       context,
       prd,
@@ -1013,104 +896,131 @@ IMPORTANT: Return ONLY valid JSON, no markdown code blocks.`
       testKind: 'api',
     })
 
-    // API-only repos (no frontend) get the deep multi-step flow expansion. The same
-    // prompt is used for the regular backend pass; when `apiOnly` is true we append
-    // an additional requirement that stateful api1→api2→…→apiN flows are produced
-    // as their own `[CAT:api_flow]` tests, with response values chained between steps.
-    const apiOnly = projectInfo.apiOnly === true
+    const baseURL = projectInfo.baseURL || 'http://localhost:3030'
+    const apiBaseURL = this.resolveApiBaseURL(projectInfo)
     const requirements = [
+      `Emit a single file named ${slug}-api.spec.ts.`,
       'Use only statuses/fields that are present in CONTEXT_JSON endpoint contracts or schemas.',
+      'Response-body grounding: each endpoint.responses entry is labeled category:"expected" (from a spec — assert its exact bodyShape/fields) or category:"observed" (from code — do NOT assert exact fields; the code may be wrong). When responses is null/empty or only "observed", assert ONLY at the bounded/contract level: status < 500, content-type is JSON, and the body is an object or array. NEVER invent response fields (e.g. a `token`) that are not in an "expected" responses entry.',
+      'Auth grounding: only add authentication/Authorization-header/401/403 checks when endpoint.requiresAuth is true OR endpoint.authEnforcement is a value other than "none"/"client-only". If endpoint.requiresAuth is false, the backend does not gate this endpoint — do NOT send Authorization headers, do NOT assert 401/403, and do NOT assume a login returns a token unless an "expected" response says so.',
       'For auth-protected endpoints include unauthenticated checks and authenticated success checks when token is available.',
       'Add negative-path checks using bounded assertions when exact codes are unknown.',
+      'Discrepancy awareness: when endpoint.discrepancies is non-null, it records conflicts between the spec (expected) and the code (observed). Trust the code for interface (request fields/auth), trust the spec for expected behavior (response shapes). Do NOT assert any discrepancy field as if it is definitely present or absent — use a bounded assertion for that field instead.',
+      'Spec-only endpoints: when endpoint.specOnly is true, the endpoint is documented in a spec but no matching controller was found. Generate tests using ONLY the spec contract fields, and mark each test with a comment noting the implementation may not yet be deployed.',
       'Include a lightweight burst test (Promise.all with small N) and assert no 5xx responses.',
-      'Cover and tag all API categories across the suite: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].',
+      ...(context?.apiEndpoints?.some(
+        (ep) => ep.requiresAuth || (ep.authEnforcement && ep.authEnforcement !== 'none' && ep.authEnforcement !== 'client-only')
+      )
+        ? ['Cover and tag all API categories: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].']
+        : ['Cover and tag applicable API categories: [CAT:api_contract], [CAT:api_negative], [CAT:api_stress]. Omit [CAT:api_auth] — no backend auth enforcement was detected on any endpoint.']),
+      ...this.apiEndpointGroundingRules(context),
     ]
+    if (apiBaseURL !== baseURL) {
+      requirements.push(
+        `The backend is on a separate origin. Prefix every request() URL with the API base URL "${apiBaseURL}" (CONTEXT_JSON.meta.projectInfo.apiBaseURL). Do NOT use relative paths — they resolve against the frontend and fail.`,
+      )
+    }
     if (apiOnly) {
       requirements.push(
-        'This repository is API-ONLY (no frontend). Produce at least three MULTI-STEP API FLOW tests tagged [CAT:api_flow] where later requests consume data returned from earlier requests (e.g., capture `id` or `token` from POST /auth/login → use in Authorization header on GET /profile → use captured id in PATCH /items/:id → assert final state via GET /items/:id).',
-        'Each api_flow test MUST chain at least 3 real endpoints drawn from CONTEXT_JSON and assert invariants across steps (e.g., created resource appears in list, deleted resource returns 404).',
+        'This repository is API-ONLY (no frontend). Produce at least two MULTI-STEP API FLOW tests tagged [CAT:api_flow] where later requests consume data from earlier requests.',
         'Do NOT emit UI/page tests in api-only mode. Playwright `request` fixture only, no `page` fixture.',
-        'Include an idempotency flow: the same POST with the same Idempotency-Key header returns the same resource both times.',
       )
     }
 
     return this.buildStructuredUserPrompt({
-      task: apiOnly
-        ? 'Generate deep multi-step API flow tests plus contract/auth/negative/stress coverage for this backend-only service.'
-        : 'Generate backend API tests with grounded status assertions, auth coverage, negative cases, and burst/stress checks.',
+      task: `Generate feature API tests for the "${slug}" feature.`,
       requirements,
       payload,
     })
   }
 
-  buildWorkflowSystemPrompt(projectInfo: ProjectInfo): string {
-    return `You are an expert E2E testing engineer. Generate comprehensive workflow tests that simulate complete user journeys.
+  // ─── Spec-driven prompt builder (Phase 2 of two-phase generation) ───────────
+
+  buildSpecsDrivenUserPrompt(
+    specs: TestCaseSpec[],
+    agentType: 'ui' | 'api',
+    context: CapturedContext,
+    prd: string | undefined,
+    projectInfo: ProjectInfo
+  ): string {
+    const slug = this.getFeatureSlug()
+    const payload = this.buildPrioritizedContextPayload({ context, prd, projectInfo, testKind: agentType })
+
+    const specLines = specs.map((spec) => {
+      const lines = [
+        `### ${spec.id}: ${spec.title}`,
+        `- Kind: ${spec.kind}`,
+        `- AC: ${spec.acId}`,
+        spec.targetRoute ? `- Route: ${spec.targetRoute}` : null,
+        spec.targetEndpoint ? `- Endpoint: ${spec.targetEndpoint}` : null,
+        spec.preconditions.length ? `- Preconditions: ${spec.preconditions.join('; ')}` : null,
+        `- Steps:\n${spec.steps.map((s, i) => `  ${i + 1}. ${s}`).join('\n')}`,
+        `- Assertions:\n${spec.assertions.map((a) => `  - ${a}`).join('\n')}`,
+        `- Required title prefix: [REQ:${spec.acId}][${spec.kind}]`,
+      ].filter(Boolean)
+      return lines.join('\n')
+    }).join('\n\n')
+
+    const fileNote = agentType === 'ui'
+      ? `Emit TWO files: ${slug}-actions.ts (exported helpers, no test blocks) and ${slug}-ui.spec.ts (tests importing from ./${slug}-actions).`
+      : `Emit a single file: ${slug}-api.spec.ts.`
+
+    const requirements = [
+      'Each test() title MUST start with [REQ:{acId}][{kind}] exactly as specified in the "Required title prefix" for each spec.',
+      'Each test() block MUST be preceded by a // @spec {spec.id} comment on its own line (e.g., // @spec F1-UI-01). Use the exact spec id from the spec definition.',
+      'Implement each spec as one test() block. Steps and assertions are already decided — translate them to Playwright code.',
+      'Use selector ladder preference: testId → role/name → label → placeholder → text.',
+      'Do not invent additional test cases beyond those listed.',
+    ]
+    if (agentType === 'api') {
+      const baseURL = projectInfo.baseURL || 'http://localhost:3030'
+      const apiBaseURL = this.resolveApiBaseURL(projectInfo)
+      if (apiBaseURL !== baseURL) {
+        requirements.push(
+          `The backend is on a separate origin. Prefix every request() URL with the API base URL "${apiBaseURL}" (CONTEXT_JSON.meta.projectInfo.apiBaseURL). Do NOT use relative paths or the frontend base URL — they would resolve against the frontend port and fail.`,
+        )
+      }
+      requirements.push(...this.apiEndpointGroundingRules(context))
+    }
+
+    return this.buildStructuredUserPrompt({
+      task: `Implement the following ${specs.length} pre-planned test cases for the "${slug}" feature. ${fileNote} Do NOT add or remove test cases — implement exactly the specs listed below.`,
+      requirements,
+      payload: { ...payload as object, TEST_CASES: specLines },
+    })
+  }
+
+  // ─── E2E agent prompt builders ────────────────────────────────────────────
+
+  buildE2ESystemPrompt(projectInfo: ProjectInfo): string {
+    const manifestSummary = this.featureManifest.length > 0
+      ? this.featureManifest
+        .map((m) => `- ${m.featureSlug} (${m.actionsFile}): ${m.actions.map((a) => a.name).join(', ')}`)
+        .join('\n')
+      : '(no feature manifest provided — use PRD user stories to infer cross-feature journeys)'
+
+    return `You are an expert E2E test engineer. Generate cross-feature workflow tests that compose user journeys using existing feature action helpers.
 
 ## Guidelines
-- Import Playwright primitives from the Healix fixture: \`import { test, expect } from './__healix-fixture'\`.
-- Playwright globals: ONLY \`test(...)\` and \`expect(...)\` are defined. Group with \`test.describe(...)\`; never bare \`describe\` or \`it\`. Use \`test.beforeEach\`/\`test.afterEach\`/\`test.afterAll\`; never bare \`beforeEach\`/\`afterEach\`/\`afterAll\` — they are undefined in Playwright and the file will fail to load.
-- Test complete flows from start to finish
-- Include both happy paths and error scenarios
-- Handle async operations and page transitions
-- Verify data persistence across steps
-- Use proper test isolation
-- Add detailed comments for each step
+- Import Playwright primitives from the Healix fixture: \`import { test, expect } from './__healix-fixture'\`. Do NOT import from '@playwright/test'.
+- Playwright globals: ONLY \`test(...)\` and \`expect(...)\` are defined. Group with \`test.describe(...)\`. Use \`test.beforeEach\`/\`test.afterEach\`. NEVER use bare \`describe\`, \`it\`, \`beforeEach\`, \`afterEach\`.
+- Emit a single file: \`e2e-workflows.spec.ts\`.
+- Import action helpers from the feature actions files listed in FEATURE_MANIFEST below. Use: \`import { fnName } from './{feature-slug}-actions'\`.
+- Focus ONLY on cross-feature user journeys described in PRD user stories.
+- Do NOT re-test individual feature behaviour — that is owned by the feature UI/API agents.
+- Do NOT duplicate tests already covered in per-feature spec files.
 
-## Anti-patterns — NEVER do these
+## FEATURE_MANIFEST
+${manifestSummary}
 
-### 1. Select option visibility
-\`<option>\` elements inside a closed \`<select>\` are always hidden in Playwright. Never use \`getByText\` or \`toBeVisible\` on select options. Use \`toContainText\` on the select element, or \`selectOption\` to interact with it.
-- WRONG: \`await page.getByText('Price: Low to High', { exact: true }).click()\`
-- RIGHT: \`await page.locator('select').selectOption({ label: 'Price: Low to High' })\`
-- RIGHT: \`await expect(page.locator('select')).toContainText('Latest')\`
+${this.buildAntiPatternsSection()}
 
-### 2. Short role name without exact: true
-Always add \`exact: true\` for \`getByRole\` calls with single-character or short names (size labels, +/-, etc.) to prevent partial matches against other elements.
-- WRONG: \`page.getByRole('button', { name: 'M' }).click()\`
-- RIGHT: \`page.getByRole('button', { name: 'M', exact: true }).click()\`
+## Base URL: ${projectInfo.baseURL || 'http://localhost:3030'}
 
-### 3. Hardcoded DB-driven counts
-Never assert exact counts for database-sourced collections. Check for known IDs or use \`toBeGreaterThan(0)\`.
-
-### 4. Exact text on marketing/CMS copy
-Use partial matching (no \`exact: true\`) for taglines, descriptions, and other copy that may differ by a trailing period or space.
-
-### 5. Assuming initial disabled state
-Do not assert \`toBeDisabled()\` on submit buttons at page load if the app may pre-select defaults. Assert the positive enabled state after making a selection.
-
-### 6. URL assertion instead of error state check
-When a not-found resource renders an in-page error (not a server redirect), assert the error text is visible rather than the URL.
-
-### 7. Selectors matching both main and footer
-Scope selectors to \`main\` to avoid strict-mode violations when elements also appear in the footer.
-
-### 8. Hardcoded UUIDs or numeric IDs in URLs
-Never hard-code a UUID or numeric record ID to navigate to a detail page (e.g., \`/shop/00000000-0000-0000-0000-000000000001\`). That specific record may not exist in the live database — the page will show a not-found state and every downstream assertion will fail.
-- WRONG: \`await page.goto('/shop/00000000-0000-0000-0000-000000000001')\`
-- RIGHT: reach the detail page by clicking a real link from the listing:
-\`\`\`ts
-await page.goto('/shop')
-const productLink = page.locator('a[href*="/shop/"]').first()
-const href = await productLink.getAttribute('href')
-await page.goto(href!)
-\`\`\`
-UUID-shaped paths in OBSERVED_FLOWS were captured during exploration and **may no longer be valid** in the current database. Do not copy them verbatim into \`page.goto\` calls.
-
-## Base URL: ${projectInfo.baseURL || 'http://localhost:3000'}
-
-## Output Format
-Return a JSON array of test files:
-[
-  {
-    "filename": "workflow-name.spec.ts",
-    "content": "// Full test file content"
-  }
-]
-
-IMPORTANT: Return ONLY valid JSON, no markdown code blocks.`
+${this.buildOutputFormatSection('e2e-workflows.spec.ts')}`
   }
 
-  buildWorkflowUserPrompt(
+  buildE2EUserPrompt(
     context: CapturedContext,
     prd: string | undefined,
     projectInfo: ProjectInfo
@@ -1119,58 +1029,18 @@ IMPORTANT: Return ONLY valid JSON, no markdown code blocks.`
       context,
       prd,
       projectInfo,
-      testKind: 'workflow',
+      testKind: 'e2e',
     })
 
     return this.buildStructuredUserPrompt({
-      task: 'Generate end-to-end workflow tests with real user actions and end-state assertions.',
+      task: 'Generate e2e-workflows.spec.ts with cross-feature user journey tests.',
       requirements: [
-        'Convert workflow steps into executable actions (navigate, fill, click, assert).',
-        'Avoid placeholders and fixed waits.',
-        'Assert route transitions and completion indicators for each workflow.',
-        'Tag workflow suites with [CAT:workflow_journey] and include at least one @phase2 deep-path test. The @phase2 tag MUST be embedded INSIDE the test title string (e.g. `test(\'@phase2 [CAT:workflow_journey] full checkout journey\', ...)`). Placing @phase2 in a code comment (`// @phase2`) is invisible to Playwright --grep and will cause the Phase 2 run to fail with "No tests found".',
-      ],
-      payload,
-    })
-  }
-
-  buildErrorTestSystemPrompt(): string {
-    return `You are an expert test engineer. Generate tests for error states and edge cases.
-
-## Guidelines
-- Import Playwright primitives from the Healix fixture: \`import { test, expect } from './__healix-fixture'\`.
-- Playwright globals: ONLY \`test(...)\` and \`expect(...)\` are defined. Group with \`test.describe(...)\`; never bare \`describe\` or \`it\`. Use \`test.beforeEach\`/\`test.afterEach\`; never bare \`beforeEach\`/\`afterEach\` — they are undefined in Playwright.
-- Test error handling and user feedback
-- Verify error messages are clear and helpful
-- Test boundary conditions
-- Include network error scenarios
-- Test form validation errors
-
-## Output Format
-Return a JSON array of test files:
-[
-  {
-    "filename": "error-states.spec.ts",
-    "content": "// Full test file content"
-  }
-]
-
-IMPORTANT: Return ONLY valid JSON.`
-  }
-
-  buildErrorTestUserPrompt(context: CapturedContext, projectInfo: ProjectInfo): string {
-    const payload = this.buildPrioritizedContextPayload({
-      context,
-      prd: undefined,
-      projectInfo,
-      testKind: 'error',
-    })
-
-    return this.buildStructuredUserPrompt({
-      task: 'Generate deterministic error-path tests.',
-      requirements: [
-        'Cover not-found routes and meaningful user-facing error states.',
-        'Prefer explicit status/content assertions over generic body checks.',
+        'Compose journeys using imported helpers from FEATURE_MANIFEST action files.',
+        'Import with: import { fnName } from \'./{feature-slug}-actions\'',
+        'Each test should traverse at least TWO features in sequence.',
+        'Assert end-state conditions (URL, visible content, data persistence) after each journey.',
+        'Tag cross-feature journey tests with [CAT:workflow_journey].',
+        'Do NOT repeat individual feature assertions already covered by per-feature agents.',
       ],
       payload,
     })
@@ -1217,12 +1087,25 @@ IMPORTANT: Return ONLY valid JSON.`
       method: endpoint.method,
       path: endpoint.path,
       requiresAuth: !!(endpoint.requiresAuth || endpoint.authRequired),
+      requiredRole: endpoint.requiredRole || null,
+      authType: endpoint.authType || null,
+      authEnforcement: endpoint.authEnforcement || null,
+      authCarrier: (endpoint as ApiEndpoint).authCarrier || null,
+      loginEndpoint: (endpoint as ApiEndpoint).loginEndpoint || null,
+      tokenField: (endpoint as ApiEndpoint).tokenField || null,
       requestSchema: endpoint.requestSchema || null,
       requestBody: endpoint.requestBody || null,
       responseSchema: endpoint.responseSchema || null,
       responseShape: endpoint.responseShape || null,
+      responses: endpoint.responses || null,
       expectedStatuses: endpoint.expectedStatuses || null,
       status: endpoint.status || null,
+      discrepancies: (endpoint as ApiEndpoint).discrepancies?.length
+        ? (endpoint as ApiEndpoint).discrepancies
+        : null,
+      specOnly: (endpoint as ApiEndpoint & { specOnly?: boolean }).specOnly || false,
+      baseService: (endpoint as ApiEndpoint).baseService || null,
+      version: (endpoint as ApiEndpoint).version || null,
     }))
 
     const apiContracts = realApiContracts.slice(0, 25).map((contract) => ({
@@ -1235,46 +1118,46 @@ IMPORTANT: Return ONLY valid JSON.`
 
     const qaContracts = context.qaContracts
       ? {
-          summary: context.qaContracts.summary || null,
-          questions: (context.qaContracts.questions || []).slice(0, 20),
-          filterContracts: (context.qaContracts.filterContracts || []).slice(0, 25).map((contract) => ({
-            id: contract.id,
-            marker: contract.marker || `[QAC:${contract.id}]`,
-            method: contract.method,
-            path: contract.path,
-            queryParam: contract.queryParam,
-            responseField: contract.responseField,
-            operator: contract.operator || 'equals',
-            sourceFile: contract.sourceFile || null,
-            requiresAuth: !!contract.requiresAuth,
-            runnable: contract.runnable !== false,
-          })),
-          deleteStatusContracts: (context.qaContracts.deleteStatusContracts || []).slice(0, 25).map((contract) => ({
-            id: contract.id,
-            marker: contract.marker || `[QAC:${contract.id}]`,
-            method: contract.method,
-            path: contract.path,
-            sourceFile: contract.sourceFile || null,
-            explicitStatuses: contract.explicitStatuses || [],
-            noBody: !!contract.noBody,
-            expectedStatus: contract.expectedStatus || null,
-            requiresConfirmation: !!contract.requiresConfirmation,
-            question: contract.question || null,
-          })),
-          formValidationContracts: (context.qaContracts.formValidationContracts || []).slice(0, 25).map((contract) => ({
-            id: contract.id,
-            marker: contract.marker || `[QAC:${contract.id}]`,
-            route: contract.route,
-            sourceFile: contract.sourceFile || null,
-            requiredFields: (contract.requiredFields || []).slice(0, 12),
-            requiresAuth: !!contract.requiresAuth,
-            runnable: contract.runnable !== false,
-          })),
-          a11yContracts: (context.qaContracts.a11yContracts || []).slice(0, 25),
-          statusCodeContracts: (context.qaContracts.statusCodeContracts || []).slice(0, 25),
-          boundaryValidationContracts: (context.qaContracts.boundaryValidationContracts || []).slice(0, 25),
-          rbacContracts: (context.qaContracts.rbacContracts || []).slice(0, 25),
-        }
+        summary: context.qaContracts.summary || null,
+        questions: (context.qaContracts.questions || []).slice(0, 20),
+        filterContracts: (context.qaContracts.filterContracts || []).slice(0, 25).map((contract) => ({
+          id: contract.id,
+          marker: contract.marker || `[QAC:${contract.id}]`,
+          method: contract.method,
+          path: contract.path,
+          queryParam: contract.queryParam,
+          responseField: contract.responseField,
+          operator: contract.operator || 'equals',
+          sourceFile: contract.sourceFile || null,
+          requiresAuth: !!contract.requiresAuth,
+          runnable: contract.runnable !== false,
+        })),
+        deleteStatusContracts: (context.qaContracts.deleteStatusContracts || []).slice(0, 25).map((contract) => ({
+          id: contract.id,
+          marker: contract.marker || `[QAC:${contract.id}]`,
+          method: contract.method,
+          path: contract.path,
+          sourceFile: contract.sourceFile || null,
+          explicitStatuses: contract.explicitStatuses || [],
+          noBody: !!contract.noBody,
+          expectedStatus: contract.expectedStatus || null,
+          requiresConfirmation: !!contract.requiresConfirmation,
+          question: contract.question || null,
+        })),
+        formValidationContracts: (context.qaContracts.formValidationContracts || []).slice(0, 25).map((contract) => ({
+          id: contract.id,
+          marker: contract.marker || `[QAC:${contract.id}]`,
+          route: contract.route,
+          sourceFile: contract.sourceFile || null,
+          requiredFields: (contract.requiredFields || []).slice(0, 12),
+          requiresAuth: !!contract.requiresAuth,
+          runnable: contract.runnable !== false,
+        })),
+        a11yContracts: (context.qaContracts.a11yContracts || []).slice(0, 25),
+        statusCodeContracts: (context.qaContracts.statusCodeContracts || []).slice(0, 25),
+        boundaryValidationContracts: (context.qaContracts.boundaryValidationContracts || []).slice(0, 25),
+        rbacContracts: (context.qaContracts.rbacContracts || []).slice(0, 25),
+      }
       : null
 
     const workflows = (context.workflows || []).slice(0, 12).map((workflow) => {
@@ -1316,27 +1199,27 @@ IMPORTANT: Return ONLY valid JSON.`
     const sourceContextRaw = context.sourceContext || null
     const sourceContext = sourceContextRaw
       ? {
-          sourceFilesAnalyzed: sourceContextRaw.sourceFilesAnalyzed || 0,
-          routingMode: sourceContextRaw.routingMode || null,
-          routePaths: (sourceContextRaw.routePaths || []).slice(0, 80),
-          testIds: (sourceContextRaw.testIds || []).slice(0, 80),
-          assertableText: (sourceContextRaw.assertableText || [])
-            .slice(0, 160)
+        sourceFilesAnalyzed: sourceContextRaw.sourceFilesAnalyzed || 0,
+        routingMode: sourceContextRaw.routingMode || null,
+        routePaths: (sourceContextRaw.routePaths || []).slice(0, 80),
+        testIds: (sourceContextRaw.testIds || []).slice(0, 80),
+        assertableText: (sourceContextRaw.assertableText || [])
+          .slice(0, 160)
+          .map((text) => redactCredentialLikeText(text)),
+        files: (sourceContextRaw.files || []).slice(0, 24).map((file) => ({
+          file: file.file,
+          kind: file.kind || 'source',
+          routePaths: (file.routePaths || []).slice(0, 12),
+          components: (file.components || []).slice(0, 8),
+          testIds: (file.testIds || []).slice(0, 12),
+          assertableText: (file.assertableText || [])
+            .slice(0, 18)
             .map((text) => redactCredentialLikeText(text)),
-          files: (sourceContextRaw.files || []).slice(0, 24).map((file) => ({
-            file: file.file,
-            kind: file.kind || 'source',
-            routePaths: (file.routePaths || []).slice(0, 12),
-            components: (file.components || []).slice(0, 8),
-            testIds: (file.testIds || []).slice(0, 12),
-            assertableText: (file.assertableText || [])
-              .slice(0, 18)
-              .map((text) => redactCredentialLikeText(text)),
-          })),
-        }
+        })),
+      }
       : null
 
-    const observedRoutes = (this.explorationArtifact?.routes || []).slice(0, 20).map((route) => ({
+    const observedRoutes = (this.explorationArtifact?.routes || []).slice(0, 60).map((route) => ({
       path: route.path,
       requiresAuth: route.requiresAuth === true ? true : (route.requiresAuth === false ? false : null),
       sourceFiles: pages
@@ -1361,10 +1244,10 @@ IMPORTANT: Return ONLY valid JSON.`
       observedRoutes,
     }
 
-    // Frontend tests only need UI-facing context. Dropping API contracts and
-    // schemas for the frontend agent cuts prompt tokens by ~30%, which reduces
-    // gpt-5.5-mini reasoning time enough to stay within the webapp-client timeout.
-    const isFrontendAgent = ['frontend', 'smoke', 'workflow', 'error', 'expansion'].includes(testKind)
+    // UI/auth agents only need UI-facing context — dropping API contracts cuts
+    // prompt tokens by ~30% and keeps prompts within the webapp-client timeout.
+    // API and e2e agents need both UI and API context.
+    const isFrontendAgent = ['ui', 'auth', 'frontend', 'smoke', 'workflow', 'error', 'expansion'].includes(testKind)
 
     // Build auth context so the model knows exactly which roles have verified
     // storage states and which tests must be skipped.
@@ -1419,22 +1302,23 @@ IMPORTANT: Return ONLY valid JSON.`
     }
     const feedback = context.generationFeedback
       ? {
-          mode: context.generationFeedback.mode || null,
-          attempt: context.generationFeedback.attempt || null,
-          previousFailureCode: context.generationFeedback.previousFailureCode || null,
-          previousFailureMessage: context.generationFeedback.previousFailureMessage || null,
-          quality: context.generationFeedback.quality || null,
-          routeAccessSummary: context.generationFeedback.routeAccessSummary || null,
-          existingSuiteManifest: context.generationFeedback.existingSuiteManifest || null,
-          instructions: (context.generationFeedback.instructions || []).slice(0, 12),
-        }
+        mode: context.generationFeedback.mode || null,
+        attempt: context.generationFeedback.attempt || null,
+        previousFailureCode: context.generationFeedback.previousFailureCode || null,
+        previousFailureMessage: context.generationFeedback.previousFailureMessage || null,
+        quality: context.generationFeedback.quality || null,
+        routeAccessSummary: context.generationFeedback.routeAccessSummary || null,
+        existingSuiteManifest: context.generationFeedback.existingSuiteManifest || null,
+        instructions: (context.generationFeedback.instructions || []).slice(0, 12),
+      }
       : null
 
     return {
       meta: {
         projectInfo: {
           name: projectInfo.name || 'App',
-          baseURL: projectInfo.baseURL || 'http://localhost:3000',
+          baseURL: projectInfo.baseURL || 'http://localhost:3030',
+          apiBaseURL: this.resolveApiBaseURL(projectInfo),
           framework: projectInfo.framework || 'Unknown',
           startCommand: projectInfo.startCommand || null,
           routingMode,
@@ -1507,16 +1391,21 @@ IMPORTANT: Return ONLY valid JSON.`
       )
     }
 
+    promptRequirements.push(
+      'Append Playwright tags to each test title: @auth when the acceptance criterion has authRequired=true.'
+    )
+
     // If a structured PRD is available, require one test per AC with a stable
     // [REQ:...] tag derived from AC id, and assert against the AC text (not
     // just navigation).
     const acSection = this.buildAcceptanceCriteriaSection()
     if (acSection) {
       promptRequirements.push(
-        'Emit exactly ONE test(...) block per acceptance criterion listed in ACCEPTANCE_CRITERIA.',
-        'Each test title MUST start with its AC id in square brackets, e.g. `[REQ:F1.S1.AC1] ...`.',
+        `For each acceptance criterion in ACCEPTANCE_CRITERIA, emit AT LEAST 3 test(...) blocks — one per kind (${TEST_CASE_KINDS.join(', ')}): 1+ positive test (happy path), 1+ negative test (invalid input, error state, or unauthorised access), and 1+ boundary test (min/max values, empty strings, or edge-case limits). You may emit more than one test of the same kind when the AC warrants it.`,
+        `Each test title MUST start with its AC id and kind in square brackets, e.g. \`[REQ:F1.S1.AC1][${TEST_CASE_KINDS[0]}] ...\`, \`[REQ:F1.S1.AC1][${TEST_CASE_KINDS[1]}] ...\`, \`[REQ:F1.S1.AC1][${TEST_CASE_KINDS[2]}] ...\`.`,
         'Each test body MUST contain at least one expect(...) assertion that grounds in the AC text — bare page.goto without assertions is rejected.',
         'For AC with authRequired=true, use tier-B-auth routing only when routeAccess proves the target route is protected. If routeAccess.authMode is public_app and the route is public, generate a normal runnable public test.',
+        'For AC with authRequired=true, append @auth to the test title.',
       )
     }
 
@@ -1566,7 +1455,7 @@ IMPORTANT: Return ONLY valid JSON.`
         )
         if (hasCoverage) {
           promptRequirements.push(
-            'Coverage-aware generation: CONTEXT_JSON.meta.generationFeedback.existingSuiteManifest.covered lists routes, API endpoints, categories, requirement markers, and test titles already covered by teammates’ specs in tests/generated/. Do not regenerate tests for any surface already in covered — focus exclusively on gaps.',
+            "Coverage-aware generation: CONTEXT_JSON.meta.generationFeedback.existingSuiteManifest.covered lists routes, API endpoints, categories, requirement markers, and test titles already covered by teammates' specs in tests/generated/. Do not regenerate tests for any surface already in covered — focus exclusively on gaps.",
             'Specifically: skip any route in covered.routes, any endpoint in covered.apiEndpoints, any category in covered.catMarkers, and any requirement marker in covered.reqMarkers. Do not reuse test titles in covered.testTitles.',
             'If existingSuiteManifest.missing is present, prioritize its routes, apiEndpoints, categories, and requirements as the surfaces to test. If no missing items exist for your agent type, return an empty file list rather than producing redundant tests.',
           )
@@ -1625,20 +1514,29 @@ Return only the JSON array of generated files.`
   }
 
   // Build the ACCEPTANCE_CRITERIA section if a parsed PRD is available.
+  // When activeFeature is set (ui/api agents), only include that feature's ACs.
+  // When activeFeature is null, include all features (auth/e2e agents or legacy fallback).
   buildAcceptanceCriteriaSection(): string | null {
     const parsed = this.parsedPRD
     if (!parsed || !Array.isArray(parsed.features) || parsed.features.length === 0) {
       return null
     }
 
+    const featuresToInclude = this.activeFeature
+      ? parsed.features.filter((f) => f.id === this.activeFeature!.id)
+      : parsed.features
+
+    if (featuresToInclude.length === 0) return null
+
     const lines: string[] = ['ACCEPTANCE_CRITERIA_START']
-    for (const feature of parsed.features) {
+    for (const feature of featuresToInclude) {
+      lines.push(`# Feature: ${feature.name} (${feature.id})`)
       for (const story of feature.userStories || []) {
         for (const ac of story.acceptanceCriteria || []) {
           const authTag = ac.authRequired ? ' AUTH' : ''
           const role = ac.roleHint ? ` ROLE=${ac.roleHint}` : ''
           lines.push(
-            `- ${ac.id} [${ac.kind}${authTag}${role}] ${this.sanitizePromptText(ac.text)}`,
+            `- ${ac.id} [${authTag.trim() || 'public'}${role}] ${this.sanitizePromptText(ac.text)}`,
           )
         }
       }
@@ -1668,7 +1566,7 @@ Return only the JSON array of generated files.`
 
     if (routes.length > 0) {
       lines.push('routes:')
-      for (const r of routes.slice(0, 20)) {
+      for (const r of routes.slice(0, 60)) {
         const authTag = r.requiresAuth ? ' (auth)' : ''
         const idTag = UUID_RE.test(r.path) ? ' [snapshot-id]' : ''
         lines.push(`- ${r.path}${authTag}${idTag}`)
@@ -1743,7 +1641,7 @@ Return only the JSON array of generated files.`
     const maxAttempts = Math.max(1, Number(this.config.maxRetries) + 1)
     const baseDelay = Math.max(200, Number(this.config.retryBackoffMs) || 1200)
     const hardenedSystemPrompt = this.sanitizePromptText(
-      `${systemPrompt}\n\n${this.buildGenerationContract(prefix)}`
+      `${systemPrompt}\n\n${this.buildGenerationContract(prefix, generationContext.context)}`
     )
     const hardenedUserPrompt = this.sanitizePromptText(userPrompt)
     const adaptiveMaxTokens = this.computeAdaptiveMaxTokens(hardenedSystemPrompt, hardenedUserPrompt)
@@ -1883,14 +1781,90 @@ Return only the JSON array of generated files.`
     return []
   }
 
-  buildGenerationContract(prefix: string): string {
+  /**
+   * Derive how API tests should authenticate, grounded in what the gatherer
+   * actually extracted — NOT a hardcoded JWT/Bearer assumption.
+   *
+   *   mode 'token'   → a login endpoint returns a token in its response body
+   *                    (tokenField set): acquire it and send Authorization: Bearer.
+   *   mode 'session' → backend enforces auth but login returns no body token
+   *                    (cookie/session auth): rely on the injected storageState
+   *                    cookies; never extract a token or send a Bearer header.
+   *   mode 'none'    → no backend enforcement: no auth setup at all.
+   */
+  deriveApiAuthGrounding(context?: CapturedContext): {
+    enforced: boolean
+    mode: 'token' | 'session' | 'none'
+    loginEndpoint: string | null
+    tokenField: string | null
+  } {
+    const endpoints = (context?.apiEndpoints || []) as ApiEndpoint[]
+    const isEnforced = (e: ApiEndpoint) =>
+      e?.requiresAuth === true ||
+      e?.authRequired === true ||
+      (!!e?.authEnforcement && e.authEnforcement !== 'none' && e.authEnforcement !== 'client-only')
+
+    const enforced = endpoints.some(isEnforced)
+    const sessionCookie = endpoints.some((e) => e?.authType === 'sessionCookie')
+
+    // Locate the login endpoint and inspect whether its analyzed response body
+    // actually carries a token. This is the ground-truth discriminator: sending
+    // Bearer against a backend whose login returns {user} (no token) is the bug
+    // we are fixing.
+    const tokenEp = endpoints.find((e) => !!e?.tokenField)
+    const loginEp = endpoints.find(
+      (e) =>
+        String(e?.method || 'GET').toUpperCase() === 'POST' &&
+        /\/(login|signin|auth\/login|auth\/token|token)\b/i.test(String(e?.path || '')),
+    )
+    const loginShape: Record<string, unknown> | null =
+      (loginEp?.responseShape && typeof loginEp.responseShape === 'object'
+        ? (loginEp.responseShape as Record<string, unknown>)
+        : null) ||
+      (loginEp?.responses?.success?.find((r) => r?.bodyShape)?.bodyShape as
+        | Record<string, unknown>
+        | undefined) ||
+      null
+
+    const tokenKeyRe = /token|jwt|accessToken|access_token|id_token/i
+    const loginHasToken = !!tokenEp || (!!loginShape && Object.keys(loginShape).some((k) => tokenKeyRe.test(k)))
+    const loginAnalyzedNoToken = !!loginShape && !loginHasToken
+
+    let mode: 'token' | 'session' | 'none' = 'none'
+    if (enforced || sessionCookie) {
+      if (loginHasToken) {
+        mode = 'token'
+      } else if (loginAnalyzedNoToken || sessionCookie) {
+        // We have positive evidence the login returns no body token (cookie/session).
+        mode = 'session'
+      } else {
+        // Enforced but the login response was never analyzed — fall back to the
+        // carrier hint so a genuine Bearer API isn't downgraded to session.
+        const headerCarried = endpoints.some(
+          (e) =>
+            isEnforced(e) &&
+            ['bearerJWT', 'oauth2', 'apiKey', 'customHeader', 'basic'].includes(String(e?.authType)),
+        )
+        mode = headerCarried ? 'token' : 'session'
+      }
+    }
+
+    return {
+      enforced: enforced || sessionCookie,
+      mode,
+      loginEndpoint: tokenEp?.loginEndpoint || endpoints.find((e) => e?.loginEndpoint)?.loginEndpoint || (loginEp ? `POST ${loginEp.path}` : null),
+      tokenField: tokenEp?.tokenField || null,
+    }
+  }
+
+  buildGenerationContract(prefix: string, context?: CapturedContext): string {
     const shared = `## HIGHEST-PRIORITY RULE — Hallucination Prevention
 NEVER invent heading text, link labels, button names, status text, or dashboard/admin widget labels from PRD wording, role names, or domain knowledge. If a specific literal is NOT present in CONTEXT_JSON.context.routeAccess.observedRoutes or CONTEXT_JSON.context.sourceContext.assertableText, you MUST NOT use it as a selector name/text argument.
 - Forbidden invented examples (these failed in prior runs): /log in/i heading, /access denied/i heading, /dashboard|admin/i heading, /low stock/i link, /unread enquiries/i link, /critical/i text, /admin panel/i heading. The PRD mentioning a feature does NOT prove the UI label exists.
 - When you don't have proven text for what you want to assert: assert structural presence only (e.g., \`await expect(page.locator('h1').first()).toBeVisible()\` or \`await expect(page).toHaveURL(/\\/expected-path/)\`) and add a \`// Grounded in: structural fallback - exact text not in CONTEXT_JSON\` comment. Do NOT make up plausible-looking text.
 - Bounded-assertion rule: never use \`toHaveText('literal')\`, exact \`toHaveCount(N)\` for N>1, or \`getByText('literal', { exact: true })\` unless that exact literal appears verbatim in CONTEXT_JSON.context.sourceContext.assertableText or routeAccess.observedRoutes. For potentially dynamic content prefer \`not.toBeEmpty()\`, \`toBeVisible()\`, or regex-based partial matches.
-- Strict-mode safety: NEVER write \`locator('a, b, c')\` (comma-separated CSS) followed by \`toBeVisible()\` / \`toBeHidden()\`. Comma CSS matches multiple DOM nodes; Playwright's strict mode requires exactly one. Use a single tag (\`locator('main')\`), use \`.or()\` chaining when you genuinely need either-or fallback, or scope to a container first. Same rule for \`locator('nav, header')\`, \`locator('main, form, body')\`, etc. — every example of comma CSS with toBeVisible is a guaranteed strict-mode failure.
-- Visible \`.first()\` rule: \`.first()\` picks DOM order, not visible-element order. Broad-selector \`.first()\` calls like \`page.locator('a, button').first()\`, \`page.getByRole('link').first()\`, or \`page.locator('main').locator('a').first()\` frequently land on hidden header/logo/skip-link elements and fail with "received: hidden". When you need a representative element: (a) scope to a meaningful container first (e.g. \`page.locator('main')\`), (b) prefer role+name with proven text, or (c) skip the assertion entirely.
+- Strict-mode safety: NEVER write \`locator('a, b, c')\` (comma-separated CSS) followed by \`toBeVisible()\` / \`toBeHidden()\`. Comma CSS matches multiple DOM nodes; Playwright's strict mode requires exactly one. Use a single tag (\`locator('body')\`), use \`.or()\` chaining when you genuinely need either-or fallback, or scope to a container first. Same rule for \`locator('nav, header')\`, \`locator('main, form, body')\`, etc. — every example of comma CSS with toBeVisible is a guaranteed strict-mode failure.
+- Visible \`.first()\` rule: \`.first()\` picks DOM order, not visible-element order. Broad-selector \`.first()\` calls like \`page.locator('a, button').first()\`, \`page.getByRole('link').first()\`, or \`page.locator('main').locator('a').first()\` frequently land on hidden header/logo/skip-link elements and fail with "received: hidden". When you need a representative element: (a) scope to a meaningful container first (e.g. \`page.locator('body')\`, or \`main\` only when a \`main\` landmark exists in CONTEXT_JSON), (b) prefer role+name with proven text, or (c) skip the assertion entirely.
 
 ## Mandatory Response Contract
 - Return a strict JSON array as the full response. A single fenced json block is tolerated only if there is no text outside it.
@@ -1953,22 +1927,42 @@ NEVER invent heading text, link labels, button names, status text, or dashboard/
 - Heading-grounding rule: before asserting page.getByRole('heading', { name: ... }) on any protected or admin route, check route.headings in CONTEXT_JSON for that route. If route.headings is empty or does not contain the asserted text, do not assert a heading — assert visible structural elements, landmark regions, or stable buttons/links observed in context instead.`
 
     if (prefix === 'api') {
+      const auth = this.deriveApiAuthGrounding(context)
+      const loginRef = auth.loginEndpoint
+        ? `the login endpoint "${auth.loginEndpoint}"`
+        : 'the auth login endpoint in CONTEXT_JSON.context.apiEndpoints'
+
+      // Auth instruction is GROUNDED in the detected login contract, not a
+      // hardcoded JWT/Bearer assumption. Sending Bearer tokens against a
+      // cookie/session backend (login returns {user} with no token) makes
+      // `expect(token).toBeTruthy()` fail — the exact bug this replaces.
+      let authRule: string
+      if (auth.mode === 'token') {
+        authRule = `- AUTH MODE = TOKEN. For an endpoint with requiresAuth:true, acquire a token: POST to ${loginRef} with a CONTEXT_JSON.meta.authContext.credentialFixtures entry, read the token from the response body field "${auth.tokenField || 'token'}" (fallbacks: token, accessToken, access_token), then set Authorization: Bearer <token> on subsequent requests. Never fabricate credentials or tokens.`
+      } else if (auth.mode === 'session') {
+        authRule = `- AUTH MODE = COOKIE/SESSION. The login response does NOT return a token in its body — it sets a session cookie. For endpoints with requiresAuth:true, rely on the authenticated session Healix already injected via storageState for @auth/@tierB tests; the shared \`request\` fixture carries those cookies automatically. Do NOT read a token from the login body, do NOT assert a body token field is truthy (e.g. never \`expect(token).toBeTruthy()\`), and do NOT set an Authorization: Bearer header. If you call the login endpoint directly, assert only bounded success (status < 500, content-type JSON, body is an object). Never fabricate credentials.`
+      } else {
+        authRule = `- AUTH MODE = NONE. No backend auth enforcement was detected on any endpoint. Do NOT acquire tokens, do NOT send Authorization headers, and do NOT assert 401/403. Call endpoints directly and assert bounded success (status < 500, content-type JSON, body is an object or array).`
+      }
+
+      const categoryRule = auth.enforced
+        ? '- Include explicit category tags across suite: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].'
+        : '- Include explicit category tags across suite: [CAT:api_contract], [CAT:api_negative], [CAT:api_stress]. Omit [CAT:api_auth] — no backend auth enforcement was detected.'
+
       return `${shared}
+- Every request() call MUST target a path present in CONTEXT_JSON.context.apiEndpoints[] (same METHOD + path) — that list is the COMPLETE backend surface. NEVER call a frontend page route (/login, /admindashboard, /userdashboard, /dashboard) as an API endpoint; those are SPA pages that return HTML/404. Do not assert content-type text/html for any API request.
+- If an acceptance criterion is UI-only with no matching backend endpoint, skip it (the UI agent covers it) rather than inventing an endpoint.
 - Do not invent undocumented API status codes or response keys.
 - Do not assume missing collection resources return 4xx. Endpoints like GET /api/reviews/:productId may legitimately return 200 [] for an unknown id unless source/API contract proves otherwise.
 - If an API success path requires authentication, obtain tokens/sessions only from CONTEXT_JSON.meta.authContext.credentialFixtures or from a documented source-backed helper endpoint. Do not fabricate emails, passwords, bearer tokens, or seed identities.
+${authRule}
+- When an endpoint has requiredRole set (e.g. "admin"), select the credentialFixture whose role or originalRole matches that value. If no credentialFixture matches the requiredRole, wrap the test in: test.skip('Requires <requiredRole> credential — not provided in this run'). For endpoints with requiresAuth:true but no requiredRole, use any available credentialFixture.
 - At least one API test file must include a lightweight stress/burst check using Promise.all with small N.
 - Prefer bounded assertions for unknown error codes (example: status >= 400 && status < 500).
-- Include explicit category tags across suite: [CAT:api_contract], [CAT:api_auth], [CAT:api_negative], [CAT:api_stress].`
+${categoryRule}`
     }
 
-    if (prefix === 'smoke') {
-      return `${shared}
-- Avoid exact absolute URL equality assertions (prefer path/regex-based URL checks).
-- Assertion grounding rule: every UI interaction or assertion (\`click\`, \`fill\`, \`expect\`) MUST include an inline comment citing the exact CONTEXT_JSON key that justifies it. Example: \`await page.goto('/login') // Grounded in: CONTEXT_JSON.meta.routeAccess.publicRoutes['/login']\`. Assertions without a grounding comment are a contract violation.`
-    }
-
-    if (['frontend', 'workflow', 'error'].includes(prefix)) {
+    if (['ui', 'auth', 'e2e', 'frontend', 'workflow', 'smoke', 'error'].includes(prefix)) {
       return `${shared}
 - Avoid exact absolute URL equality assertions (prefer path/regex-based URL checks).`
     }
@@ -2050,10 +2044,19 @@ Return JSON array only.`
     schemaResult.data.forEach((file, index) => {
       const filename = this.sanitizeFilename(file.filename, prefix, index)
       const normalizedContent = this.normalizeGeneratedContent(file.content)
-      const qualityCheck = this.validateGeneratedContent(normalizedContent, prefix, generationContext)
+      // Helper/actions files have no test() blocks by design — only run spec-quality
+      // checks on actual spec files so actions files aren't silently dropped.
+      const isSpecFile = /\.spec\.ts$/i.test(filename)
+      const qualityCheck = isSpecFile
+        ? this.validateGeneratedContent(normalizedContent, prefix, generationContext)
+        : { valid: true, errors: [] }
       const syntaxCheck = this.validateTypeScriptSyntax(normalizedContent, filename)
       const groundingCheck = groundingEnabled
-        ? validateGrounding(normalizedContent, generationContext.context, prefix)
+        ? validateGrounding(normalizedContent, generationContext.context, prefix, {
+            // Reuse the run-level determination so the structural-landmark check
+            // stays consistent with normalizeGeneratedContent's main→body rewrite.
+            appHasMainLandmark: this.appHasMainLandmark,
+          })
         : { valid: true, confidence: 1, totalLiterals: 0, groundedLiterals: 0, ungrounded: [] }
 
       // Always record grounding telemetry (even in report mode) so the
@@ -2239,7 +2242,10 @@ Return JSON array only.`
 
     if (!candidate) return fallbackName
 
-    if (!candidate.endsWith('.spec.ts')) {
+    // Helper modules (actions, setup, etc.) keep their original .ts extension so
+    // spec files can resolve `import { ... } from './feature-actions'` correctly.
+    const HELPER_FILE_PATTERN = /^[\w-]+-(?:actions|setup|helpers?)\.(?:ts|js)$/i
+    if (!candidate.endsWith('.spec.ts') && !HELPER_FILE_PATTERN.test(candidate)) {
       if (candidate.endsWith('.ts') || candidate.endsWith('.js')) {
         candidate = candidate.replace(/\.(ts|js)$/i, '.spec.ts')
       } else {
@@ -2304,6 +2310,59 @@ Return JSON array only.`
         },
       )
     }
+
+    // Main-landmark safety rewrite: on apps with no <main> landmark (CRA, plain
+    // MUI/<div> layouts), `page.locator('main')` — and the `[role="main"]` /
+    // `getByRole('main')` variants — match zero elements, so every scoped
+    // toBeVisible()/click() dead-hangs for the full test timeout, then fails and
+    // retries. This is the single largest cause of execution-budget timeouts on
+    // such apps. When exploration found no main landmark, rewrite the scope to
+    // `body` (which always exists) so assertions resolve instead of hanging.
+    // Apps that genuinely expose <main> keep their scoping (appHasMainLandmark
+    // is true), preserving the strict-mode header/footer de-duplication intent.
+    if (!this.appHasMainLandmark) {
+      // .locator('main') / .locator('main ...') / .locator('main, ...') → body.
+      // The lookahead only matches the bare `main` element token (followed by a
+      // quote, whitespace, comma or combinator) so identifiers like
+      // `main-content` or `maintenance` are left untouched.
+      normalized = normalized.replace(
+        /(\.locator\(\s*['"`])main(?=['"`]|\s|,|>)/g,
+        '$1body',
+      )
+      // .locator('[role="main"]') → .locator('body')
+      normalized = normalized.replace(
+        /\.locator\(\s*['"`]\[role=["']main["']\]['"`]\s*\)/g,
+        ".locator('body')",
+      )
+      // getByRole('main' [, { ... }]) → locator('body')
+      normalized = normalized.replace(
+        /getByRole\(\s*['"`]main['"`]\s*(?:,\s*\{[^}]*\})?\s*\)/g,
+        "locator('body')",
+      )
+    }
+
+    // Tab-as-button reconciliation: the generator sometimes emits
+    // `getByRole('button', { name: X })` for elements that are actually tabs
+    // (MUI <Tab> labels leak into the exploration artifact's flat `buttons`
+    // list). A `button` query for a `tab` matches nothing and hangs for the
+    // full timeout. When the observed-role map says X is a tab and never a
+    // button, rewrite the role to `tab`. Conservative: only fires on names we
+    // observed exclusively as tabs, so real buttons are never touched.
+    if (this.observedRoleMap.size > 0) {
+      normalized = normalized.replace(
+        /getByRole\(\s*(['"`])button\1\s*,\s*(\{[^}]*\})\s*\)/g,
+        (match: string, _quote: string, opts: string) => {
+          const nameMatch = opts.match(/name\s*:\s*['"`]([^'"`]+)['"`]/)
+          if (!nameMatch) return match
+          const roles = this.observedRoleMap.get(nameMatch[1].trim().toLowerCase())
+          if (roles && roles.has('tab') && !roles.has('button')) {
+            return match.replace(/^(getByRole\(\s*['"`])button/, '$1tab')
+          }
+          return match
+        },
+      )
+    }
+
     return normalized
   }
 
@@ -2482,7 +2541,7 @@ Return JSON array only.`
       }
     }
 
-    const isUIPrefix = ['smoke', 'frontend', 'workflow', 'error'].includes(prefix)
+    const isUIPrefix = ['ui', 'auth', 'e2e', 'smoke', 'frontend', 'workflow', 'error'].includes(prefix)
     if (isUIPrefix) {
       const hasPreferredSelector = PREFERRED_SELECTOR_PATTERN.test(content)
       const hasNonBodyLocator = /page\.locator\(\s*['"`](?!body['"`]\s*\))/.test(content)
@@ -2909,7 +2968,7 @@ Return JSON array only.`
 
     visit(source)
 
-    const isUIPrefix = ['smoke', 'frontend', 'workflow', 'error'].includes(prefix)
+    const isUIPrefix = ['ui', 'auth', 'e2e', 'smoke', 'frontend', 'workflow', 'error'].includes(prefix)
     if (isUIPrefix) {
       const hasPreferredSelectorCall = Array.from(callNames).some((name) =>
         ['getByRole', 'getByLabel', 'getByPlaceholder', 'getByTestId', 'getByText', 'getByAltText'].some(
@@ -2980,12 +3039,25 @@ Return JSON array only.`
     }
 
     let content = this.normalizeGeneratedContent(test.content || '')
-    const hasPwImport = content.includes("from '@playwright/test'")
-    const hasFixtureImport = content.includes("from './__healix-fixture'")
-    if (hasPwImport) {
-      content = content.replace(/from\s+(['"])@playwright\/test\1/g, "from './__healix-fixture'")
-    } else if (!hasFixtureImport) {
-      content = `import { test, expect } from './__healix-fixture';\n\n${content}`
+
+    const agentType = String(test.type || 'generated')
+    content = tagTestContent(content, normalizeAgentTypeForTags(agentType))
+
+    // Only spec files import test/expect from the Healix fixture. Action modules
+    // (e.g. `{feature}-actions.ts`) legitimately import the `Page` *type* from
+    // '@playwright/test' and have no test() blocks — rewriting that import to the
+    // fixture (which only exports { test, expect, request }) would break them, and
+    // prepending a fixture import is meaningless for a non-spec file.
+    const isSpecFile =
+      /\.spec\.ts$/i.test(safeFilename) || /(?<![.\w])test(?:\.\w+)?\s*\(/.test(content)
+    if (isSpecFile) {
+      const hasPwImport = content.includes("from '@playwright/test'")
+      const hasFixtureImport = content.includes("from './__healix-fixture'")
+      if (hasPwImport) {
+        content = content.replace(/from\s+(['"])@playwright\/test\1/g, "from './__healix-fixture'")
+      } else if (!hasFixtureImport) {
+        content = `import { test, expect } from './__healix-fixture';\n\n${content}`
+      }
     }
 
     this.generatedFiles.push({
@@ -3077,7 +3149,7 @@ Return JSON array only.`
 ${baseUrlComment}
 // Fallback reason: ${reason}
 test.describe('Fallback smoke checks', () => {
-  test('root route responds with non-error status and main landmark is visible', async ({ page }) => {
+  test('root route responds with non-error status and main landmark is visible @smoke @sanity @regression @happy-path', async ({ page }) => {
     const response = await page.goto('/');
     expect(response).not.toBeNull();
     const status = response?.status() ?? 0;
@@ -3087,7 +3159,7 @@ test.describe('Fallback smoke checks', () => {
     await expect(page.locator('main, [role="main"], body').first()).toBeVisible();
   });
 
-  test('mobile viewport still renders the app shell', async ({ page }) => {
+  test('mobile viewport still renders the app shell @smoke @sanity @regression @happy-path', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const response = await page.goto('/');
     expect(response).not.toBeNull();
@@ -3117,7 +3189,7 @@ const routes = ${JSON.stringify(fallbackRoutes)};
 
 test.describe('Fallback frontend checks', () => {
   for (const route of routes) {
-    test(\`route \${route} renders stable layout\`, async ({ page }) => {
+    test(\`route \${route} renders stable layout @sanity @regression @happy-path\`, async ({ page }) => {
       const response = await page.goto(route);
       expect(response).not.toBeNull();
       const status = response?.status() ?? 0;
@@ -3157,13 +3229,13 @@ function methodSupportsBody(method: string) {
 }
 
 test.describe('Fallback API checks', () => {
-  test(${JSON.stringify(`${endpointMethod} ${endpointPath} returns expected status class`)}, async ({ request }) => {
+  test(${JSON.stringify(`${endpointMethod} ${endpointPath} returns expected status class @api @regression @happy-path`)}, async ({ request }) => {
     const response = await request.fetch(REQUEST_PATH, { method: REQUEST_METHOD });
     const status = response.status();
     expect(EXPECTED_SUCCESS_STATUSES${endpointRequiresAuth ? '.concat(EXPECTED_AUTH_STATUSES)' : ''}).toContain(status);
   });
 
-  test('handles lightweight burst traffic without 5xx', async ({ request }) => {
+  test('handles lightweight burst traffic without 5xx @api @regression', async ({ request }) => {
     const burst = Math.max(2, Math.min(12, STRESS_BURST));
     const timings: number[] = [];
     const responses = await Promise.all(
@@ -3201,7 +3273,7 @@ ${baseUrlComment}
 // Fallback reason: ${reason}
 
 test.describe('Fallback workflow checks', () => {
-  test(${JSON.stringify(`${workflowName} basic navigation`)}, async ({ page }) => {
+  test(${JSON.stringify(`${workflowName} basic navigation @e2e @regression @happy-path`)}, async ({ page }) => {
     const response = await page.goto('/');
     expect(response).not.toBeNull();
     await expect(page.locator('main, [role="main"], body').first()).toBeVisible();
@@ -3234,7 +3306,7 @@ test.describe('Fallback workflow checks', () => {
 ${baseUrlComment}
 // Fallback reason: ${reason}
 test.describe('Fallback error handling checks', () => {
-  test('invalid route is handled with explicit not-found behavior', async ({ page }) => {
+  test('invalid route is handled with explicit not-found behavior @regression @negative', async ({ page }) => {
     const response = await page.goto('/__healix_invalid_route__');
     expect(response).not.toBeNull();
     const status = response?.status() ?? 0;
@@ -3409,13 +3481,20 @@ test.describe('Fallback error handling checks', () => {
         && (endpoint.synthetic === true || endpoint.source === 'healix_fallback' || !endpoint.source))
     )
     const apiCount = apiEndpoints.length
-    const authPatternCount = (context.authPatterns || []).length
-    const apiAuthSignals = apiEndpoints.filter(
+    // api_auth is only meaningful when the BACKEND enforces auth on at least one
+    // endpoint. A login PATH (e.g. /api/auth/login) or a frontend-only auth pattern
+    // is NOT backend enforcement. The old path-regex/authPattern heuristic forced
+    // api_auth on open backends (e.g. an RBAC app whose login returns {user} with no
+    // token), which then failed the coverage gate once the grounded prompt correctly
+    // omitted api_auth. This now matches the buildFeatureAPIUserPrompt condition.
+    const backendAuthEnforced = apiEndpoints.some(
       (endpoint) =>
         endpoint?.authRequired === true ||
         endpoint?.requiresAuth === true ||
-        /auth|token|login|logout|session|bearer/i.test(String(endpoint?.path || ''))
-    ).length
+        (endpoint?.authEnforcement &&
+          endpoint.authEnforcement !== 'none' &&
+          endpoint.authEnforcement !== 'client-only')
+    )
 
     const explicitFrontend = normalizedType === 'frontend'
     const explicitBackend = normalizedType === 'backend'
@@ -3435,7 +3514,7 @@ test.describe('Fallback error handling checks', () => {
 
     if (hasApiSurface) {
       required.push('api_contract', 'api_negative', 'api_stress')
-      if (apiAuthSignals > 0 || authPatternCount > 0) required.push('api_auth')
+      if (backendAuthEnforced) required.push('api_auth')
     }
 
     if (required.length === 0) return this.requiredCategoriesForTestType(testType)
@@ -3457,10 +3536,24 @@ test.describe('Fallback error handling checks', () => {
     const global = new Set(this.requiredCategoriesForContext({ testType, context }))
     const keep = (categories: string[]) => categories.filter((category) => global.has(category))
 
+    // New feature-based agent types
+    if (agent === 'ui') {
+      const uiRequired = keep(['ui_flow', 'form_validation'])
+      return uiRequired.length > 0 ? uiRequired : ['ui_flow']
+    }
+    if (agent === 'auth') {
+      const authRequired = keep(['ui_flow', 'form_validation'])
+      return authRequired.length > 0 ? authRequired : ['ui_flow']
+    }
     if (agent === 'api') {
       const apiRequired = keep(['api_contract', 'api_auth', 'api_negative', 'api_stress'])
       return apiRequired.length > 0 ? apiRequired : ['api_contract']
     }
+    if (agent === 'e2e') {
+      const e2eRequired = keep(['workflow_journey'])
+      return e2eRequired.length > 0 ? e2eRequired : ['workflow_journey']
+    }
+    // Legacy agent types (kept for backward compat with old Inngest DB rows)
     if (agent === 'workflow') {
       const workflowRequired = keep(['workflow_journey'])
       return workflowRequired.length > 0 ? workflowRequired : ['workflow_journey']
@@ -3610,9 +3703,13 @@ test.describe('Fallback error handling checks', () => {
         modelUsed: this.lastModelUsed,
       },
       byType: {
+        auth: this.generatedFiles.filter((f) => f.type === 'auth').length,
+        ui: this.generatedFiles.filter((f) => f.type === 'ui').length,
+        api: this.generatedFiles.filter((f) => f.type === 'api').length,
+        e2e: this.generatedFiles.filter((f) => f.type === 'e2e').length,
+        // Legacy type counts kept for telemetry back-compat
         smoke: this.generatedFiles.filter((f) => f.type === 'smoke').length,
         frontend: this.generatedFiles.filter((f) => f.type === 'frontend').length,
-        api: this.generatedFiles.filter((f) => f.type === 'api').length,
         workflow: this.generatedFiles.filter((f) => f.type === 'workflow').length,
         error: this.generatedFiles.filter((f) => f.type === 'error').length,
       },

@@ -346,6 +346,10 @@
                 <span class="section-badge-required">02 — Required</span>
                 <h3 style="font-size:1.1rem;font-weight:700;margin:4px 0 4px;color:#ffffff;">Execution Settings</h3>
                 <p style="font-size:13px;color:#a0a0a0;margin-bottom:14px;">Choose test generation and run behavior before launching the pipeline.</p>
+                <div id="composeNote" class="hidden" style="border:1px solid #2f6f4f;background:#0e1f17;border-radius:6px;padding:12px 14px;margin-bottom:14px;">
+                    <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#5fd39a;letter-spacing:0.06em;">DOCKER COMPOSE DETECTED</span>
+                    <p id="composeNoteBody" style="font-size:12px;color:#a0a0a0;margin-top:6px;"></p>
+                </div>
                 <div class="brutal-card p-6">
                     <div class="field-row flex items-start gap-4">
                         <div class="field-label" style="padding-top:11px;">Start Command</div>
@@ -389,6 +393,42 @@
                 </div>
             </div>
 
+            <!-- Add-external-service: always available. Lets the user declare a
+                 service Healix can't auto-detect (e.g. a backend in a separate repo).
+                 In single-service mode the first click converts the form to the
+                 multi-service layout, seeding the current app as the primary. -->
+            <div>
+                <button type="button" id="addExternalServiceBtn" class="btn-secondary" style="padding:8px 16px;font-size:11px;">
+                    + Add external service
+                </button>
+                <p style="font-size:12px;color:#505050;margin-top:8px;font-family:'Space Mono',monospace;">// for a backend in another repo or one you start yourself — leave the start command empty if it's already running</p>
+            </div>
+
+            <!-- Backend prerequisite (shown only for frontend-only repos that call an
+                 external backend — populated from the `backendDependency` URL param by
+                 initBackendDependency(). The form blocks submit until the user confirms
+                 the backend is running. -->
+            <div id="backendPrereqSection" class="hidden">
+                <span class="section-badge-required">!! — Prerequisite</span>
+                <h3 style="font-size:1.1rem;font-weight:700;margin:4px 0 4px;color:#ffffff;">Backend Service Required</h3>
+                <p style="font-size:13px;color:#a0a0a0;margin-bottom:14px;">This looks like a frontend-only project. Healix can't start its backend automatically — start it yourself before running tests, or the app's API calls will fail.</p>
+                <div class="brutal-card p-6" style="border-color:#ffb000;box-shadow:6px 6px 0 #ffb000;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <span style="font-family:'Space Mono',monospace;font-size:20px;color:#ffb000;line-height:1;">[!]</span>
+                        <span style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#ffb000;text-transform:uppercase;letter-spacing:0.06em;">Detected backend dependency</span>
+                    </div>
+                    <div class="url-preview" style="margin-top:0;">
+                        <div class="url-preview-label">Expected backend URL</div>
+                        <div id="backendPrereqUrl">—</div>
+                    </div>
+                    <p id="backendPrereqSource" style="font-size:11px;color:#505050;margin-top:8px;font-family:'Space Mono',monospace;"></p>
+                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-top:16px;">
+                        <input type="checkbox" id="backendPrereqAck" style="accent-color:#ffb000;margin-top:3px;">
+                        <span style="font-size:13px;color:#ffffff;font-family:'Space Mono',monospace;" id="backendPrereqAckLabel">My backend is running and reachable.</span>
+                    </label>
+                </div>
+            </div>
+
             <!-- Section 3 -->
             <div>
                 <span class="section-badge">03 — Optional</span>
@@ -413,7 +453,10 @@
                     </div>
                     <div class="field-row flex items-center gap-4" style="margin-top:20px;">
                         <div class="field-label">Port</div>
-                        <div style="flex:1;"><input type="text" id="port" value="5173" class="input-glass"></div>
+                        <div style="flex:1;">
+                            <input type="text" id="port" value="5173" class="input-glass">
+                            <div id="singlePortStatus" style="margin-top:6px;font-family:'Space Mono',monospace;font-size:11px;color:#505050;"></div>
+                        </div>
                     </div>
                     <div class="field-row flex items-center gap-4" style="margin-top:20px;">
                         <div class="field-label">Path</div>
@@ -447,6 +490,26 @@
                     <p style="font-size:12px;color:#505050;font-family:'Space Mono',monospace;margin-top:12px;">Text-based docs only. PDF parsing is intentionally disabled.</p>
 
                     <div id="filesPreviewList" style="margin-top:12px;"></div>
+                </div>
+            </div>
+
+            <!-- Section 5: Time Budget -->
+            <div>
+                <span class="section-badge">06 — Optional</span>
+                <h3 style="font-size:1.1rem;font-weight:700;margin:4px 0 4px;color:#ffffff;">Time Budget</h3>
+                <p style="font-size:13px;color:#a0a0a0;margin-bottom:14px;">Maximum wall-clock time allowed for the full test suite (exploration → generation → execution). Increase for large codebases or <code style="font-family:'Space Mono',monospace;font-size:12px;color:#a0a0a0;">exhaustive</code> coverage profiles.</p>
+                <div class="brutal-card p-6">
+                    <div class="field-row flex items-center gap-4">
+                        <div class="field-label">Max Run Time</div>
+                        <div style="flex:1;">
+                            <select id="timeBudgetMinutes" class="input-glass" style="cursor:pointer;">
+                                <option value="30">30 minutes</option>
+                                <option value="60">60 minutes</option>
+                                <option value="90" selected>90 minutes (recommended)</option>
+                                <option value="120">120 minutes</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -510,6 +573,41 @@
         }
         const detectedServices = parseServicesParam();
         const multiServiceMode = !!detectedServices;
+
+        // Frontend-only repos may carry a `backendDependency` param: the external
+        // backend the app calls. We can't start it, so we prompt the user to.
+        function parseBackendDependency() {
+            const raw = urlParams.get('backendDependency');
+            if (!raw) return null;
+            try {
+                const parsed = JSON.parse(raw);
+                if (!parsed || !parsed.url) return null;
+                return { url: String(parsed.url), port: parsed.port || null, source: parsed.source || null };
+            } catch {
+                return null;
+            }
+        }
+        const backendDependency = parseBackendDependency();
+
+        // Docker Compose stacks launch as one unit; the form stays single-service
+        // and just notes that `docker compose up` starts everything.
+        function parseComposeStack() {
+            const raw = urlParams.get('composeStack');
+            if (!raw) return null;
+            try {
+                const parsed = JSON.parse(raw);
+                if (!parsed || !parsed.command) return null;
+                return {
+                    file: parsed.file || null,
+                    command: String(parsed.command),
+                    port: parsed.port || null,
+                    services: Array.isArray(parsed.services) ? parsed.services : [],
+                };
+            } catch {
+                return null;
+            }
+        }
+        const composeStack = parseComposeStack();
 
         const MAX_PRD_FILES = 5;
 
@@ -801,6 +899,39 @@
             updateBaseURLPreview();
 
             if (multiServiceMode) initMultiService();
+            initBackendDependency();
+            initComposeStack();
+            // Probe the single-service port on load (no-op when hidden because
+            // the badge element still exists; result is just never seen).
+            if (!multiServiceMode) probeSinglePort();
+        }
+
+        // ── Docker Compose note (single-service layout) ────────────────────
+        function initComposeStack() {
+            if (!composeStack) return;
+            const note = document.getElementById('composeNote');
+            const body = document.getElementById('composeNoteBody');
+            if (!note || !body) return;
+            const fileLabel = composeStack.file ? `<code>${escapeAttr(composeStack.file)}</code>` : 'a compose file';
+            const svcLabel = composeStack.services.length
+                ? ` (${composeStack.services.map(escapeAttr).join(', ')})`
+                : '';
+            body.innerHTML = `Healix found ${fileLabel} and will start the whole stack${svcLabel} with <code>${escapeAttr(composeStack.command)}</code>. Tests target the web service${composeStack.port ? ` on port ${composeStack.port}` : ''}.`;
+            note.classList.remove('hidden');
+        }
+
+        // ── Backend prerequisite (frontend-only repos) ─────────────────────
+        function initBackendDependency() {
+            if (!backendDependency) return;
+            const section = document.getElementById('backendPrereqSection');
+            const urlEl = document.getElementById('backendPrereqUrl');
+            const sourceEl = document.getElementById('backendPrereqSource');
+            const ackLabel = document.getElementById('backendPrereqAckLabel');
+            if (!section) return;
+            urlEl.textContent = backendDependency.url;
+            ackLabel.textContent = `My backend is running and reachable at ${backendDependency.url}.`;
+            sourceEl.textContent = backendDependency.source ? `// detected from ${backendDependency.source}` : '';
+            section.classList.remove('hidden');
         }
 
         // ── Multi-service mode ─────────────────────────────────────────────
@@ -828,9 +959,27 @@
                 card.className = 'brutal-card p-6';
                 card.style.marginBottom = '16px';
                 const previewBase = (svc.host && svc.port) ? `http://${svc.host}:${svc.port}/` : '—';
-                const roleLabel = svc.role ? svc.role.toUpperCase() : `SERVICE #${idx + 1}`;
+                const roleLabel = svc.isExternal
+                    ? (svc.role ? svc.role.toUpperCase() : 'EXTERNAL')
+                    : (svc.role ? svc.role.toUpperCase() : `SERVICE #${idx + 1}`);
                 const frameworkBadge = svc.framework
                     ? `<span style="font-family:'Space Mono',monospace;font-size:10px;color:#505050;margin-left:8px;">[${svc.framework}]</span>`
+                    : (svc.isExternal ? `<span style="font-family:'Space Mono',monospace;font-size:10px;color:#505050;margin-left:8px;">[external]</span>` : '');
+                const removeBtn = svc.isExternal
+                    ? `<button type="button" class="svc-remove" data-index="${idx}" style="background:none;border:1px solid #333;cursor:pointer;font-size:11px;font-weight:700;color:#a0a0a0;padding:4px 8px;font-family:'Space Mono',monospace;">&times; Remove</button>`
+                    : '';
+                const startCmdPlaceholder = svc.isExternal ? 'optional — leave empty if already running' : 'e.g. npm run dev';
+                const pathField = svc.isExternal
+                    ? `<div class="field-row flex items-center gap-4" style="margin-top:16px;">
+                        <div class="field-label">Working dir</div>
+                        <div style="flex:1;"><input type="text" class="input-glass svc-path" data-index="${idx}" value="${escapeAttr(svc.path || '')}" placeholder="optional — absolute path or repo-relative"></div>
+                    </div>`
+                    : (svc.path ? `<p style="font-size:11px;color:#505050;margin-top:6px;font-family:'Space Mono',monospace;">cwd: ${escapeAttr(svc.path)}</p>` : '');
+                const roleField = svc.isExternal
+                    ? `<div class="field-row flex items-center gap-4" style="margin-top:16px;">
+                        <div class="field-label">Role</div>
+                        <div style="flex:1;"><input type="text" class="input-glass svc-role" data-index="${idx}" value="${escapeAttr(svc.role || '')}" placeholder="e.g. backend, auth, api"></div>
+                    </div>`
                     : '';
                 card.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
@@ -838,18 +987,23 @@
                             <span style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#ffffff;letter-spacing:0.08em;">${roleLabel}</span>
                             ${frameworkBadge}
                         </div>
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-family:'Space Mono',monospace;font-size:11px;color:#a0a0a0;text-transform:uppercase;letter-spacing:0.06em;">
-                            <input type="radio" name="primaryService" class="svc-primary" data-index="${idx}" ${svc.isPrimary ? 'checked' : ''} style="accent-color:#ffffff;">
-                            Primary (test target)
-                        </label>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-family:'Space Mono',monospace;font-size:11px;color:#a0a0a0;text-transform:uppercase;letter-spacing:0.06em;">
+                                <input type="radio" name="primaryService" class="svc-primary" data-index="${idx}" ${svc.isPrimary ? 'checked' : ''} style="accent-color:#ffffff;">
+                                Primary (test target)
+                            </label>
+                            ${removeBtn}
+                        </div>
                     </div>
                     <div class="field-row flex items-start gap-4">
                         <div class="field-label" style="padding-top:11px;">Start Command</div>
                         <div style="flex:1;">
-                            <input type="text" class="input-glass svc-startCommand" data-index="${idx}" value="${escapeAttr(svc.startCommand)}" placeholder="e.g. npm run dev">
-                            ${svc.path ? `<p style="font-size:11px;color:#505050;margin-top:6px;font-family:'Space Mono',monospace;">cwd: ${escapeAttr(svc.path)}</p>` : ''}
+                            <input type="text" class="input-glass svc-startCommand" data-index="${idx}" value="${escapeAttr(svc.startCommand)}" placeholder="${startCmdPlaceholder}">
+                            ${svc.isExternal ? '' : pathField}
                         </div>
                     </div>
+                    ${roleField}
+                    ${svc.isExternal ? pathField : ''}
                     <div class="field-row flex items-center gap-4" style="margin-top:16px;">
                         <div class="field-label">Host</div>
                         <div style="flex:1;"><input type="text" class="input-glass svc-host" data-index="${idx}" value="${escapeAttr(svc.host || 'localhost')}"></div>
@@ -862,6 +1016,7 @@
                         <div class="url-preview-label">Base URL</div>
                         <div class="svc-preview" data-index="${idx}">${previewBase}</div>
                     </div>
+                    <div class="svc-port-status" data-index="${idx}" style="margin-top:10px;font-family:'Space Mono',monospace;font-size:11px;color:#505050;">checking port…</div>
                 `;
                 container.appendChild(card);
             });
@@ -870,6 +1025,17 @@
                 radio.addEventListener('change', (e) => {
                     const idx = Number(e.target.dataset.index);
                     state.services.forEach((s, i) => { s.isPrimary = (i === idx); });
+                });
+            });
+            container.querySelectorAll('.svc-remove').forEach((btn) => {
+                btn.addEventListener('click', (e) => {
+                    const idx = Number(e.currentTarget.dataset.index);
+                    const wasPrimary = state.services[idx]?.isPrimary;
+                    state.services.splice(idx, 1);
+                    if (wasPrimary && state.services.length > 0 && !state.services.some((s) => s.isPrimary)) {
+                        state.services[0].isPrimary = true;
+                    }
+                    renderServices();
                 });
             });
             const wireInput = (selector, field) => {
@@ -884,6 +1050,52 @@
             wireInput('.svc-startCommand', 'startCommand');
             wireInput('.svc-host', 'host');
             wireInput('.svc-port', 'port');
+            wireInput('.svc-path', 'path');
+            wireInput('.svc-role', 'role');
+
+            // Wire port input to re-probe when the user edits the port field.
+            container.querySelectorAll('.svc-port').forEach((input) => {
+                input.addEventListener('input', (e) => {
+                    const i = Number(e.target.dataset.index);
+                    schedulePortProbe(i);
+                });
+            });
+
+            // Probe all ports after rendering.
+            probeAllServicePorts();
+        }
+
+        // Probe a single service port and update its status badge.
+        async function probeServicePort(idx) {
+            const svc = state.services[idx];
+            const badge = document.querySelector(`.svc-port-status[data-index="${idx}"]`);
+            if (!badge) return;
+            const port = Number(svc?.port);
+            if (!port || port < 1 || port > 65535) {
+                badge.textContent = '';
+                return;
+            }
+            badge.style.color = '#505050';
+            badge.textContent = 'checking port…';
+            try {
+                const serverPort = urlParams.get('serverPort') || '54321';
+                const r = await fetch(`http://localhost:${serverPort}/api/probe-port?port=${port}`, { signal: AbortSignal.timeout(2000) });
+                const data = await r.json();
+                if (data.inUse) {
+                    badge.style.color = '#f59e0b';  // amber
+                    badge.textContent = `⚠ port ${port} is already in use — if this is your app already running, Healix will reuse it; otherwise change the port`;
+                } else {
+                    badge.style.color = '#5fd39a';  // green
+                    badge.textContent = `✓ port ${port} is free`;
+                }
+            } catch {
+                badge.style.color = '#505050';
+                badge.textContent = '';  // probe failed silently (server restarted, etc.)
+            }
+        }
+
+        function probeAllServicePorts() {
+            state.services.forEach((_, idx) => probeServicePort(idx));
         }
 
         function updateServicePreview(idx) {
@@ -891,6 +1103,48 @@
             const preview = document.querySelector(`.svc-preview[data-index="${idx}"]`);
             if (!preview) return;
             preview.textContent = (svc.host && svc.port) ? `http://${svc.host}:${svc.port}/` : '—';
+        }
+
+        // Debounced re-probe triggered by port input changes (avoids firing on
+        // every keystroke while the user is still typing).
+        const _probeTimers = {};
+        function schedulePortProbe(idx) {
+            clearTimeout(_probeTimers[idx]);
+            _probeTimers[idx] = setTimeout(() => probeServicePort(idx), 600);
+        }
+
+        // Port probe for the single-service layout (singleServerPortSection).
+        // Shows the same amber/green badge below the port input field.
+        async function probeSinglePort() {
+            const badge = document.getElementById('singlePortStatus');
+            if (!badge) return;
+            const port = Number((portInput.value || '').trim());
+            if (!port || port < 1 || port > 65535) {
+                badge.textContent = '';
+                return;
+            }
+            badge.style.color = '#505050';
+            badge.textContent = 'checking port…';
+            try {
+                const serverPort = urlParams.get('serverPort') || '54321';
+                const r = await fetch(`http://localhost:${serverPort}/api/probe-port?port=${port}`, { signal: AbortSignal.timeout(2000) });
+                const data = await r.json();
+                if (data.inUse) {
+                    badge.style.color = '#f59e0b';
+                    badge.textContent = `⚠ port ${port} is already in use — if this is your app already running, Healix will reuse it; otherwise change the port`;
+                } else {
+                    badge.style.color = '#5fd39a';
+                    badge.textContent = `✓ port ${port} is free`;
+                }
+            } catch {
+                badge.style.color = '#505050';
+                badge.textContent = '';
+            }
+        }
+        let _singleProbeTimer;
+        function scheduleSinglePortProbe() {
+            clearTimeout(_singleProbeTimer);
+            _singleProbeTimer = setTimeout(probeSinglePort, 600);
         }
 
         function escapeAttr(value) {
@@ -915,8 +1169,14 @@
                 const startCommand = (svc.startCommand || '').trim();
                 const host = (svc.host || '').trim() || 'localhost';
                 const portStr = String(svc.port || '').trim();
-                if (!startCommand) {
+                // External services may already be running — start command is
+                // optional. The primary always needs one (we have to launch the
+                // thing under test).
+                if (!startCommand && !svc.isExternal) {
                     return { ok: false, message: `Service ${i + 1} (${svc.role || 'unnamed'}): start command is required.` };
+                }
+                if (!startCommand && svc.isPrimary) {
+                    return { ok: false, message: `The primary service (${svc.role || 'unnamed'}) needs a start command so Healix can launch it.` };
                 }
                 if (!/^\d+$/.test(portStr) || Number(portStr) < 1 || Number(portStr) > 65535) {
                     return { ok: false, message: `Service ${i + 1} (${svc.role || 'unnamed'}): port must be a number between 1 and 65535.` };
@@ -926,13 +1186,54 @@
                     host,
                     port: Number(portStr),
                     path: svc.path || undefined,
-                    startCommand,
+                    startCommand: startCommand || undefined,
                     framework: svc.framework || undefined,
                     isPrimary: !!svc.isPrimary,
+                    isExternal: !!svc.isExternal,
                 });
             }
             const primary = out.find((s) => s.isPrimary);
             return { ok: true, services: out, primary };
+        }
+
+        // Convert a single-service form into multi-service layout on demand.
+        // Seeds the detected app as the primary row from the single-service
+        // inputs, then reveals the services list. No-op once already multi.
+        function ensureMultiMode() {
+            if (state.services.length > 0) return;
+            const portStr = String(portInput.value || '').trim();
+            state.services.push({
+                role: 'fullstack',
+                host: (hostInput.value || 'localhost').trim() || 'localhost',
+                port: portStr,
+                startCommand: (startCommandInput.value || '').trim(),
+                path: (pathInput.value || '').trim(),
+                framework: '',
+                isPrimary: true,
+                isExternal: false,
+            });
+            document.getElementById('singleServiceSection')?.classList.add('hidden');
+            document.getElementById('singleServerPortSection')?.classList.add('hidden');
+            document.getElementById('multiServiceSection')?.classList.remove('hidden');
+            setActiveToggle('generate-group-multi', String(state.generateTests));
+            setupToggle('generate-group-multi', 'generateTests', (value) => value === 'true');
+            renderServices();
+        }
+
+        // Append an empty external-service row. The user fills in role, port,
+        // and (optionally) a start command. External rows can be removed.
+        function addExternalService() {
+            state.services.push({
+                role: '',
+                host: 'localhost',
+                port: '',
+                startCommand: '',
+                path: '',
+                framework: '',
+                isPrimary: false,
+                isExternal: true,
+            });
+            renderServices();
         }
 
         setupToggle('mode-group', 'mode');
@@ -940,6 +1241,7 @@
 
         hostInput.addEventListener('input', updateBaseURLPreview);
         portInput.addEventListener('input', updateBaseURLPreview);
+        portInput.addEventListener('input', scheduleSinglePortProbe);
         pathInput.addEventListener('input', updateBaseURLPreview);
 
         dropzone.addEventListener('click', () => fileInput.click());
@@ -965,13 +1267,21 @@
 
         addCredentialBtn.addEventListener('click', addCredential);
 
+        document.getElementById('addExternalServiceBtn')?.addEventListener('click', () => {
+            ensureMultiMode();
+            addExternalService();
+        });
+
         document.getElementById('submitBtn').addEventListener('click', async () => {
             clearError();
 
             let baseURL;
             let startCommand;
             let servicesPayload;
-            if (multiServiceMode) {
+            // Use the services list whenever it's populated — either from
+            // detection (multiServiceMode) or because the user added an external
+            // service, which seeds the list via ensureMultiMode().
+            if (state.services.length > 0) {
                 const built = buildServicesPayload();
                 if (!built.ok) {
                     showError(built.message);
@@ -996,7 +1306,19 @@
                 }
             }
 
+            // Block submit until the user confirms their external backend is up.
+            if (backendDependency) {
+                const ack = document.getElementById('backendPrereqAck');
+                if (ack && !ack.checked) {
+                    showError(`Start your backend at ${backendDependency.url} and confirm it's running before launching tests.`);
+                    document.getElementById('backendPrereqSection')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+            }
+
             const validCredentials = state.credentials.filter(c => c.username && c.password);
+
+            const timeBudgetMinutes = parseInt(document.getElementById('timeBudgetMinutes')?.value || '90', 10);
 
             const payload = {
                 testType: state.mode,
@@ -1005,6 +1327,7 @@
                 startCommand,
                 generateTests: state.generateTests,
                 openDashboard: true,
+                timeBudgetMinutes,
                 ...(servicesPayload ? { services: servicesPayload } : {}),
                 ...(validCredentials.length > 0 ? { credentials: validCredentials } : {}),
                 prdFiles: state.prdFiles.length > 0 ? state.prdFiles : null,

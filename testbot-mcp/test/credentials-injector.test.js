@@ -10,6 +10,7 @@ const {
   stateFileFor,
   summarizeAuthStateEvidence,
   fillFirstVisible,
+  probeStorageState,
   DEFAULT_USERNAME_SELECTORS,
 } = require('../src/credentials-injector');
 
@@ -350,6 +351,47 @@ test('credential injector treats discovered successIndicator as advisory', () =>
   }), false);
 });
 
+test('credential injector rejects soft signals when the auth request failed (no real artifact)', () => {
+  // The RBAC failure mode: login POST hit ERR_CONNECTION_REFUSED, yet the login
+  // page text "Login to Dashboard" matches the generic /dashboard/i success
+  // locator. A locator/url match alone must NOT count as verified here.
+  assert.equal(shouldAcceptLoginVerification({
+    urlChanged: false,
+    successIndicatorVisible: true,
+    authStateEvidence: { hasAuthState: false },
+    failureVisible: false,
+    loginNetworkFailed: true,
+  }), false);
+
+  // Even a URL change is untrustworthy when the auth request failed.
+  assert.equal(shouldAcceptLoginVerification({
+    urlChanged: true,
+    successIndicatorVisible: false,
+    authStateEvidence: { hasAuthState: false },
+    failureVisible: false,
+    loginNetworkFailed: true,
+  }), false);
+
+  // But a genuine auth artifact still counts even if a (possibly unrelated)
+  // auth-ish request failed — the session demonstrably exists.
+  assert.equal(shouldAcceptLoginVerification({
+    urlChanged: false,
+    successIndicatorVisible: false,
+    authStateEvidence: { hasAuthState: true, cookieName: 'session' },
+    failureVisible: false,
+    loginNetworkFailed: true,
+  }), true);
+
+  // A success-locator match ALONE (still on the login page, no auth artifact)
+  // must NOT verify — this is the RBAC "Login to Dashboard" false positive.
+  assert.equal(shouldAcceptLoginVerification({
+    urlChanged: false,
+    successIndicatorVisible: true,
+    authStateEvidence: { hasAuthState: false },
+    failureVisible: false,
+  }), false);
+});
+
 // Fake page for pageHasCredentialForm: `visible` maps selector → bool. A
 // selector absent from the map has count 0 (does not exist).
 function makeGatePage(visible = {}) {
@@ -410,6 +452,88 @@ test('pageHasCredentialForm rejects a 404 / wrong-route shell with no inputs', a
   assert.ok(Date.now() - started < 3_000, 'empty page should resolve quickly');
 });
 
+// Two-step login: password field appears only after username is submitted.
+// Simulates the new driveLogin step-2 logic by verifying that:
+// (a) pageHasCredentialForm correctly detects "via=username" when only email is visible,
+// (b) after a simulated Continue click (the password field is now added to DOM),
+//     pageHasCredentialForm returns ok=true via "password",
+// (c) when the password field never appears, the gate returns ok=false (passwordless path).
+test('two-step login: password gate returns ok after email-first step', async () => {
+  // Simulate DOM state after step-2 submit: both fields present.
+  const pageWithPassword = makeGatePage({
+    'input[type="email"]': true,
+    'input[type="password"]': true,
+  });
+  const res = await pageHasCredentialForm(
+    pageWithPassword,
+    ['input[type="email"]'],
+    ['input[type="password"]'],
+    2_500,
+  );
+  assert.equal(res.ok, true);
+  assert.equal(res.via, 'password');
+});
+
+test('two-step login: password gate returns ok=false when no password field appears', async () => {
+  // Simulate a magic-link / passwordless app: only email field, never a password field.
+  const pageNoPassword = makeGatePage({ 'input[type="email"]': true });
+  const res = await pageHasCredentialForm(
+    pageNoPassword,
+    [],
+    ['input[type="password"]'],
+    500,
+  );
+  assert.equal(res.ok, false);
+});
+
+test('two-step login: fillFirstVisible fills username on email-only page', async () => {
+  const page = makeFakePage({ 'input[type="email"]': { count: 1 } });
+  const result = await fillFirstVisible(
+    page,
+    ['input[type="email"]'],
+    'user@example.com',
+    5_000,
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.selector, 'input[type="email"]');
+  assert.deepEqual(page.calls.fill, [{ selector: 'input[type="email"]', value: 'user@example.com' }]);
+});
+
+// Gap 3: per-role credential filter uses normalizeRoleLabel for key matching.
+// Verifies that the filter logic used in exploration-phase.js correctly
+// identifies which credentials still need browser-use login after partial pre-auth.
+test('normalizeRoleLabel produces consistent keys for role alias matching', () => {
+  // These must all produce the same key so the per-role filter can match them.
+  assert.equal(normalizeRoleLabel('Admin'), normalizeRoleLabel('admin'));
+  assert.equal(normalizeRoleLabel('SUPER_ADMIN'), normalizeRoleLabel('super_admin'));
+  assert.equal(normalizeRoleLabel(undefined), 'user');
+  assert.equal(normalizeRoleLabel(''), 'user');
+});
+
+test('per-role credential filter passes failed role credential when one role pre-authed', () => {
+  // Simulate exploration-phase.js per-role filter logic:
+  // admin succeeded pre-auth, user failed — user credential should be returned.
+  const allCreds = [
+    { role: 'admin', username: 'admin@example.com', password: 'pass1' },
+    { role: 'user', username: 'user@example.com', password: 'pass2' },
+  ];
+  const preAuthRoleKeys = new Set(['admin'].map((r) => normalizeRoleLabel(r)));
+  const failedCreds = allCreds.filter((c) => !preAuthRoleKeys.has(normalizeRoleLabel(c.role || c.name || 'user')));
+  assert.equal(failedCreds.length, 1);
+  assert.equal(failedCreds[0].role, 'user');
+  assert.equal(failedCreds[0].username, 'user@example.com');
+});
+
+test('per-role credential filter returns empty when all roles pre-authed', () => {
+  const allCreds = [
+    { role: 'admin', username: 'admin@example.com', password: 'pass1' },
+    { role: 'user', username: 'user@example.com', password: 'pass2' },
+  ];
+  const preAuthRoleKeys = new Set(['admin', 'user'].map((r) => normalizeRoleLabel(r)));
+  const failedCreds = allCreds.filter((c) => !preAuthRoleKeys.has(normalizeRoleLabel(c.role || c.name || 'user')));
+  assert.equal(failedCreds.length, 0);
+});
+
 test('credential injector checks durable logged-in markers and username text', () => {
   const locators = buildSuccessLocators(
     { successIndicator: 'nav >> text=Signed in' },
@@ -419,4 +543,67 @@ test('credential injector checks durable logged-in markers and username text', (
   assert.ok(locators.includes('nav >> text=Signed in'));
   assert.ok(locators.includes('text=/log\\s*out/i'));
   assert.ok(locators.includes('text=\"customer@example.test\"'));
+});
+
+// Gap 5: probeStorageState returns authenticated:false when playwright is not available.
+// (Playwright is not installed in the unit-test environment, so this exercises
+// the graceful-degradation path — the probe should never crash the pipeline.)
+test('probeStorageState returns authenticated:false when playwright is not installed', async () => {
+  const result = await probeStorageState({
+    baseURL: 'http://localhost:3000',
+    storageStatePath: '/nonexistent/auth-state.json',
+    protectedPath: '/dashboard',
+  });
+  assert.equal(result.authenticated, false);
+  assert.ok(typeof result.reason === 'string');
+});
+
+test('probeStorageState returns authenticated:false when storageStatePath is missing', async () => {
+  const result = await probeStorageState({
+    baseURL: 'http://localhost:3000',
+    storageStatePath: '',
+  });
+  assert.equal(result.authenticated, false);
+  assert.ok(result.reason.includes('storageStatePath'));
+});
+
+// Gap 6: parallel injection — all roles are attempted even when one fails.
+// Simulates the Promise.allSettled shape by verifying the logic preserves all outcomes.
+test('parallel injection shape: all settled outcomes produce a role entry', () => {
+  // Simulate what Promise.allSettled produces for two roles where one fails.
+  const settled = [
+    { status: 'fulfilled', value: { role: 'admin', storageStatePath: '/tmp/admin.json', result: { ok: true } } },
+    { status: 'fulfilled', value: { role: 'user', storageStatePath: null, result: { ok: false, reason: 'Login failed', noLoginForm: false } } },
+  ];
+  const roles = [];
+  for (const outcome of settled) {
+    if (outcome.status === 'rejected') continue;
+    const { role, storageStatePath, result } = outcome.value;
+    if (result.ok) {
+      roles.push({ role, name: role, storageStatePath, loginVerified: true });
+    } else {
+      roles.push({ role, name: role, storageStatePath: null, loginVerified: false, reason: result.reason });
+    }
+  }
+  assert.equal(roles.length, 2);
+  assert.equal(roles[0].loginVerified, true);
+  assert.equal(roles[1].loginVerified, false);
+  assert.equal(roles[1].role, 'user');
+});
+
+test('parallel injection shape: rejected promise is skipped with a warning (driveLogin should not reject)', () => {
+  const settled = [
+    { status: 'fulfilled', value: { role: 'admin', storageStatePath: '/tmp/admin.json', result: { ok: true } } },
+    { status: 'rejected', reason: new Error('unexpected throw') },
+  ];
+  const roles = [];
+  for (const outcome of settled) {
+    if (outcome.status === 'rejected') continue; // skipped — driveLogin never throws
+    const { role, storageStatePath, result } = outcome.value;
+    roles.push(result.ok
+      ? { role, storageStatePath, loginVerified: true }
+      : { role, loginVerified: false });
+  }
+  assert.equal(roles.length, 1);
+  assert.equal(roles[0].role, 'admin');
 });

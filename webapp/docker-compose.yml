@@ -21,12 +21,12 @@ services:
     env_file:
       - .env.docker
     ports:
-      - "${PORT:-3000}:3000"
+      - "${PORT:-3030}:3030"
     # Keep migrations OFF here — run them once via the `migrate` service below.
     environment:
       RUN_MIGRATIONS: "false"
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/',(r)=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3030/',(r)=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3

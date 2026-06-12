@@ -18,7 +18,7 @@
 # (BuildKit uses webapp/Dockerfile.dockerignore for context filtering)
 #
 # Run:
-#   docker run --rm -p 3000:3000 --env-file webapp/.env.docker healix-webapp:1.0.0
+#   docker run --rm -p 3030:3030 --env-file webapp/.env.docker healix-webapp:1.0.0
 # =============================================================================
 
 ARG NODE_VERSION=20.18-alpine
@@ -88,7 +88,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT=3030
 ENV HOSTNAME=0.0.0.0
 
 # Non-root user — Next.js best practice.
@@ -114,7 +114,7 @@ RUN find /app -name "*.js.map" -delete \
  && chmod +x /usr/local/bin/entrypoint.sh
 
 USER nextjs
-EXPOSE 3000
+EXPOSE 3030
 
 # Healthcheck — node is guaranteed; avoid any optional alpine tool dependency.
 # Treats HTTP 2xx/3xx as healthy, 5xx or connection error as unhealthy.

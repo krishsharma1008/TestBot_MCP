@@ -17,7 +17,7 @@ See the [top-level README](../README.md) for the full product overview and archi
 
 ```bash
 # From the monorepo root:
-npm run dev:webapp          # Start Next.js dev server on 0.0.0.0:3000
+npm run dev:webapp          # Start Next.js dev server on 0.0.0.0:3030
 
 # Or directly from webapp/:
 npm run dev                 # same as above
@@ -132,7 +132,7 @@ When `HEALIX_GEN_ASYNC=true`:
 #### Local Inngest dev
 
 ```bash
-npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
+npx inngest-cli@latest dev -u http://localhost:3030/api/inngest
 ```
 
 The CLI auto-discovers `generate-tests-orchestrator` and `generate-tests-agent` and streams event runs.

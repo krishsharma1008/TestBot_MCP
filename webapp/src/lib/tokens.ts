@@ -94,7 +94,7 @@ export async function checkTokenBalance(params: {
 export async function recordTokenUsage(params: {
   userId: string
   endpoint: string                  // '/api/generate-tests' etc.
-  agent: string                     // 'smoke'|'frontend'|'api'|'workflow'|'error'|'expansion'|'planner'|'parse_prd'|'analyze_failures'
+  agent: string                     // 'smoke'|'frontend'|'api'|'workflow'|'error'|'expansion'|'planner'|'parse_prd'|'analyze_failures'|'auth'|'ui'|'e2e'|'scenario-planner'
   model: string
   tokensInput: number
   tokensOutput: number

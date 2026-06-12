@@ -45,3 +45,4 @@ notebooks/
 targets/
 logs/
 __pycache__/
+*/coverage/
