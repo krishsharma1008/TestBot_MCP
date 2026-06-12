@@ -533,6 +533,33 @@ class HealixMCPServer {
     return savedPaths;
   }
 
+  saveLastConfig(projectPath, validatedConfig) {
+    try {
+      const lastConfigPath = path.join(projectPath, '.healix', 'last-config.json');
+      const toSave = {
+        testType: validatedConfig.testType,
+        scope: validatedConfig.scope,
+        baseURL: validatedConfig.baseURL,
+        startCommand: validatedConfig.startCommand,
+        services: validatedConfig.services,
+        generateTests: validatedConfig.generateTests,
+        openDashboard: validatedConfig.openDashboard,
+      };
+      fs.mkdirSync(path.dirname(lastConfigPath), { recursive: true });
+      fs.writeFileSync(lastConfigPath, JSON.stringify(toSave, null, 2), 'utf-8');
+    } catch (_) { /* non-fatal */ }
+  }
+
+  loadLastConfig(projectPath) {
+    try {
+      const lastConfigPath = path.join(projectPath, '.healix', 'last-config.json');
+      if (fs.existsSync(lastConfigPath)) {
+        return JSON.parse(fs.readFileSync(lastConfigPath, 'utf-8'));
+      }
+    } catch (_) { /* non-fatal */ }
+    return {};
+  }
+
   normalizeCredentials(credentials) {
     if (!credentials) return undefined;
     
@@ -791,6 +818,8 @@ class HealixMCPServer {
     try {
       const uiSubmission = await waitForConfig;
       const validatedConfig = this.validateUISubmission(uiSubmission);
+
+      this.saveLastConfig(baseConfig.projectPath, validatedConfig);
 
       this.writeRunStatus(statusFile, {
         runId,
@@ -1982,27 +2011,31 @@ Return the JSON structure above based on what you find in the codebase.
         // Always open the browser for the config form — headless controls
         // Playwright test execution, not the config UI itself.
         const configUILauncher = this.createConfigUILauncher({ headless, autoOpenBrowser: true });
+
+        const lastConfig = this.loadLastConfig(baseConfig.projectPath);
+
         const launchResult = await configUILauncher.launchNonBlocking({
           projectPath: baseConfig.projectPath,
           projectName: baseConfig.projectName,
           framework: this.detectFramework(context),
-          baseURL: baseConfig.baseURL,
+          baseURL: lastConfig.baseURL || baseConfig.baseURL,
           port: String(baseConfig.port),
-          startCommand: baseConfig.startCommand,
+          startCommand: lastConfig.startCommand || baseConfig.startCommand,
           // Multi-service repos (frontend+backend monorepos) surface every
           // detected service so the form can render one card per service.
           // Single-service repos pass undefined and the form keeps its
           // existing one-card layout.
-          services: Array.isArray(baseConfig.services) && baseConfig.services.length > 1
+          services: lastConfig.services || (Array.isArray(baseConfig.services) && baseConfig.services.length > 1
             ? baseConfig.services
-            : undefined,
+            : undefined),
           // Frontend-only repos: the external backend the app expects to talk to.
           // The form renders a "start your backend first" prerequisite banner.
           backendDependency: baseConfig.backendDependency || undefined,
           composeStack: baseConfig.composeStack || undefined,
-          testType: baseConfig.testType,
-          generateTests: baseConfig.generateTests,
-          openDashboard: baseConfig.openDashboard,
+          testType: lastConfig.testType || baseConfig.testType,
+          scope: lastConfig.scope,
+          generateTests: lastConfig.generateTests ?? baseConfig.generateTests,
+          openDashboard: lastConfig.openDashboard ?? baseConfig.openDashboard,
           strictAIGeneration: baseConfig.strictAIGeneration !== false,
           minGeneratedTests: Number(baseConfig.minGeneratedTests || 50),
           coverageProfile: baseConfig.coverageProfile || 'qa-max',

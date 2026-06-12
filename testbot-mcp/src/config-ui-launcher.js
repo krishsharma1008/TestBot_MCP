@@ -161,6 +161,7 @@ class ConfigUILauncher {
       port: String(projectInfo.port || '3000'),
       startCommand: projectInfo.startCommand || 'npm run dev',
       testType: projectInfo.testType || 'both',
+      scope: projectInfo.scope || 'codebase',
       generateTests: String(projectInfo.generateTests !== false),
       openDashboard: String(projectInfo.openDashboard !== false),
       strictAIGeneration: String(projectInfo.strictAIGeneration !== false),
