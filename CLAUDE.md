@@ -17,10 +17,12 @@ npm run db:migrate          # Apply pending migrations to the database
 # MCP server
 npm run start:testbot       # Start the MCP server (stdin/stdout transport)
 
-# Tests (MCP only — webapp has no tests yet)
+# Tests
 npm run test:testbot        # Run all 27 MCP unit tests (node --test)
-# Run a single test file:
+# Run a single MCP test file:
 cd testbot-mcp && node --test test/classifier.test.js
+# Webapp unit tests (Vitest — auth, storage, Cognito JWT modules)
+cd webapp && npx vitest run
 ```
 
 ## Environment Setup
@@ -29,12 +31,20 @@ Copy `.env.example` to `webapp/.env.local`. Required vars:
 
 | Var | Where | Purpose |
 |-----|-------|---------|
-| `DATABASE_URL` | webapp | PostgreSQL connection string |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | webapp | Auth + artifact storage |
+| `DATABASE_URL` | webapp | PostgreSQL connection string (Supabase PostgreSQL) |
+| `AWS_REGION` | webapp | AWS region for Cognito + S3 (e.g. `us-east-1`) |
+| `COGNITO_USER_POOL_ID` | webapp | Cognito User Pool ID — user auth |
+| `COGNITO_CLIENT_ID` | webapp | Cognito app client ID |
+| `COGNITO_CLIENT_SECRET` | webapp | Cognito app client secret (confidential client) |
+| `AWS_S3_BUCKET_NAME` | webapp | S3 bucket name for test artifact storage |
+| `AWS_ACCESS_KEY_ID` | webapp | IAM access key (Cognito + S3 permissions) |
+| `AWS_SECRET_ACCESS_KEY` | webapp | IAM secret key |
 | `OPENAI_API_KEY` | webapp | GPT calls — server-side only, never in MCP |
 | `HEALIX_API_KEY` | MCP (.env.local) | Authenticates MCP → webapp API calls |
 | `HEALIX_API_URL` | MCP | Points to webapp base URL |
 | `HEALIX_GEN_ASYNC` | MCP | Set `true` to use Inngest async generation |
+
+See `AWS_MANUAL_SETUP.md` for step-by-step AWS infrastructure setup (Cognito, SES, S3, IAM).
 
 OpenAI is only called from the webapp server. The MCP has no AI credentials — all AI proxies through `webapp-client.js` → `HEALIX_API_URL`.
 

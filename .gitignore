@@ -46,3 +46,4 @@ targets/
 logs/
 __pycache__/
 */coverage/
+.python-version

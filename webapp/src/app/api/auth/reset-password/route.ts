@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { ForgotPasswordCommand } from '@aws-sdk/client-cognito-identity-provider'
+import { getCognitoClient, getCognitoConfig } from '@/lib/cognito/client'
+import { computeSecretHash } from '@/lib/cognito/secret-hash'
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,18 +12,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
 
-    const supabase = await createSupabaseServerClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase(), {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/update-password`,
-    })
+    const { clientId, clientSecret } = getCognitoConfig()
+    const username = email.toLowerCase()
+    const secretHash = await computeSecretHash(username, clientId, clientSecret)
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
+    await getCognitoClient().send(
+      new ForgotPasswordCommand({
+        ClientId: clientId,
+        Username: username,
+        SecretHash: secretHash,
+      })
+    )
 
+    // Always return success to avoid user enumeration
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Reset password error:', error)
+  } catch (err: unknown) {
+    const name = (err as { name?: string })?.name
+    // Return success even for non-existent users to prevent user enumeration
+    if (name === 'UserNotFoundException' || name === 'NotAuthorizedException') {
+      return NextResponse.json({ success: true })
+    }
+    console.error('Reset password error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,14 +1,23 @@
-import { NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { GlobalSignOutCommand } from '@aws-sdk/client-cognito-identity-provider'
+import { getCognitoClient } from '@/lib/cognito/client'
 
-export async function POST() {
-  const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+const CLEAR_COOKIE = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: 0 }
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export async function POST(request: NextRequest) {
+  const accessToken = request.cookies.get('access_token')?.value
+
+  if (accessToken) {
+    try {
+      await getCognitoClient().send(new GlobalSignOutCommand({ AccessToken: accessToken }))
+    } catch {
+      // Best-effort — clear cookies regardless
+    }
   }
 
-  await supabase.auth.signOut()
-  return NextResponse.json({ success: true })
+  const response = NextResponse.json({ success: true })
+  response.cookies.set('access_token', '', CLEAR_COOKIE)
+  response.cookies.set('refresh_token', '', CLEAR_COOKIE)
+  response.cookies.set('cognito_username', '', CLEAR_COOKIE)
+  return response
 }

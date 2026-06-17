@@ -6,39 +6,78 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 
+type Step = 'email' | 'reset' | 'success'
+
 export default function ForgotPasswordPage() {
+  const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
 
-  const handleReset = async (e: React.FormEvent) => {
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
-
     try {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       })
-
       const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.error || 'Failed to send reset email')
-        setLoading(false)
-        return
-      }
-
-      setSuccess(true)
+      if (!res.ok) { setError(data.error || 'Failed to send reset code'); return }
+      setStep('reset')
     } catch {
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
     }
   }
+
+  const handleConfirmReset = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (newPassword.length < 8) { setError('Password must be at least 8 characters.'); return }
+    if (newPassword !== confirmPassword) { setError('Passwords do not match.'); return }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/confirm-reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code, new_password: newPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Failed to reset password'); return }
+      setStep('success')
+    } catch {
+      setError('An unexpected error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const Logo = ({ subtitle }: { subtitle: string }) => (
+    <div className="flex flex-col items-center mb-8">
+      <div className="mb-4">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="48" height="48" rx="14" fill="url(#logo-grad-fp)" />
+          <path d="M14 20h20M14 28h14M24 14v20" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="34" cy="28" r="4" fill="white" fillOpacity="0.9" />
+          <defs>
+            <linearGradient id="logo-grad-fp" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#3B82F6" />
+              <stop offset="1" stopColor="#1D4ED8" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <h1 className="text-2xl font-bold text-text-primary">Reset your password</h1>
+      <p className="text-text-muted text-sm mt-1 text-center">{subtitle}</p>
+    </div>
+  )
 
   return (
     <motion.div
@@ -48,50 +87,30 @@ export default function ForgotPasswordPage() {
       className="w-full max-w-md"
     >
       <div className="glass-modal p-8">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="mb-4">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="48" height="48" rx="14" fill="url(#logo-grad-fp)" />
-              <path d="M14 20h20M14 28h14M24 14v20" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-              <circle cx="34" cy="28" r="4" fill="white" fillOpacity="0.9" />
-              <defs>
-                <linearGradient id="logo-grad-fp" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#3B82F6" />
-                  <stop offset="1" stopColor="#1D4ED8" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-text-primary">Reset your password</h1>
-          <p className="text-text-muted text-sm mt-1">We&apos;ll send you a link to reset it</p>
-        </div>
-
         <AnimatePresence mode="wait">
-          {success ? (
+          {step === 'success' ? (
             <motion.div
               key="success"
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center gap-4 py-4 text-center"
             >
-              <div className="w-14 h-14 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-400">
-                  <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
+              <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400">
+                  <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-text-primary">Check your inbox</h3>
-                <p className="text-text-muted text-sm mt-1">
-                  We sent a reset link to <span className="text-blue-400">{email}</span>.
-                </p>
+                <h3 className="text-lg font-semibold text-text-primary">Password updated!</h3>
+                <p className="text-text-muted text-sm mt-1">Your password has been reset successfully.</p>
               </div>
               <Link href="/login" className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors">
-                Back to sign in
+                Sign in with new password
               </Link>
             </motion.div>
-          ) : (
-            <motion.div key="form">
+          ) : step === 'reset' ? (
+            <motion.div key="reset" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}>
+              <Logo subtitle={`Enter the code we sent to ${email} and your new password`} />
               {error && (
                 <motion.div
                   initial={{ opacity: 0, y: -8 }}
@@ -101,8 +120,63 @@ export default function ForgotPasswordPage() {
                   {error}
                 </motion.div>
               )}
-
-              <form onSubmit={handleReset} className="flex flex-col gap-4">
+              <form onSubmit={handleConfirmReset} className="flex flex-col gap-4">
+                <Input
+                  label="Reset code"
+                  type="text"
+                  placeholder="123456"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                />
+                <Input
+                  label="New password"
+                  type="password"
+                  placeholder="Min. 8 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+                <Input
+                  label="Confirm new password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+                <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full mt-1">
+                  Set New Password
+                </Button>
+              </form>
+              <p className="text-center text-sm text-text-muted mt-6">
+                Didn&apos;t receive a code?{' '}
+                <button
+                  type="button"
+                  onClick={() => { setStep('email'); setCode(''); setError(null) }}
+                  className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                >
+                  Resend
+                </button>
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div key="email" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <Logo subtitle="We&apos;ll send a reset code to your email" />
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-400 text-sm"
+                >
+                  {error}
+                </motion.div>
+              )}
+              <form onSubmit={handleSendCode} className="flex flex-col gap-4">
                 <Input
                   label="Email"
                   type="email"
@@ -112,12 +186,10 @@ export default function ForgotPasswordPage() {
                   required
                   autoComplete="email"
                 />
-
                 <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full mt-1">
-                  Send Reset Link
+                  Send Reset Code
                 </Button>
               </form>
-
               <div className="flex justify-center mt-6">
                 <Link
                   href="/login"

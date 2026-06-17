@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { testArtifacts, testRuns } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
+import { getArtifactSignedUrl } from '@/lib/storage/s3-storage'
 
 /**
  * Fetch artifact from Supabase Storage.
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
       id: testArtifacts.id,
       testName: testArtifacts.testName,
       storageUrl: testArtifacts.storageUrl,
+      storagePath: testArtifacts.storagePath,
       fileName: testArtifacts.fileName,
       contentType: testArtifacts.contentType,
     })
@@ -87,10 +89,10 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  if (!artifact.storageUrl) {
+  if (!artifact.storagePath) {
     return NextResponse.json(
       {
-        error: 'Artifact not uploaded to Supabase Storage',
+        error: 'Artifact not uploaded to storage',
         fileName,
         hint: 'This run was recorded before artifact upload was configured, or the MCP failed to upload.',
       },
@@ -98,5 +100,6 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  return NextResponse.redirect(artifact.storageUrl, 307)
+  const signedUrl = await getArtifactSignedUrl(artifact.storagePath)
+  return NextResponse.redirect(signedUrl, 307)
 }

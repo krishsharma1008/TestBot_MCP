@@ -1,13 +1,16 @@
-import { createSupabaseServerClient } from '../supabase/server'
+import { cookies } from 'next/headers'
+import { verifyCognitoToken } from '../cognito/jwt'
 import { db } from '../db'
 import { profiles } from '../db/schema'
 import { eq } from 'drizzle-orm'
 
 export async function getCurrentUser() {
-  const supabase = await createSupabaseServerClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return null
-  return user
+  const cookieStore = await cookies()
+  const token = cookieStore.get('access_token')?.value
+  if (!token) return null
+  const claims = await verifyCognitoToken(token)
+  if (!claims) return null
+  return { id: claims.sub, email: claims.email }
 }
 
 export async function getCurrentProfile() {
