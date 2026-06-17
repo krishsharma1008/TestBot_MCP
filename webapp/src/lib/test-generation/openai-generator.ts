@@ -11,7 +11,7 @@
 
 import { z } from 'zod'
 import { OpenAIClient } from './openai-client'
-import { resolveApiAgentModel, resolveConfiguredOpenAIModel } from '@/lib/model-defaults'
+import { resolveConfiguredOpenAIModel } from '@/lib/model-defaults'
 import {
   validateGrounding,
   renderGroundingErrors,
@@ -526,7 +526,7 @@ export class OpenAITestGenerator {
       context,
       prd,
       projectInfo,
-      model: resolveApiAgentModel(),
+      model: resolveConfiguredOpenAIModel(),
     })
 
     if (apiSpecs?.length && tests.length > 0 && this.generationMeta) {
@@ -1674,7 +1674,7 @@ Return only the JSON array of generated files.`
       : ''
 
     const hardenedSystemPrompt = this.sanitizePromptText(
-      `${systemPrompt}${sparseContextWarning}\n\n${this.buildGenerationContract(prefix)}`
+      `${systemPrompt}${sparseContextWarning}\n\n${this.buildGenerationContract(prefix,generationContext.context)}`
     )
     const hardenedUserPrompt = this.sanitizePromptText(userPrompt)
     const adaptiveMaxTokens = this.computeAdaptiveMaxTokens(hardenedSystemPrompt, hardenedUserPrompt)

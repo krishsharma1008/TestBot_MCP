@@ -1,8 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import {
   DEFAULT_OPENAI_MODEL,
-  DEFAULT_API_AGENT_MODEL,
-  resolveApiAgentModel,
   resolveConfiguredOpenAIModel,
   resolveProviderOpenAIModel,
 } from './model-defaults'
@@ -11,55 +9,6 @@ describe('DEFAULT_OPENAI_MODEL', () => {
   it('is a non-empty string', () => {
     expect(typeof DEFAULT_OPENAI_MODEL).toBe('string')
     expect(DEFAULT_OPENAI_MODEL.length).toBeGreaterThan(0)
-  })
-})
-
-describe('DEFAULT_API_AGENT_MODEL', () => {
-  it('is a non-empty string', () => {
-    expect(typeof DEFAULT_API_AGENT_MODEL).toBe('string')
-    expect(DEFAULT_API_AGENT_MODEL.length).toBeGreaterThan(0)
-  })
-
-  it('is different from DEFAULT_OPENAI_MODEL (stronger model for API agent)', () => {
-    expect(DEFAULT_API_AGENT_MODEL).not.toBe(DEFAULT_OPENAI_MODEL)
-  })
-})
-
-describe('resolveApiAgentModel', () => {
-  const savedEnv = process.env.OPENAI_API_AGENT_MODEL
-
-  afterEach(() => {
-    if (savedEnv === undefined) delete process.env.OPENAI_API_AGENT_MODEL
-    else process.env.OPENAI_API_AGENT_MODEL = savedEnv
-  })
-
-  it('returns explicit override when provided', () => {
-    expect(resolveApiAgentModel('gpt-5.5')).toBe('gpt-5.5')
-  })
-
-  it('trims whitespace from explicit override', () => {
-    expect(resolveApiAgentModel('  gpt-5.5  ')).toBe('gpt-5.5')
-  })
-
-  it('falls back to OPENAI_API_AGENT_MODEL env var when no override', () => {
-    process.env.OPENAI_API_AGENT_MODEL = 'gpt-5.5'
-    expect(resolveApiAgentModel()).toBe('gpt-5.5')
-  })
-
-  it('falls back to DEFAULT_API_AGENT_MODEL when no override and env is unset', () => {
-    delete process.env.OPENAI_API_AGENT_MODEL
-    expect(resolveApiAgentModel(null)).toBe(DEFAULT_API_AGENT_MODEL)
-  })
-
-  it('prefers explicit override over env var', () => {
-    process.env.OPENAI_API_AGENT_MODEL = 'gpt-5.4-mini'
-    expect(resolveApiAgentModel('gpt-5.5')).toBe('gpt-5.5')
-  })
-
-  it('ignores OPENAI_MODEL — API agent has its own default', () => {
-    delete process.env.OPENAI_API_AGENT_MODEL
-    process.env.OPENAI_MODEL = 'gpt-5.4-mini'
-    expect(resolveApiAgentModel()).toBe(DEFAULT_API_AGENT_MODEL)
   })
 })
 
